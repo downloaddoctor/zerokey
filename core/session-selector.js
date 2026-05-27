@@ -1,0 +1,315 @@
+const fs = require('fs')
+const path = require('path')
+const inquirer = require('inquirer')
+
+/**
+ * Session selector: Provider → User → Session
+ *
+ * Flow:
+ *   1. Select Provider (deepseek / chatgpt)
+ *   2. Select User (provides headers)
+ *   3. Select Session
+ *
+ * users.json structure:
+ *   { "deepseek": { "Learner": { username, parsedFetch, sessions: [...] }, ... },
+ *     "chatgpt":  { "new":      { username, parsedFetch, sessions: [...] }, ... } }
+ *
+ * Returns: { user, provider, parsedFetch, session, sessionName, saveSession }
+ */
+class SessionSelector {
+  constructor() {
+    this._dataDir = path.join(__dirname, '..', 'temp')
+    this._usersFile = path.join(this._dataDir, 'users.json')
+    this.TIMEOUT_MS = 0
+  }
+
+  async select() {
+    // Step 1: Provider selection
+    this.provider = await this._stepProviderSelection()
+    if (!this.provider) return null
+
+    // Step 2: User login (scoped to this provider)
+    this.user = await this._stepUserLogin()
+    if (!this.user) return null
+
+    // Initialize sessions array if needed
+    if (!this.user.sessions) this.user.sessions = []
+
+    // Step 3: Session selection
+    this.session = await this._stepSessionSelection()
+    if (!this.session) return null
+
+    // Save back
+    this._saveUser(this.provider, this.user.username, this.user)
+
+    return {
+      user: this.user.username,
+      provider: this.provider,
+      parsedFetch: this.user.parsedFetch || null,
+      session: this.session,
+      sessionName: this.session.name,
+      saveSession: () => this._saveUser(this.provider, this.user.username, this.user),
+    }
+  }
+
+  async _stepProviderSelection() {
+    const choices = [
+      { name: '  DeepSeek', value: 'deepseek' },
+      { name: '  ChatGPT', value: 'chatgpt' },
+      { name: '  Claude', value: 'claude' },
+    ]
+
+    const { provider } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'provider',
+        message: 'Select AI Provider:',
+        choices,
+        pageSize: 10,
+      },
+    ])
+    return provider
+  }
+
+  async _stepUserLogin() {
+    const allProviders = this._loadAll()
+    const providerUsers = allProviders[this.provider] || {}
+    const savedUsers = Object.keys(providerUsers)
+
+    if (savedUsers.length > 0) {
+      const choices = [
+        ...savedUsers.map((username) => ({ name: `  ${username}`, value: username })),
+        { name: '＋ Create new user...', value: '__new__' },
+      ]
+
+      const { username } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'username',
+          message: `Select User (${this.provider}):`,
+          choices,
+          pageSize: 10,
+        },
+      ])
+
+      if (username === '__new__') return this._promptNewUser()
+      return providerUsers[username]
+    }
+
+    return this._promptNewUser()
+  }
+
+  async _promptNewUser() {
+    console.log('\n=== Create New User ===\n')
+    const { username } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'username',
+        message: 'Enter Username:',
+        validate: (v) => v.trim().length > 0 || 'Username is required',
+      },
+    ])
+
+    if (!username) return null
+
+    console.log(
+      '\nPaste the full fetch() call from browser DevTools:\n' +
+        '  DevTools → Network → Find a "conversation" request → Right-click → Copy → Copy as fetch\n' +
+        '  (This captures ALL headers + body with real browser fingerprint)\n',
+    )
+    const fetchStr = await this._stepFetchInput()
+    if (!fetchStr) return null
+
+    // Parse immediately — one method for both providers
+    const parsedFetch = this._parseFetchDirect(fetchStr)
+
+    const user = { username, parsedFetch, sessions: [] }
+    this._saveUser(this.provider, username, user)
+    return user
+  }
+
+  async _stepSessionSelection() {
+    const sessions = this.user.sessions || []
+
+    const choices = sessions.map((s, i) => ({
+      name: `${s.name}  │  last: ${this._formatTime(s.lastUsed)}`,
+      value: i,
+    }))
+
+    choices.push({ name: '＋ Create new session...', value: -1 })
+    if (sessions.length > 0) {
+      choices.push({ name: '🗑 Delete all sessions...', value: -2 })
+    }
+
+    const result = await this._prompt(choices)
+
+    if (result === null) return null
+    if (result === -1) return this._createNewSession()
+    if (result === -2) return this._deleteAllSessions()
+
+    return this.user.sessions[result]
+  }
+
+  async _createNewSession() {
+    const name = await this._promptSessionName()
+    if (!name) return null
+
+    const newSession = {
+      name,
+      chatSessionId: null,
+      parentMessageId: null,
+      createdAt: new Date().toISOString(),
+      lastUsed: new Date().toISOString(),
+    }
+
+    this.user.sessions.push(newSession)
+    return newSession
+  }
+
+  async _deleteAllSessions() {
+    const count = this.user.sessions.length
+    const confirmed = await this._confirmDeleteAll(count)
+    if (!confirmed) return this._stepSessionSelection()
+
+    this.user.sessions = []
+    return this._createNewSession()
+  }
+
+  _parseFetchDirect(fetchStr) {
+    const urlMatch = fetchStr.match(/fetch\("([^"]+)"\s*,/)
+    if (!urlMatch) throw new Error('Could not parse fetch URL')
+
+    const afterUrl = fetchStr.slice(urlMatch[0].length)
+    const optStart = afterUrl.indexOf('{')
+    if (optStart === -1) throw new Error('Could not parse options')
+
+    let depth = 0,
+      inStr = false,
+      sc = '',
+      js = -1,
+      je = -1
+    for (let i = optStart; i < afterUrl.length; i++) {
+      const c = afterUrl[i]
+      if (inStr) {
+        if (c === '\\') {
+          i++
+          continue
+        }
+        if (c === sc) inStr = false
+        continue
+      }
+      if (c === '"' || c === "'") {
+        inStr = true
+        sc = c
+        continue
+      }
+      if (c === '{') {
+        if (depth === 0) js = i
+        depth++
+      } else if (c === '}') {
+        depth--
+        if (depth === 0) {
+          je = i + 1
+          break
+        }
+      }
+    }
+    if (js === -1 || je === -1) throw new Error('Could not parse options JSON')
+
+    const opts = JSON.parse(afterUrl.slice(js, je))
+    const headers = opts.headers || {}
+    let body = {}
+    if (opts.body && typeof opts.body === 'string') {
+      try {
+        body = JSON.parse(opts.body)
+      } catch {
+        body = {}
+      }
+    }
+    return { headers, body, url: urlMatch[1] }
+  }
+
+  async _stepFetchInput() {
+    const { raw } = await inquirer.prompt([
+      {
+        type: 'editor',
+        name: 'raw',
+        message: 'Paste fetch() call:',
+        default: 'fetch("https://chatgpt.com/...", { ... })',
+        validate: (v) => v.includes('fetch(') || 'Must be a valid fetch() call',
+      },
+    ])
+    return raw?.trim() || null
+  }
+
+  _loadAll() {
+    try {
+      if (fs.existsSync(this._usersFile)) {
+        return JSON.parse(fs.readFileSync(this._usersFile, 'utf8'))
+      }
+    } catch (e) {
+      console.error('Load users error:', e.message)
+    }
+    return {}
+  }
+
+  _saveUser(provider, username, userData) {
+    try {
+      const all = this._loadAll()
+      if (!all[provider]) all[provider] = {}
+      all[provider][username] = userData
+      const tmp = this._usersFile + '.tmp'
+      fs.writeFileSync(tmp, JSON.stringify(all, null, 2), 'utf8')
+      fs.renameSync(tmp, this._usersFile)
+    } catch (e) {
+      console.error('Save user error:', e.message)
+    }
+  }
+
+  _formatTime(isoString) {
+    if (!isoString) return 'never'
+    try {
+      const d = new Date(isoString)
+      const mins = Math.floor((Date.now() - d) / 60000)
+      if (mins < 1) return 'just now'
+      if (mins < 60) return `${mins}m ago`
+      if (mins < 1440) return `${Math.floor(mins / 60)}h ago`
+      return `${Math.floor(mins / 1440)}d ago`
+    } catch {
+      return 'unknown'
+    }
+  }
+
+  async _prompt(choices) {
+    try {
+      const { session } = await inquirer.prompt([
+        { type: 'list', name: 'session', message: 'Choose:', choices, pageSize: 10 },
+      ])
+      return session
+    } catch {
+      return null
+    }
+  }
+
+  async _promptSessionName() {
+    const defaultName = new Date().toISOString().slice(0, 19).replace('T', ' ')
+    const { name } = await inquirer.prompt([
+      { type: 'input', name: 'name', message: 'Session name:', default: defaultName },
+    ])
+    return name?.trim() || null
+  }
+
+  async _confirmDeleteAll(count) {
+    const { confirm } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'confirm',
+        message: `Delete all ${count} sessions?`,
+        default: false,
+      },
+    ])
+    return confirm
+  }
+}
+
+module.exports = { SessionSelector }

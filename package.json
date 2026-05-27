@@ -1,0 +1,16 @@
+{
+  "name": "xproxy",
+  "version": "1.0.0",
+  "description": "OpenAI-compatible API proxy for DeepSeek & ChatGPT",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "inquirer": "^8.2.7"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.3"
+  }
+}

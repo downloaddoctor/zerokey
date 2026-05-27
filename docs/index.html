@@ -1,0 +1,755 @@
+<html lang="en">
+
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>XProxy — Real browser sessions for DeepSeek, ChatGPT & Claude. No API keys.</title>
+    <meta name="description" content="A self-hosted, OpenAI-compatible proxy that uses real browser fingerprints and sessions — no API keys needed. Use DeepSeek, ChatGPT, or Claude inside VS Code Copilot Chat or Terax.">
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="canonical" href="https://downloaddoctor.github.io/xproxy/">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="XProxy">
+    <meta property="og:title" content="XProxy — Real browser sessions. No API keys.">
+    <meta property="og:description" content="OpenAI-compatible proxy for DeepSeek, ChatGPT & Claude. Paste a fetch, start chatting. Works in VS Code Copilot Chat and Terax.">
+    <meta property="og:url" content="https://downloaddoctor.github.io/xproxy/">
+    <meta property="og:image" content="https://downloaddoctor.github.io/xproxy/og.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="XProxy — paste a fetch, no API keys, real browser sessions for DeepSeek, ChatGPT & Claude.">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="XProxy — Real browser sessions. No API keys.">
+    <meta name="twitter:description" content="OpenAI-compatible proxy for DeepSeek, ChatGPT & Claude. Paste a fetch, start chatting. Works in VS Code Copilot Chat and Terax.">
+    <meta name="twitter:image" content="https://downloaddoctor.github.io/xproxy/og.png">
+    <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230a0a0a'/%3E%3Cpath d='M7 16 L13 22 L25 10' stroke='%23ffffff' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    <style>
+      :root,
+      [data-theme="clean"] {
+        --bg: #fafafa;
+        --fg: #0a0a0a;
+        --muted: #6b6b6b;
+        --border: #e5e5e5;
+        --card: #ffffff;
+        --accent: #0a0a0a;
+        --accent-soft: #f0f0f0;
+        --green: #16a34a;
+        --green-soft: #f0fdf4;
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.05);
+        --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.08), 0 24px 56px rgba(0, 0, 0, 0.10);
+        --radius-sm: 12px;
+        --radius: 20px;
+        --radius-lg: 28px;
+      }
+
+      [data-theme="deepseek"] {
+        --bg: #ffffff;
+        --fg: #1a1a2e;
+        --muted: #6b7280;
+        --border: #e0e7ff;
+        --card: #ffffff;
+        --accent: #4D6BFE;
+        --accent-soft: #eef1ff;
+        --green: #4D6BFE;
+        --green-soft: #eef1ff;
+        --shadow: 0 1px 2px rgba(77, 107, 254, 0.06), 0 8px 24px rgba(77, 107, 254, 0.08);
+        --shadow-lg: 0 4px 12px rgba(77, 107, 254, 0.10), 0 24px 56px rgba(77, 107, 254, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        user-select: none;
+      }
+
+      .terminal-body {
+        user-select: text;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .mono {
+        font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, 'Cascadia Code', monospace;
+      }
+
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+
+      nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 0;
+        gap: 16px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 17px;
+        color: var(--fg);
+        text-decoration: none;
+      }
+
+      .brand-mark {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        background: var(--fg);
+        display: grid;
+        place-items: center;
+        box-shadow: var(--shadow);
+      }
+
+      .brand-mark svg {
+        width: 18px;
+        height: 18px;
+        display: block;
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 8px;
+      }
+
+      .nav-links a {
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 14px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        transition: all 0.15s;
+      }
+
+      .nav-links a:hover {
+        background: var(--accent-soft);
+        color: var(--fg);
+      }
+
+      .hero {
+        padding: 80px 0 48px;
+        text-align: center;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: var(--card);
+        color: var(--fg);
+        font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.05em;
+        border: 1px solid var(--border);
+      }
+
+      .badge-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.15);
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        50% {
+          box-shadow: 0 0 0 8px transparent;
+        }
+      }
+
+      h1 {
+        font-size: clamp(36px, 6vw, 64px);
+        line-height: 1.05;
+        letter-spacing: -0.03em;
+        margin: 24px 0 20px;
+        font-weight: 800;
+      }
+
+      h1 .gradient {
+        color: var(--muted);
+      }
+
+      .subtitle {
+        font-size: clamp(17px, 2vw, 20px);
+        color: var(--muted);
+        max-width: 640px;
+        margin: 0 auto 40px;
+      }
+
+      .cta-row {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: center;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 24px;
+        border-radius: 999px;
+        font-size: 15px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s;
+        border: 1px solid transparent;
+      }
+
+      .btn-primary {
+        background: var(--fg);
+        color: var(--bg);
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-lg);
+      }
+
+      .btn-secondary {
+        background: var(--card);
+        color: var(--fg);
+        border-color: var(--border);
+      }
+
+      .btn-secondary:hover {
+        background: var(--accent-soft);
+        border-color: var(--fg);
+      }
+
+      /* Fetch stat block */
+      .fetch-stat {
+        margin: 64px auto;
+        max-width: 760px;
+        background: var(--fg);
+        color: var(--bg);
+        border-radius: var(--radius-lg);
+        padding: 64px 32px;
+        text-align: center;
+        box-shadow: var(--shadow-lg);
+      }
+
+      .fetch-label {
+        font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.25em;
+        opacity: 0.6;
+      }
+
+      .fetch-big {
+        font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
+        font-size: clamp(40px, 8vw, 80px);
+        font-weight: 700;
+        line-height: 1;
+        margin: 22px 0 14px;
+        letter-spacing: -0.03em;
+        display: block;
+      }
+
+      .fetch-unit {
+        display: block;
+        font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
+        font-size: clamp(13px, 1.4vw, 15px);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.4em;
+        opacity: 0.6;
+        margin-top: 4px;
+      }
+
+      .fetch-sub {
+        margin-top: 28px;
+        opacity: 0.7;
+        font-size: 14px;
+        max-width: 520px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      /* Sections */
+      section {
+        padding: 56px 0;
+      }
+
+      .section-header {
+        text-align: center;
+        margin-bottom: 40px;
+      }
+
+      .section-eyebrow {
+        font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.25em;
+      }
+
+      h2 {
+        font-size: clamp(28px, 4vw, 40px);
+        margin: 8px 0 12px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .section-sub {
+        color: var(--muted);
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      /* Provider cards */
+      .provider-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      }
+
+      .provider-card {
+        background: var(--card);
+        border-radius: var(--radius);
+        padding: 28px;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        transition: all 0.2s ease;
+      }
+
+      .provider-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+        border-color: var(--fg);
+      }
+
+      .provider-name {
+        font-weight: 700;
+        font-size: 18px;
+        margin: 0 0 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .provider-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        flex: none;
+        background: var(--accent-soft);
+        border: 1px solid var(--border);
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+        overflow: hidden;
+      }
+
+      .provider-icon img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      .provider-tagline {
+        color: var(--muted);
+        font-size: 13px;
+        margin: 0 0 14px;
+      }
+
+      .provider-detail {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .provider-detail b {
+        color: var(--fg);
+        font-weight: 600;
+      }
+
+      /* How it works */
+      .steps {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+
+      .step {
+        background: var(--card);
+        border-radius: var(--radius);
+        padding: 28px;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+      }
+
+      .step-num {
+        display: inline-grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        background: var(--fg);
+        color: var(--bg);
+        font-weight: 800;
+        margin-bottom: 14px;
+      }
+
+      .step h3 {
+        margin: 0 0 6px;
+        font-size: 17px;
+        font-weight: 700;
+      }
+
+      .step p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      /* IDE cards */
+      .ide-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      }
+
+      .ide-card {
+        background: var(--card);
+        border-radius: var(--radius);
+        padding: 28px;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+      }
+
+      .ide-card h3 {
+        margin: 0 0 10px;
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .ide-card p {
+        margin: 0 0 16px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .ide-card ol {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.8;
+      }
+
+      .ide-card ol li {
+        margin-bottom: 2px;
+      }
+
+      /* Terminal */
+      .terminal {
+        max-width: 760px;
+        margin: 0 auto;
+        background: var(--fg);
+        color: #d4d4d4;
+        border-radius: var(--radius);
+        overflow: hidden;
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--fg);
+      }
+
+      .terminal-chrome {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 18px;
+        background: rgba(255, 255, 255, 0.04);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .terminal-chrome .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      .terminal-chrome .filename {
+        margin-left: 12px;
+        color: rgba(255, 255, 255, 0.55);
+        font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+        font-size: 12px;
+        letter-spacing: 0.05em;
+      }
+
+      .terminal-body {
+        padding: 24px 28px;
+        font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
+        font-size: 13.5px;
+        line-height: 1.85;
+        overflow-x: auto;
+        margin: 0;
+      }
+
+      .terminal-body .prompt {
+        color: #8fa9ff;
+        user-select: none;
+        margin-right: 10px;
+      }
+
+      .terminal-body .c {
+        color: rgba(255, 255, 255, 0.4);
+        font-style: italic;
+      }
+
+      .terminal-body .k {
+        color: #ffffff;
+        font-weight: 600;
+      }
+
+      .terminal-body .s {
+        color: #c0c0c0;
+      }
+
+      .terminal-body .blank {
+        display: block;
+        height: 0.4em;
+      }
+
+      /* Feature chips */
+      .chip-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+        margin-top: 24px;
+      }
+
+      .chip {
+        padding: 8px 16px;
+        border-radius: 999px;
+        background: var(--card);
+        color: var(--fg);
+        font-size: 13px;
+        font-weight: 500;
+        border: 1px solid var(--border);
+      }
+
+      .chip.check::before {
+        content: "✓ ";
+        color: var(--green);
+        font-weight: 700;
+      }
+
+      footer {
+        margin-top: 64px;
+        padding: 40px 0;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+      }
+
+      footer a {
+        color: var(--fg);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      footer a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <nav>
+        <a class="brand" href="#">
+          <span class="brand-mark">
+            <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M7 16 L13 22 L25 10" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <span>XProxy</span>
+        </a>
+        <div class="nav-links">
+          <a href="#providers">Providers</a>
+          <a href="#ides">IDE Setup</a>
+          <a href="#start">Quick start</a>
+          <a href="https://github.com/downloaddoctor/xproxy" target="_blank" rel="noopener">GitHub</a>
+          <button id="theme-toggle" style="margin-left:8px;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--fg);font-size:12px;cursor:pointer;font-family:inherit;" title="Toggle theme">🌓</button>
+        </div>
+      </nav>
+
+      <header class="hero">
+        <span class="badge"><span class="badge-dot"></span> 3 providers · real browser sessions · self-hosted</span>
+        <h1>No API keys.<br><span class="gradient">Real browser</span> sessions.<br>Just paste a fetch.</h1>
+        <p class="subtitle">A self-hosted, OpenAI-compatible proxy that turns browser sessions into your coding agent. Paste a fetch from DeepSeek, ChatGPT, or Claude — get POW solving, sentinel tokens, and Cloudflare headers so your IDE talks like a real user, not an API key.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://github.com/downloaddoctor/xproxy" target="_blank" rel="noopener">View on GitHub →</a>
+          <a class="btn btn-secondary" href="#start">Quick start</a>
+        </div>
+      </header>
+
+      <div class="fetch-stat">
+        <div class="fetch-label">One-time setup. Zero API costs.</div>
+        <div class="fetch-big">paste fetch</div>
+        <div class="fetch-unit">→ your coding agent</div>
+        <div class="fetch-sub">Copy a single fetch() from your browser's DevTools. XProxy extracts your session, cookies, and fingerprint — then replays it as your coding agent inside VS Code or Terax. Rate limits apply per provider.</div>
+      </div>
+
+      <section id="providers">
+        <div class="section-header">
+          <div class="section-eyebrow">Supported providers</div>
+          <h2>Three platforms. One proxy.</h2>
+          <p class="section-sub">Pick your provider at startup. Switch anytime by restarting.</p>
+        </div>
+        <div class="provider-grid">
+          <div class="provider-card">
+            <div class="provider-name"><span class="provider-icon"><img src="logos/deepseek.svg" alt=""></span>DeepSeek</div>
+            <div class="provider-tagline">DeepSeek V3 - Expert Mode</div>
+            <div class="provider-detail"><b>WASM SHA3-512</b> proof-of-work solver. Browser fingerprint replay. Session persistence across restarts.</div>
+          </div>
+          <div class="provider-card">
+            <div class="provider-name"><span class="provider-icon"><img src="logos/chatgpt.svg" alt=""></span>ChatGPT</div>
+            <div class="provider-tagline">GPT-4o</div>
+            <div class="provider-detail"><b>Sentinel token</b> decode + solve. Conduit token from conversation/prepare. Pure JS SHA3-512 POW. Cloudflare-safe headers.</div>
+          </div>
+          <div class="provider-card">
+            <div class="provider-name"><span class="provider-icon"><img src="logos/claude.svg" alt=""></span>Claude</div>
+            <div class="provider-tagline">Claude Sonnet</div>
+            <div class="provider-detail"><b>HAR capture</b> authentication. Cloudflare browser fingerprint headers. Organization-scoped routing. Cookie jar management.</div>
+          </div>
+        </div>
+
+        <div class="chip-grid" style="margin-top: 32px;">
+          <span class="chip check">SSE streaming</span>
+          <span class="chip check">Tool calling</span>
+          <span class="chip check">Session persistence</span>
+          <span class="chip check">Multi-IDE templates</span>
+          <span class="chip check">Cookie management</span>
+          <span class="chip check">Auto port selection</span>
+          <span class="chip check">OpenAI-compatible</span>
+        </div>
+      </section>
+
+      <section id="ides">
+        <div class="section-header">
+          <div class="section-eyebrow">Where you chat</div>
+          <h2>IDE Integration</h2>
+          <p class="section-sub">Use XProxy inside your editor — not a separate window.</p>
+        </div>
+        <div class="ide-grid">
+          <div class="ide-card">
+            <h3><img src="logos/vscode.png" alt="" style="width:22px;height:22px;vertical-align:-4px;margin-right:6px;">VS Code Copilot Chat</h3>
+            <p>Route Copilot Chat through XProxy via the LLM Gateway extension.</p>
+            <ol>
+              <li>Install <a href="https://marketplace.visualstudio.com/items?itemName=AndrewButson.github-copilot-llm-gateway" target="_blank" rel="noopener">GitHub Copilot LLM Gateway</a></li>
+              <li>Open Copilot Chat → model picker → <b>Select a language model</b></li>
+              <li>Click ⚙️ → <b>Add models</b> → <b>LLM Gateway</b></li>
+              <li>Enter your XProxy URL and <code>vscode</code> as the API key</li>
+              <li>Select your model from the picker</li>
+            </ol>
+          </div>
+          <div class="ide-card">
+            <h3><img src="logos/terax.png" alt="" style="width:22px;height:22px;vertical-align:-4px;margin-right:6px;">Terax</h3>
+            <p>Point Terax at XProxy with a bearer token.</p>
+            <ol>
+              <li>Set API base to <code>http://localhost:8000/v1</code></li>
+              <li>Set <code>Authorization: Bearer terax</code></li>
+              <li>Model name matches your chosen provider</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section id="start">
+        <div class="section-header">
+          <div class="section-eyebrow">Two minutes to first token</div>
+          <h2>Quick start</h2>
+        </div>
+
+        <div class="steps" style="margin-bottom: 32px;">
+          <div class="step">
+            <div class="step-num">1</div>
+            <h3>Clone &amp; install</h3>
+            <p>Node.js required. No build step — just <code>npm install</code>.</p>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <h3>Paste a fetch</h3>
+            <p>Copy any <code>fetch()</code> from your browser DevTools on DeepSeek, ChatGPT, or Claude. Paste into the wizard.</p>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <h3>Point your IDE</h3>
+            <p>Set your IDE to <code>http://localhost:8000/v1</code>. Start chatting like a real browser user.</p>
+          </div>
+        </div>
+
+        <div class="terminal">
+          <div class="terminal-chrome">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="filename">~/xproxy · cmd</span>
+          </div>
+          <pre class="terminal-body"><span class="c"># 1. clone, install, start</span>
+<span class="prompt">&gt;</span><span class="k">git</span> clone https://github.com/downloaddoctor/xproxy.git
+<span class="prompt">&gt;</span><span class="k">cd</span> xproxy
+<span class="prompt">&gt;</span>npm install <span class="k">&amp;&amp;</span> npm start
+<span class="blank"></span>
+<span class="c"># 2. interactive wizard — pick provider, paste fetch, choose session</span>
+<span class="blank"></span>
+<span class="c"># 3. call it like OpenAI</span>
+<span class="prompt">&gt;</span><span class="k">curl</span> http://localhost:8000/v1/chat/completions \
+    -H <span class="s">"Content-Type: application/json"</span> \
+    -H <span class="s">"Authorization: Bearer vscode"</span> \
+    -d <span class="s">'{"messages":[{"role":"user","content":"hello"}],"model":"deepseek"}'</span></pre>
+        </div>
+      </section>
+
+      <footer>
+        <p>XProxy — open source, self-hosted, single-user. <a href="https://github.com/downloaddoctor/xproxy" target="_blank" rel="noopener">github.com/downloaddoctor/xproxy</a></p>
+        <p style="margin-top: 6px; opacity: 0.7;">Built for personal use only. Use your own browser sessions responsibly.</p>
+      </footer>
+    </div>
+    <script>
+      const toggle = document.getElementById('theme-toggle');
+      const saved = localStorage.getItem('xproxy-theme') || 'deepseek';
+      document.documentElement.setAttribute('data-theme', saved);
+      toggle.textContent = saved === 'deepseek' ? '☀️' : '🌙';
+      toggle.addEventListener('click', function () {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'deepseek' ? 'clean' : 'deepseek';
+        document.documentElement.setAttribute('data-theme', next);
+        toggle.textContent = next === 'deepseek' ? '☀️' : '🌙';
+        localStorage.setItem('xproxy-theme', next);
+      });
+    </script>
+  </body>
+
+</html>

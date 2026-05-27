@@ -1,0 +1,105 @@
+const express = require('express')
+const { DeepSeekAPI } = require('../core/deepseek/api')
+const { toOpenAIError } = require('../utils/errors')
+const { streamHandler } = require('../core/deepseek/stream-handler')
+const ToolCompiler = require('../lib/engine')
+
+const deepseekApi = new DeepSeekAPI()
+
+/**
+ * Build the chat router with pre-resolved model + session baked in via closure.
+ * IDE extracted per-request from Authorization: Bearer <ide> header (req.ide).
+ */
+async function buildChatRouter(headers, session, saveSession) {
+  if (!saveSession) saveSession = () => {}
+  await initDeepSeekAPI(session, headers, saveSession)
+
+  const router = express.Router()
+
+  // POST /v1/chat/completions
+  router.post('/', async (req, res) => {
+    const { messages = [], tools } = req.body
+    if (!messages || messages.length === 0) {
+      return res
+        .status(400)
+        .json(
+          toOpenAIError(
+            400,
+            'messages is required and must be a non-empty array',
+            'invalid_request_error',
+            'missing_messages',
+          ),
+        )
+    }
+
+    // ToolCompiler created per-request with IDE from auth header
+    const compiler = new ToolCompiler(req.ide)
+    let prompt = compiler.formatPrompt(messages)
+    let model_type = null
+
+    if (!session.parentMessageId) {
+      prompt = compiler.buildPrompt(prompt)
+      model_type = 'expert'
+    }
+
+    try {
+      const deepseekStream = await deepseekApi.chatCompletion(
+        headers,
+        session.chatSessionId,
+        prompt,
+        session.parentMessageId,
+        false,
+        true,
+        model_type,
+      )
+
+      res.setHeader('Content-Type', 'text/event-stream')
+      res.setHeader('Cache-Control', 'no-cache')
+      res.setHeader('Connection', 'keep-alive')
+      res.setHeader('Access-Control-Allow-Origin', '*')
+
+      const parser = new ToolCompiler.Stream(res, 'deepseek', compiler)
+
+      streamHandler(res, deepseekStream, session, parser, saveSession)
+    } catch (error) {
+      console.error('Chat completion error:', error)
+      return res
+        .status(500)
+        .json(
+          toOpenAIError(
+            500,
+            error.message || 'Internal server error',
+            'api_error',
+            'internal_error',
+          ),
+        )
+    }
+  })
+
+  return router
+}
+
+/**
+ * Initialize the DeepSeek API and resolve session.
+ */
+async function initDeepSeekAPI(session, headers, saveSession) {
+  await deepseekApi.initialize(headers)
+  console.log('[API] initialized successfully')
+
+  if (!session) {
+    throw new Error('No session provided')
+  }
+
+  if (session.chatSessionId) {
+    return console.log(
+      `[CHAT] Using session: "${session.name}" (chatSessionId: ${session.chatSessionId})`,
+    )
+  }
+
+  const chatSessionId = await deepseekApi.createChatSession(headers)
+  session.chatSessionId = chatSessionId
+  saveSession()
+  console.log(`[CHAT] Session "${session.name}" created with chatSessionId: ${chatSessionId}`)
+}
+
+module.exports = { buildChatRouter, initDeepSeekAPI }
