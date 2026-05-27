@@ -1,4 +1,5 @@
 const { readSSE } = require('../../utils/sse-reader')
+const { classifyError } = require('../../utils/errors')
 
 /**
  * Claude SSE Stream Handler
@@ -48,12 +49,15 @@ async function claudeStreamHandler(res, stream, session, saveSession, parser) {
     onData,
     onDone: sendFinalChunk,
     onError: (err) => {
-      console.error('[Claude Stream] Error:', err.message)
+      const classified = classifyError(err, 'Claude')
+      console.error(`[Claude Stream] ${classified.category}: ${err.message}`)
       if (finished) return
 
       finished = true
       parser.emit({}, 'error', {})
-      res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`)
+      res.write(
+        `data: ${JSON.stringify({ error: { message: classified.message, action: classified.action, category: classified.category } })}\n\n`,
+      )
       res.end()
     },
     isDone: () => finished,

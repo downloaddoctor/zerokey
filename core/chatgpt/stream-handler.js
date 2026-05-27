@@ -1,4 +1,5 @@
 const { readSSE } = require('../../utils/sse-reader')
+const { classifyError } = require('../../utils/errors')
 
 /**
  * ChatGPT SSE Stream Handler
@@ -79,12 +80,15 @@ async function chatgptStreamHandler(res, stream, session, saveSession, parser) {
     onData,
     onDone: sendFinalChunk,
     onError: (err) => {
-      console.error('[ChatGPT Stream] Error:', err.message)
+      const classified = classifyError(err, 'ChatGPT')
+      console.error(`[ChatGPT Stream] ${classified.category}: ${err.message}`)
       if (finished) return
 
       finished = true
       parser.emit({}, 'error', {})
-      res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`)
+      res.write(
+        `data: ${JSON.stringify({ error: { message: classified.message, action: classified.action, category: classified.category } })}\n\n`,
+      )
       res.end()
     },
     isDone: () => finished,

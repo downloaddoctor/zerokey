@@ -1,4 +1,5 @@
 const { readSSE } = require('../../utils/sse-reader')
+const { classifyError } = require('../../utils/errors')
 
 /**
  * DeepSeek SSE Stream Handler
@@ -48,9 +49,12 @@ function streamHandler(res, stream, session, parser, saveSession) {
     onData,
     onDone: sendFinalChunk,
     onError: (err) => {
-      console.error('[DeepSeek Stream] Error:', err.message)
+      const classified = classifyError(err, 'DeepSeek')
+      console.error(`[DeepSeek Stream] ${classified.category}: ${err.message}`)
       if (!res.writableEnded) {
-        res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`)
+        res.write(
+          `data: ${JSON.stringify({ error: { message: classified.message, action: classified.action, category: classified.category } })}\n\n`,
+        )
         res.end()
       }
     },

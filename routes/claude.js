@@ -74,16 +74,8 @@ async function buildClaudeRouter(parsedFetch, session, saveSession) {
       claudeStreamHandler(res, stream, session, saveSession, parser, claudeApi)
     } catch (error) {
       console.error('[Claude Route] Error:', error.message)
-      return res
-        .status(500)
-        .json(
-          toOpenAIError(
-            500,
-            error.message || 'Internal server error',
-            'api_error',
-            'internal_error',
-          ),
-        )
+      const err = toOpenAIError(error, 'Claude')
+      return res.status(err.error.status || 500).json(err)
     }
   })
 

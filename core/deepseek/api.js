@@ -111,7 +111,11 @@ class DeepSeekAPI {
         if (res.statusCode !== 200) {
           let errorBody = ''
           res.on('data', (chunk) => (errorBody += chunk))
-          res.on('end', () => reject(JSON.stringify({ errorBody, code: res.statusCode })))
+          res.on('end', () => {
+            const err = new Error(`DeepSeek HTTP ${res.statusCode}: ${errorBody.slice(0, 300)}`)
+            err.code = res.statusCode
+            reject(err)
+          })
           return
         }
         resolve(res)

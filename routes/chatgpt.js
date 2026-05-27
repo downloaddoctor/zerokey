@@ -61,16 +61,8 @@ async function buildChatGPTRouter(parsedFetch, session, saveSession) {
       chatgptStreamHandler(res, stream, session, saveSession, parser)
     } catch (error) {
       console.error('[ChatGPT Route] Error:', error.message)
-      return res
-        .status(500)
-        .json(
-          toOpenAIError(
-            500,
-            error.message || 'Internal server error',
-            'api_error',
-            'internal_error',
-          ),
-        )
+      const err = toOpenAIError(error, 'ChatGPT')
+      return res.status(err.error.status || 500).json(err)
     }
   })
 

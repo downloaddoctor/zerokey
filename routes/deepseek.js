@@ -62,17 +62,9 @@ async function buildChatRouter(headers, session, saveSession) {
 
       streamHandler(res, deepseekStream, session, parser, saveSession)
     } catch (error) {
-      console.error('Chat completion error:', error)
-      return res
-        .status(500)
-        .json(
-          toOpenAIError(
-            500,
-            error.message || 'Internal server error',
-            'api_error',
-            'internal_error',
-          ),
-        )
+      console.error('[DeepSeek Route] Error:', error.message)
+      const err = toOpenAIError(error, 'DeepSeek')
+      return res.status(err.error.status || 500).json(err)
     }
   })
 
