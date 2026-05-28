@@ -2,20 +2,6 @@ const fs = require('fs')
 const path = require('path')
 const inquirer = require('inquirer')
 
-/**
- * Session selector: Provider → User → Session
- *
- * Flow:
- *   1. Select Provider (deepseek / chatgpt)
- *   2. Select User (provides headers)
- *   3. Select Session
- *
- * users.json structure:
- *   { "deepseek": { "Learner": { username, parsedFetch, sessions: [...] }, ... },
- *     "chatgpt":  { "new":      { username, parsedFetch, sessions: [...] }, ... } }
- *
- * Returns: { user, provider, parsedFetch, session, sessionName, saveSession }
- */
 class SessionSelector {
   constructor() {
     this._dataDir = path.join(__dirname, '..', 'temp')
@@ -300,12 +286,14 @@ class SessionSelector {
   }
 
   async _confirmDeleteAll(count) {
+    // Make Enter confirm by default and clarify cancellation keys
     const { confirm } = await inquirer.prompt([
       {
         type: 'confirm',
         name: 'confirm',
-        message: `Delete all ${count} sessions?`,
-        default: false,
+        message: `Delete all ${count} sessions? (Enter = Yes, Esc = Cancel)`,
+        // default true so pressing Enter without typing explicitly will confirm
+        default: true,
       },
     ])
     return confirm
