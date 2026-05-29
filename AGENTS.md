@@ -85,22 +85,22 @@ module: claude.js
  → ../core/claude/stream-handler → claudeStreamHandler
  → ../utils/errors → toOpenAIError
  → ../lib/engine → ToolCompiler
-module: api.js
+module: core/deepseek/api.js
  → https (keep-alive agent)
  → ../../utils/cookie-jar → CookieJar
  → ./pow → DeepSeekPOW
-module: api.js
+module: core/chatgpt/api.js
  → crypto
  → ./pow → ChatGPTProofOfWork
  → ../../utils/cookie-jar → CookieJar
-module: api.js
+module: core/claude/api.js
  → crypto
  → ../../utils/cookie-jar → CookieJar
 module: index.js
  → fs, path
  → ./tool-defs → getIDEMapper
  → ./stream → Stream
- → ./prompt.md (read at buildPrompt)
+ → ./instructions.md (read at buildPrompt)
 module: tool-defs.js
  → fs
  → TOOLS: read, write, append, prepend, replace, list, mkdir, glob, grep, cmd, todo
