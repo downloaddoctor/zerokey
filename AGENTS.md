@@ -20,7 +20,7 @@ core/: provider API clients
  claude/: Claude provider
   api.js: ClaudeAPI → fetch, org-based, conversation UUID
   stream-handler.js: SSE stream parser for Claude
- session-selector.js: inquirer-based provider/user/session selector
+ session-selector.js: inquirer-based provider/user/session selector + Claude instructions prompt
 lib/: tool compilation engine
  engine/: ToolCompiler + Stream parser
   index.js: ToolCompiler → formatPrompt, buildPrompt, compile, emit
@@ -128,12 +128,13 @@ server start
    → _stepProviderSelection: inquirer list deepseek|chatgpt|claude
    → _stepUserLogin: load temp/users.json, prompt or create new
      → _promptNewUser: username + fetch() paste → _parseFetchDirect
+   → if claude → _stepClaudeInstructions: ask if instructions saved in Web UI
    → _stepSessionSelection: list, create, delete sessions
-   → return { user, provider, parsedFetch, session, saveSession }
+   → return { user, provider, parsedFetch, session, saveInstructions, saveSession }
  → build provider chat router
    → deepseek: initDeepSeekAPI → createChatSession
    → chatgpt: initializeFromJSON → sentinel refresh
-   → claude: initializeFromJSON → extract orgId
+   → claude: initializeFromJSON → extract orgId, pass saveInstructions
  → app.use('/v1/chat/completions', chatRouter)
  → checkPort → find available port
  → app.listen(port)
@@ -141,7 +142,7 @@ server start
 POST /v1/chat/completions
  → validate messages array
  → ToolCompiler(req.ide) → formatPrompt(messages)
- → if !session.parentMessageId → buildPrompt (system prompt + tool grammar)
+ → if !session.parentMessageId && !saveInstructions → buildPrompt (system prompt + tool grammar)
  → provider.chatCompletion(prompt, session, ...)
    → deepseek: POW challenge → https POST → raw stream
    → chatgpt: prepareConversation → fetch POST → ReadableStream

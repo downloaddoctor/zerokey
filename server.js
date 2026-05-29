@@ -49,6 +49,7 @@ app.use('/', healthRouter)
         preSelected.parsedFetch,
         preSelected.session,
         preSelected.saveSession,
+        preSelected.saveInstructions,
       )
     } else {
       chatRouter = await buildChatRouter(
