@@ -7,49 +7,30 @@ const CONFIG = {
 }
 
 const MODELS = {
-  deepseek: {
-    id: 'deepseek',
+  'DeepSeek V4': {
+    id: 'DeepSeek V4',
     object: 'model',
-    created: 1_700_000_000,
+    created: 1_784_736_000,
     owned_by: 'deepseek',
-    context_length: 131_072,
-    max_output_length: 8192,
-    permission: [],
-    root: 'deepseek',
-    capabilities: ['chat', 'completion', 'streaming'],
+    context_length: 1_000_000,
+    max_output_length: 384_000,
   },
-  chatgpt: {
-    id: 'chatgpt',
+  'GPT-4o': {
+    id: 'GPT-4o',
     object: 'model',
-    created: 1_700_000_000,
+    created: 1_712_822_400,
     owned_by: 'openai',
     context_length: 128_000,
-    max_output_length: 16384,
-    permission: [],
-    root: 'chatgpt',
-    capabilities: ['chat', 'completion', 'streaming'],
+    max_output_length: 16_384,
   },
-  claude: {
-    id: 'claude',
+  'Claude Sonnet 4.6': {
+    id: 'Claude Sonnet 4.6',
     object: 'model',
-    created: 1_700_000_000,
+    created: 1_772_736_000,
     owned_by: 'anthropic',
-    context_length: 200_000,
-    max_output_length: 32768,
-    permission: [],
-    root: 'claude',
-    capabilities: ['chat', 'completion', 'streaming'],
+    context_length: 1_000_000,
+    max_output_length: 64_000,
   },
 }
 
-const MODEL_ALIASES = {
-  deepseek: 'deepseek',
-  chatgpt: 'chatgpt',
-  claude: 'claude',
-}
-
-module.exports = {
-  CONFIG,
-  MODELS,
-  MODEL_ALIASES,
-}
+module.exports = { CONFIG, MODELS }

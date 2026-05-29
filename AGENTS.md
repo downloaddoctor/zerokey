@@ -8,6 +8,7 @@ description: OpenAI-compatible AI proxy for DeepSeek, ChatGPT & Claude — no AP
 #DIRECTORY
 config/: server configuration
  constants.js: CONFIG PORT, MODELS definitions, MODEL_ALIASES
+ models.json: VS Code custom endpoint model registry
 core/: provider API clients
  deepseek/: DeepSeek provider
   api.js: DeepSeekAPI → https.request, POW, cookie-jar
@@ -27,7 +28,6 @@ lib/: tool compilation engine
   stream.js: Stream → scans LLM output for ⟦tool¦params⟧, builds OpenAI tool_call deltas
   tool-defs.js: TOOLS registry, getIDEMapper → IDE-specific tool mappings
   instructions.md: full system prompt with output contract, enforcement, save workflow
-  extra-tools.js: additional tool definitions
   templates/: IDE config templates
    opencode.json: opencode IDE config
    terax.json: terax IDE config
@@ -85,17 +85,36 @@ module: claude.js
  → ../core/claude/stream-handler → claudeStreamHandler
  → ../utils/errors → toOpenAIError
  → ../lib/engine → ToolCompiler
+module: routes/health.js
+ → express
+module: routes/models.js
+ → express
+ → ../config/constants → MODELS
 module: core/deepseek/api.js
  → https (keep-alive agent)
+ → crypto
  → ../../utils/cookie-jar → CookieJar
  → ./pow → DeepSeekPOW
+module: core/deepseek/stream-handler.js
+ → ../../utils/sse-reader → readSSE
+ → ../../utils/errors → classifyError
 module: core/chatgpt/api.js
  → crypto
  → ./pow → ChatGPTProofOfWork
  → ../../utils/cookie-jar → CookieJar
+module: core/chatgpt/stream-handler.js
+ → ../../utils/sse-reader → readSSE
+ → ../../utils/errors → classifyError
 module: core/claude/api.js
  → crypto
  → ../../utils/cookie-jar → CookieJar
+module: core/claude/stream-handler.js
+ → ../../utils/sse-reader → readSSE
+ → ../../utils/errors → classifyError
+module: core/session-selector.js
+ → fs, path, inquirer
+module: utils/har-to-capture.js
+ → fs, path
 module: index.js
  → fs, path
  → ./tool-defs → getIDEMapper

@@ -630,7 +630,7 @@
         <div class="provider-grid">
           <div class="provider-card">
             <div class="provider-name"><span class="provider-icon"><img src="logos/deepseek.svg" alt=""></span>DeepSeek</div>
-            <div class="provider-tagline">DeepSeek V3 - Expert Mode</div>
+            <div class="provider-tagline">DeepSeek V4 - Expert Mode</div>
             <div class="provider-detail">Blazing fast responses. Full session persistence across restarts. Works exactly like your browser — because it is your browser.</div>
           </div>
           <div class="provider-card">
@@ -664,23 +664,27 @@
         </div>
         <div class="ide-grid">
           <div class="ide-card">
-            <h3><img src="logos/vscode.png" alt="" style="width:22px;height:22px;vertical-align:-4px;margin-right:6px;">VS Code Copilot Chat</h3>
-            <p>Route Copilot Chat through ZeroKey via the LLM Gateway extension.</p>
+            <h3><img src="logos/vscode.png" alt="" style="width:22px;height:22px;vertical-align:-4px;margin-right:6px;">VS Code — LLM Gateway</h3>
             <ol>
-              <li>Install <a href="https://marketplace.visualstudio.com/items?itemName=AndrewButson.github-copilot-llm-gateway" target="_blank" rel="noopener">GitHub Copilot LLM Gateway</a></li>
-              <li>Open Copilot Chat → model picker → <b>Select a language model</b></li>
-              <li>Click ⚙️ → <b>Add models</b> → <b>LLM Gateway</b></li>
-              <li>Enter your ZeroKey URL and <code>vscode</code> as the API key</li>
-              <li>Select your model from the picker</li>
+              <li>Install <a href="https://marketplace.visualstudio.com/items?itemName=AndrewButson.github-copilot-llm-gateway" target="_blank" rel="noopener">LLM Gateway extension</a></li>
+              <li>F1 → Manage Language Model → Add models → LLM Gateway</li>
+              <li>URL: <code>http://localhost:8000/v1</code> → API key: <code>vscode</code></li>
+            </ol>
+          </div>
+          <div class="ide-card">
+            <h3><img src="logos/vscode.png" alt="" style="width:22px;height:22px;vertical-align:-4px;margin-right:6px;">VS Code — Built-in</h3>
+            <ol>
+              <li>F1 → Manage Language Model → Add models → Custom Endpoint</li>
+              <li>Chat Completions → API key: <code>vscode</code></li>
+              <li>Copy <code>config/models.json</code> contents into the auto-opened VS Code models file</li>
             </ol>
           </div>
           <div class="ide-card">
             <h3><img src="logos/terax.png" alt="" style="width:22px;height:22px;vertical-align:-4px;margin-right:6px;">Terax</h3>
-            <p>Point Terax at ZeroKey with a bearer token.</p>
             <ol>
+              <li>Settings → Models → Add Provider → OpenAI Compatible</li>
               <li>Set API base to <code>http://localhost:8000/v1</code></li>
               <li>Set <code>Authorization: Bearer terax</code></li>
-              <li>Model name matches your chosen provider</li>
             </ol>
           </div>
         </div>
