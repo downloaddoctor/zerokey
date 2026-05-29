@@ -10,7 +10,7 @@ const claudeApi = new ClaudeAPI()
  * Build the Claude router.
  * IDE extracted per-request from Authorization: Bearer <ide> header (req.ide).
  */
-async function buildClaudeRouter(parsedFetch, session, saveSession) {
+async function buildClaudeRouter(parsedFetch, session, saveSession, saveInstructions = false) {
   if (!parsedFetch || !parsedFetch.headers) {
     throw new Error('parsedFetch with headers is required')
   }
@@ -43,7 +43,8 @@ async function buildClaudeRouter(parsedFetch, session, saveSession) {
     let prompt = compiler.formatPrompt(messages)
 
     // Prepend system prompt for first message in conversation
-    if (!session.parentMessageId) {
+    // Skip if user saved instructions in Claude Web UI (saves tokens)
+    if (!session.parentMessageId && !saveInstructions) {
       prompt = compiler.buildPrompt(prompt)
     }
 
