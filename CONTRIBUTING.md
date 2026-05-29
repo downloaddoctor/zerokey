@@ -1,6 +1,6 @@
-# Contributing to XProxy
+# Contributing to ZeroKey
 
-Thanks for your interest in contributing! XProxy is a personal-use tool — contributions that improve the experience for individual developers are welcome.
+Thanks for your interest in contributing! ZeroKey is a personal-use tool — contributions that improve the experience for individual developers are welcome.
 
 ## Getting Started
 

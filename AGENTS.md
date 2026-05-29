@@ -1,9 +1,9 @@
 #PROJECT
-xproxy v1.0.0
+zerokey v1.0.0
 language: javascript
 runtime: node.js
 package-manager: npm
-description: OpenAI-compatible API proxy for DeepSeek, ChatGPT & Claude
+description: OpenAI-compatible AI proxy for DeepSeek, ChatGPT & Claude — no API keys, real browser sessions
 
 #DIRECTORY
 config/: server configuration

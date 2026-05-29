@@ -15,9 +15,9 @@ router.get('/health', (req, res) => {
 // GET / - Root endpoint with API info
 router.get('/', (req, res) => {
   res.json({
-    name: 'XProxy API Server',
+    name: 'ZeroKey API Server',
     version: '1.0.0',
-    description: 'OpenAI-compatible API proxy for DeepSeek & ChatGPT',
+    description: 'OpenAI-compatible AI proxy for DeepSeek & ChatGPT',
     endpoints: {
       models: 'GET /v1/models',
       chat_completions: 'POST /v1/chat/completions',

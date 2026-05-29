@@ -27,4 +27,4 @@ Paste relevant terminal output here
 **Environment:**
 - OS: [e.g. Windows 11]
 - Node version: [e.g. 20.11.0]
-- XProxy commit: [e.g. 57fcc41]
+- ZeroKey commit: [e.g. 57fcc41]

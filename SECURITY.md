@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in XProxy, please **do not** open a public issue.
+If you discover a security vulnerability in ZeroKey, please **do not** open a public issue.
 
 Send details to the project maintainer via a private channel. Include:
 
@@ -19,19 +19,19 @@ Only the latest commit on `main` is supported. No backports for prior releases.
 
 ## Security Design
 
-XProxy stores browser session credentials (cookies, headers, tokens) in `temp/users.json`. This file is gitignored and should never be committed. Treat it as sensitive — anyone with access to this file can impersonate your browser sessions.
+ZeroKey stores browser session credentials (cookies, headers, tokens) in `temp/users.json`. This file is gitignored and should never be committed. Treat it as sensitive — anyone with access to this file can impersonate your browser sessions.
 
 ### Best Practices
 
-- Run XProxy on `localhost` only — do not expose it to public networks
+- Run ZeroKey on `localhost` only — do not expose it to public networks
 - Keep `temp/users.json` private and never commit it
-- Use a firewall to block external access to the XProxy port
+- Use a firewall to block external access to the ZeroKey port
 - Regularly refresh your browser sessions by re-capturing a fresh `fetch()` call
 - If you suspect a session is compromised, delete the session from the startup wizard
 
 ### Dependencies
 
-XProxy uses minimal dependencies (express, inquirer). Keep them updated:
+ZeroKey uses minimal dependencies (express, inquirer). Keep them updated:
 
 ```bash
 npm audit

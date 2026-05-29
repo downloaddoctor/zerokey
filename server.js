@@ -87,7 +87,7 @@ app.use('/', healthRouter)
     }
 
     app.listen(port, () => {
-      console.log(`\n✅ XProxy running on http://localhost:${port}`)
+      console.log(`\n✅ ZeroKey running on http://localhost:${port}`)
       console.log('Endpoints:')
       console.log(`  GET  http://localhost:${port}/`)
       console.log(`  GET  http://localhost:${port}/health`)

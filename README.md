@@ -1,6 +1,6 @@
-# XProxy
+# ZeroKey
 
-OpenAI-compatible local API proxy for **DeepSeek**, **ChatGPT**, and **Claude** — use with VS Code or Terax via real browser-backed sessions, no API key required.
+OpenAI-compatible local AI proxy for **DeepSeek**, **ChatGPT**, and **Claude** — pipe any of them into VS Code or Terax using your real browser session. No API key. No subscription. Just paste a fetch().
 
 ## Features
 
@@ -15,8 +15,8 @@ OpenAI-compatible local API proxy for **DeepSeek**, **ChatGPT**, and **Claude** 
 ## Quick Start
 
 ```bash
-git clone https://github.com/DownloadDoctor/xproxy.git
-cd xproxy
+git clone https://github.com/downloaddoctor/zerokey.git
+cd zerokey
 npm install
 npm start
 ```
@@ -74,14 +74,14 @@ Set `Authorization: Bearer <ide>` in your client config. Default is `vscode` if 
 
 ### VS Code (Copilot Chat)
 
-Use XProxy as a model provider in Copilot Chat via the **LLM Gateway** extension:
+Use ZeroKey as a model provider in Copilot Chat via the **LLM Gateway** extension:
 
 1. Install [GitHub Copilot LLM Gateway](https://marketplace.visualstudio.com/items?itemName=AndrewButson.github-copilot-llm-gateway) from the VS Code marketplace
 2. Open Copilot Chat → click the model picker → **Select a language model**
 3. Click the settings icon (⚙️) in the language model picker
 4. Under **Add models**, select **LLM Gateway**
-5. Enter your XProxy server URL (e.g. `http://localhost:8000/v1`) and `vscode` for the API key
-6. The available models from XProxy will now appear in the model picker
+5. Enter your ZeroKey server URL (e.g. `http://localhost:8000/v1`) and `vscode` for the API key
+6. The available models from ZeroKey will now appear in the model picker
 
 ### Terax
 
@@ -115,7 +115,7 @@ lib/engine/
   index.js              → ToolCompiler singleton, prompt formatting
   tool-defs.js          → IDE tool mappings, prompt grammar, RAW_EDIT transforms
   stream.js             → SSE parser, ⟦tool¦param⟧ marker detection, tool buffering
-  prompt.md             → system prompt injected on new sessions
+  instructions.md       → system prompt injected on new sessions
   extra-tools.js        → VSCode-only tool definitions
   templates/            → opencode.json, terax.json, vscode.json
 utils/
