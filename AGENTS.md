@@ -26,7 +26,7 @@ lib/: tool compilation engine
   index.js: ToolCompiler → formatPrompt, buildPrompt, compile, emit
   stream.js: Stream → scans LLM output for ⟦tool¦params⟧, builds OpenAI tool_call deltas
   tool-defs.js: TOOLS registry, getIDEMapper → IDE-specific tool mappings
-  prompt.md: system prompt template for LLM
+  instructions.md: full system prompt with output contract, enforcement, save workflow
   extra-tools.js: additional tool definitions
   templates/: IDE config templates
    opencode.json: opencode IDE config
