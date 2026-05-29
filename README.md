@@ -65,40 +65,30 @@ The server auto-finds an available port starting from `8000` and prints the endp
 
 ### Bearer Tokens
 
-Set `Authorization: Bearer <ide>` in your client config. Default is `vscode` if omitted.
+The `Authorization: Bearer <ide>` header maps the request to the correct IDE's tool definitions. Default is `vscode` if omitted.
 
-| IDE     | Bearer Token    |
-| ------- | --------------- |
-| VS Code | `Bearer vscode` |
-| Terax   | `Bearer terax`  |
+| IDE     | Bearer Token    | Purpose             |
+| ------- | --------------- | ------------------- |
+| VS Code | `Bearer vscode` | Loads VS Code tools |
+| Terax   | `Bearer terax`  | Loads Terax tools   |
 
-### VS Code (Copilot Chat)
+### VS Code — LLM Gateway
 
-Use ZeroKey as a model provider in Copilot Chat via the **LLM Gateway** extension:
+1. Install [GitHub Copilot LLM Gateway](https://marketplace.visualstudio.com/items?itemName=AndrewButson.github-copilot-llm-gateway)
+2. F1 → Manage Language Model → Add models → LLM Gateway
+3. URL: `http://localhost:8000/v1` → API key: `vscode`
 
-1. Install [GitHub Copilot LLM Gateway](https://marketplace.visualstudio.com/items?itemName=AndrewButson.github-copilot-llm-gateway) from the VS Code marketplace
-2. Open Copilot Chat → click the model picker → **Select a language model**
-3. Click the settings icon (⚙️) in the language model picker
-4. Under **Add models**, select **LLM Gateway**
-5. Enter your ZeroKey server URL (e.g. `http://localhost:8000/v1`) and `vscode` for the API key
-6. The available models from ZeroKey will now appear in the model picker
+### VS Code — Built-in
+
+1. F1 → Manage Language Model → Add models → Custom Endpoint
+2. Chat Completions → API key: `vscode`
+3. Copy `config/models.json` contents into the auto-opened VS Code models file
 
 ### Terax
 
-Set `Authorization: Bearer terax` in your Terax client config pointing to `http://localhost:8000/v1`.
-
-### Generic Client Configuration
-
-```json
-{
-  "provider": "openai",
-  "apiBase": "http://localhost:8000/v1",
-  "apiKey": "not-needed",
-  "model": "deepseek"
-}
-```
-
-Set `model` to `deepseek`, `chatgpt`, or `claude` to match the provider selected at startup.
+1. Settings → Models → Add Provider → OpenAI Compatible
+2. Set API base to `http://localhost:8000/v1`
+3. Set `Authorization: Bearer terax`
 
 ## Architecture
 

@@ -19,6 +19,8 @@ async function buildChatRouter(headers, session, saveSession) {
   // POST /v1/chat/completions
   router.post('/', async (req, res) => {
     const { messages = [], tools } = req.body
+    // require('fs').writeFile('temp/tools.json', JSON.stringify(tools, null, 1), () => {})
+
     if (!messages || messages.length === 0) {
       return res
         .status(400)

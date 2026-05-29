@@ -1,5 +1,5 @@
 const express = require('express')
-const { MODELS, MODEL_ALIASES } = require('../config/constants')
+const { MODELS } = require('../config/constants')
 const { toOpenAIError } = require('../utils/errors')
 
 const router = express.Router()
@@ -14,8 +14,7 @@ router.get('/', (req, res) => {
 
 // GET /v1/models/:model - Get specific model
 router.get('/:model', (req, res) => {
-  const resolved = MODEL_ALIASES[req.params.model]
-  const model = MODELS[resolved]
+  const model = MODELS[req.params.model]
   if (model) return res.json(model)
 
   res
