@@ -7,7 +7,7 @@ description: OpenAI-compatible AI proxy for DeepSeek, ChatGPT & Claude — no AP
 
 #DIRECTORY
 config/: server configuration
- constants.js: CONFIG PORT, MODELS definitions, MODEL_ALIASES
+ constants.js: CONFIG PORT, MODELS definitions
  models.json: VS Code custom endpoint model registry
 core/: provider API clients
  deepseek/: DeepSeek provider
@@ -67,60 +67,60 @@ module: server.js
  → ./routes/chatgpt → buildChatGPTRouter
  → ./routes/claude → buildClaudeRouter
  → ./core/session-selector → SessionSelector
-module: deepseek.js
+module: routes/deepseek.js
  → express
  → ../core/deepseek/api → DeepSeekAPI
  → ../core/deepseek/stream-handler → streamHandler
  → ../utils/errors → toOpenAIError
  → ../lib/engine → ToolCompiler
-module: chatgpt.js
+module: routes/chatgpt.js
  → express
  → ../core/chatgpt/api → ChatGPTAPI
  → ../core/chatgpt/stream-handler → chatgptStreamHandler
  → ../utils/errors → toOpenAIError
  → ../lib/engine → ToolCompiler
-module: claude.js
+module: routes/claude.js
  → express
  → ../core/claude/api → ClaudeAPI
  → ../core/claude/stream-handler → claudeStreamHandler
  → ../utils/errors → toOpenAIError
  → ../lib/engine → ToolCompiler
-module: health.js
+module: routes/health.js
  → express
-module: models.js
+module: routes/models.js
  → express
  → ../config/constants → MODELS
-module: api.js
+module: core/deepseek/api.js
  → https (keep-alive agent)
  → crypto
  → ../../utils/cookie-jar → CookieJar
  → ./pow → DeepSeekPOW
-module: stream-handler.js
+module: core/deepseek/stream-handler.js
  → ../../utils/sse-reader → readSSE
  → ../../utils/errors → classifyError
-module: api.js
+module: core/chatgpt/api.js
  → crypto
  → ./pow → ChatGPTProofOfWork
  → ../../utils/cookie-jar → CookieJar
-module: stream-handler.js
+module: core/chatgpt/stream-handler.js
  → ../../utils/sse-reader → readSSE
  → ../../utils/errors → classifyError
-module: api.js
+module: core/claude/api.js
  → crypto
  → ../../utils/cookie-jar → CookieJar
-module: stream-handler.js
+module: core/claude/stream-handler.js
  → ../../utils/sse-reader → readSSE
  → ../../utils/errors → classifyError
-module: session-selector.js
+module: core/session-selector.js
  → fs, path, inquirer
-module: har-to-capture.js
+module: utils/har-to-capture.js
  → fs, path
-module: index.js
+module: lib/engine/index.js
  → fs, path
  → ./tool-defs → getIDEMapper
  → ./stream → Stream
  → ./instructions.md (read at buildPrompt)
-module: tool-defs.js
+module: lib/engine/tool-defs.js
  → fs
  → TOOLS: read, write, append, prepend, replace, list, mkdir, glob, grep, cmd, todo
  → RAW_EDIT → factory for vscode/terax edit tool mappings
@@ -130,18 +130,18 @@ module: tool-defs.js
  → IDES_PROMPT_OPTIMIZER: vscode, terax, opencode → { user, tool } message formatters
  → NEW_SESSION_START_LENGTH: per-IDE session detection thresholds
  → getAllTags / getAllTagsArray: XML-like tag extraction helpers
-module: stream.js
+module: lib/engine/stream.js
  → Stream: state-machine SSE output parser
   → scan(text): 3-state parser (outside ⟦, toolStartFound, inTool) → emits text deltas
   → flush(): drains incomplete tool buffers → calls compiler.compile → emits OpenAI tool_call deltas
  → buildCall, buildToolDelta: OpenAI chunk helpers
-module: cookie-jar.js
+module: utils/cookie-jar.js
  → Map-based cookie store
  → parseSetCookie, seedFromHeader, captureFromFetchHeaders, captureFromRawHeaders, toString
-module: sse-reader.js
+module: utils/sse-reader.js
  → Readable (Node.js stream)
  → readSSE: unified SSE reader for Web ReadableStream + Node.js stream; isDone guard in processChunk loop
-module: errors.js
+module: utils/errors.js
  → classifyError → categorized error with action
  → toOpenAIError → OpenAI-compatible error response
 

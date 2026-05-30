@@ -95,7 +95,8 @@ The `Authorization: Bearer <ide>` header maps the request to the correct IDE's t
 
 ```
 server.js               → Express app, startup wizard, provider dispatch, port selection
-config/constants.js     → PORT, MODELS, MODEL_ALIASES
+config/
+  constants.js          → PORT, MODELS
 routes/                 → chatgpt.js, claude.js, deepseek.js, models.js, health.js
 core/
   deepseek/             → api.js (POW + HTTPS), pow.js (WASM SHA3-512), stream-handler.js
@@ -103,15 +104,15 @@ core/
   claude/               → api.js (HAR auth + Cloudflare headers), stream-handler.js
   session-selector.js   → inquirer wizard, fetch() parser, users.json persistence
 lib/engine/
-  index.js              → ToolCompiler singleton, prompt formatting
-  tool-defs.js          → IDE tool mappings, prompt grammar, RAW_EDIT transforms
-  stream.js             → SSE parser, ⟦tool¦param⟧ marker detection, tool buffering
+  index.js              → ToolCompiler singleton: formatPrompt, buildPrompt, parse, emit, compile, inferType
+  tool-defs.js          → TOOLS registry, getIDEMapper, IDES_PROMPT_OPTIMIZER, RAW_EDIT, reverseMap
+  stream.js             → 3-state SSE parser (outside/toolStartFound/inTool), ⟦tool¦param⟧ detection, flush→OpenAI deltas
   instructions.md       → system prompt injected on new sessions
-  extra-tools.js        → VSCode-only tool definitions
   templates/            → opencode.json, terax.json, vscode.json
 utils/
   cookie-jar.js         → shared cookie management for all providers
   errors.js             → OpenAI-format error factory
+  sse-reader.js         → unified SSE reader for Web ReadableStream + Node.js streams
 ```
 
 ## Session Storage
