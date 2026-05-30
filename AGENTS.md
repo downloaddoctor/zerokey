@@ -72,18 +72,21 @@ module: routes/deepseek.js
  → ../core/deepseek/api → DeepSeekAPI
  → ../core/deepseek/stream-handler → streamHandler
  → ../utils/errors → toOpenAIError
+ → ../utils/rate-limiter → acquireSlot
  → ../lib/engine → ToolCompiler
 module: routes/chatgpt.js
  → express
  → ../core/chatgpt/api → ChatGPTAPI
  → ../core/chatgpt/stream-handler → chatgptStreamHandler
  → ../utils/errors → toOpenAIError
+ → ../utils/rate-limiter → acquireSlot
  → ../lib/engine → ToolCompiler
 module: routes/claude.js
  → express
  → ../core/claude/api → ClaudeAPI
  → ../core/claude/stream-handler → claudeStreamHandler
  → ../utils/errors → toOpenAIError
+ → ../utils/rate-limiter → acquireSlot
  → ../lib/engine → ToolCompiler
 module: routes/health.js
  → express
@@ -144,6 +147,8 @@ module: utils/sse-reader.js
 module: utils/errors.js
  → classifyError → categorized error with action
  → toOpenAIError → OpenAI-compatible error response
+module: utils/rate-limiter.js
+ → acquireSlot → 5 calls/10s sliding window rate limiter → Promise-based slot acquisition with wait queue
 
 #RUNTIME-GRAPH
 server start
