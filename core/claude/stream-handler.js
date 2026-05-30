@@ -18,7 +18,7 @@ async function claudeStreamHandler(res, stream, session, saveSession, parser) {
     finished = true
     parser.flush()
     parser.emit({}, 'stop', tokenUsage)
-    res.write('data: [DONE]')
+    res.write('data: [DONE]\n\n')
     res.end()
     session.lastUsed = new Date().toISOString()
     saveSession()

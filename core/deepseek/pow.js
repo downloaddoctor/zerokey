@@ -42,9 +42,16 @@ class DeepSeekHash {
   }
 
   _allocate(length, alignment) {
+    if (!this._currentMemoryOffset) this._currentMemoryOffset = 1024 // start above WASM stack
     const ptr = this._currentMemoryOffset
     const aligned = Math.ceil(ptr / alignment) * alignment
-    this._currentMemoryOffset = aligned + length
+    const end = aligned + length
+    // WebAssembly.Memory max = 512 pages = 33_554_432 bytes
+    const maxBytes = 512 * 65536
+    if (end > maxBytes) {
+      throw new Error(`[DeepSeekPOW] WASM allocator OOB: requested ${end} bytes, max ${maxBytes}`)
+    }
+    this._currentMemoryOffset = end
     return aligned
   }
 

@@ -1,20 +1,27 @@
-// Rate limiter: 5 calls per 10 seconds, queues excess
+// Rate limiter: 5 calls per 10 seconds per provider, queues excess
 const RATE_LIMIT = 5
 const RATE_WINDOW = 10000 // ms
-const callTimestamps = []
+
+const _windows = new Map()
+
+function _getWindow(key) {
+  if (!_windows.has(key)) _windows.set(key, [])
+  return _windows.get(key)
+}
 
 function acquireSlot(label = 'API') {
   return new Promise((resolve) => {
+    const timestamps = _getWindow(label)
     const tryAcquire = () => {
       const now = Date.now()
-      while (callTimestamps.length && callTimestamps[0] <= now - RATE_WINDOW) {
-        callTimestamps.shift()
+      while (timestamps.length && timestamps[0] <= now - RATE_WINDOW) {
+        timestamps.shift()
       }
-      if (callTimestamps.length < RATE_LIMIT) {
-        callTimestamps.push(now)
+      if (timestamps.length < RATE_LIMIT) {
+        timestamps.push(now)
         resolve()
       } else {
-        const wait = RATE_WINDOW - (now - callTimestamps[0])
+        const wait = RATE_WINDOW - (now - timestamps[0])
         console.log(`[${label}] Rate limit hit — waiting ${(wait / 1000).toFixed(1)}s`)
         setTimeout(tryAcquire, wait)
       }
