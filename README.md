@@ -81,14 +81,15 @@ The `Authorization: Bearer <ide>` header maps the request to the correct IDE's t
 ### VS Code — Built-in
 
 1. F1 → Manage Language Model → Add models → Custom Endpoint
-2. Chat Completions → API key: `vscode`
+2. Select Chat Completions → API key: `vscode`
 3. Copy `config/models.json` contents into the auto-opened VS Code models file
 
 ### Terax
 
 1. Settings → Models → Add Provider → OpenAI Compatible
-2. Set API base to `http://localhost:8000/v1`
-3. Set `Authorization: Bearer terax`
+2. Base URL: `http://localhost:8000/v1`
+3. API key: `terax`
+4. Click Test — worked? Done.
 
 ## Architecture
 

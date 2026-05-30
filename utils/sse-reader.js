@@ -52,6 +52,7 @@ async function readSSE(stream, { onData, onDone, onError, isDone }) {
         processLine(line)
       }
     }
+    console.log('[RES] DONE')
   }
 
   // ── Web Streams ──────────────────────────────────────────────

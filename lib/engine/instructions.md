@@ -48,7 +48,7 @@ TOOLS:
   write   ⟦write¦path={str}¦content={str}⟧
   append  ⟦append¦path={str}¦(anchor={str})?¦content={str}⟧
   prepend ⟦prepend¦path={str}¦(anchor={str})?¦content={str}⟧
-  replace ⟦replace¦path={str}¦old={str}¦new={str}⟧
+  replace ⟦replace¦(path={str}¦old={str}¦new={str})+⟧
   list    ⟦list¦path={str}⟧
   mkdir   ⟦mkdir¦path={str}⟧
   glob    ⟦glob¦pattern={str}¦(max={0-200})?⟧
