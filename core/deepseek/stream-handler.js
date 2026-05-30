@@ -25,6 +25,11 @@ function streamHandler(res, stream, session, parser, saveSession) {
   }
 
   const onData = (data) => {
+    if (data.type === 'error') {
+      console.error('[DeepSeek] Error event:', data.content)
+      sendFinalChunk()
+      return
+    }
     if (data.o === 'SET') {
       if (data.v === 'FINISHED') {
         sendFinalChunk()
