@@ -3,6 +3,7 @@ const { DeepSeekAPI } = require('../core/deepseek/api')
 const { toOpenAIError } = require('../utils/errors')
 const { streamHandler } = require('../core/deepseek/stream-handler')
 const ToolCompiler = require('../lib/engine')
+const { acquireSlot } = require('../utils/rate-limiter')
 
 const deepseekApi = new DeepSeekAPI()
 
@@ -43,6 +44,8 @@ async function buildChatRouter(headers, session, saveSession) {
       prompt = compiler.buildPrompt(prompt)
       model_type = 'expert'
     }
+
+    await acquireSlot('DeepSeek')
 
     try {
       const deepseekStream = await deepseekApi.chatCompletion(

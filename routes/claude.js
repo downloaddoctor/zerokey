@@ -5,6 +5,7 @@ const { toOpenAIError } = require('../utils/errors')
 const ToolCompiler = require('../lib/engine')
 
 const claudeApi = new ClaudeAPI()
+const { acquireSlot } = require('../utils/rate-limiter')
 
 /**
  * Build the Claude router.
@@ -47,6 +48,8 @@ async function buildClaudeRouter(parsedFetch, session, saveSession, saveInstruct
     if (!session.parentMessageId && !saveInstructions) {
       prompt = compiler.buildPrompt(prompt)
     }
+
+    await acquireSlot('Claude')
 
     try {
       // No tools for now — Claude tools have different format

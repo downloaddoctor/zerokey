@@ -38,6 +38,17 @@ async function claudeStreamHandler(res, stream, session, saveSession, parser) {
         }
         break
       }
+      case 'message_limit': {
+        const ml = parsed.message_limit
+        if (ml) {
+          const w5h = ml.windows?.['5h']
+          const w7d = ml.windows?.['7d']
+          console.log(
+            `[Claude] Limit: ${ml.type} | 5h: ${w5h ? (w5h.utilization * 100).toFixed(1) + '%' : 'n/a'} (resets ${w5h?.resets_at ? new Date(w5h.resets_at * 1000).toLocaleTimeString() : 'n/a'}) | 7d: ${w7d ? (w7d.utilization * 100).toFixed(1) + '%' : 'n/a'} (resets ${w7d?.resets_at ? new Date(w7d.resets_at * 1000).toLocaleTimeString() : 'n/a'})`,
+          )
+        }
+        break
+      }
       case 'message_stop': {
         sendFinalChunk()
         break

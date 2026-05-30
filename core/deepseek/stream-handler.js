@@ -30,8 +30,16 @@ function streamHandler(res, stream, session, parser, saveSession) {
         sendFinalChunk()
       }
     } else if (data.o === 'BATCH') {
-      tokenUsage.completion_tokens = data.v[0].v
-      tokenUsage.total_tokens = tokenUsage.completion_tokens + (tokenUsage.prompt_tokens || 0)
+      const usageEntry = data.v?.find((e) => e.p === 'accumulated_token_usage')
+      const statusEntry = data.v?.find((e) => e.p === 'quasi_status')
+      if (usageEntry) {
+        tokenUsage.completion_tokens = usageEntry.v
+        tokenUsage.total_tokens = usageEntry.v + (tokenUsage.prompt_tokens || 0)
+        console.log('[DeepSeek] Token usage:', {
+          accumulated: usageEntry.v,
+          status: statusEntry?.v ?? null,
+        })
+      }
     } else {
       const response = data.v?.response
       if (response) {

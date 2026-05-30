@@ -3,6 +3,7 @@ const { ChatGPTAPI } = require('../core/chatgpt/api')
 const { chatgptStreamHandler } = require('../core/chatgpt/stream-handler')
 const { toOpenAIError } = require('../utils/errors')
 const ToolCompiler = require('../lib/engine')
+const { acquireSlot } = require('../utils/rate-limiter')
 
 const chatgptApi = new ChatGPTAPI()
 
@@ -42,6 +43,8 @@ async function buildChatGPTRouter(parsedFetch, session, saveSession) {
     if (!session.parentMessageId) {
       prompt = compiler.buildPrompt(prompt)
     }
+
+    await acquireSlot('ChatGPT')
 
     try {
       const stream = await chatgptApi.chatCompletion(
