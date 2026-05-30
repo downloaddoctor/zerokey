@@ -40,7 +40,7 @@ async function buildClaudeRouter(parsedFetch, session, saveSession, saveInstruct
     const model = 'claude-sonnet-4-6'
 
     // ToolCompiler created per-request with IDE from auth header
-    const compiler = new ToolCompiler(req.ide)
+    const compiler = new ToolCompiler(req.ide, 'claude')
     let prompt = compiler.formatPrompt(messages)
 
     // Prepend system prompt for first message in conversation

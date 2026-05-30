@@ -36,7 +36,7 @@ async function buildChatRouter(headers, session, saveSession) {
     }
 
     // ToolCompiler created per-request with IDE from auth header
-    const compiler = new ToolCompiler(req.ide)
+    const compiler = new ToolCompiler(req.ide, 'deepseek')
     let prompt = compiler.formatPrompt(messages)
     let model_type = null
 
