@@ -73,7 +73,7 @@ async function buildClaudeRouter(parsedFetch, session, saveSession, saveInstruct
       res.setHeader('Access-Control-Allow-Origin', '*')
 
       // Use ToolCompiler.Stream to parse tool calls from LLM output
-      const parser = new ToolCompiler.Stream(res, 'claude', compiler)
+      const parser = new ToolCompiler.Stream(res, 'claude', compiler, session)
 
       claudeStreamHandler(res, stream, session, saveSession, parser, claudeApi)
     } catch (error) {

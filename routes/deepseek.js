@@ -63,7 +63,7 @@ async function buildChatRouter(headers, session, saveSession) {
       res.setHeader('Connection', 'keep-alive')
       res.setHeader('Access-Control-Allow-Origin', '*')
 
-      const parser = new ToolCompiler.Stream(res, 'deepseek', compiler)
+      const parser = new ToolCompiler.Stream(res, 'deepseek', compiler, session)
 
       streamHandler(res, deepseekStream, session, parser, saveSession)
     } catch (error) {

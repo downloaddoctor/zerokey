@@ -52,7 +52,8 @@ TOOLS:
   glob    ⟦glob¦pattern={str}¦(max={0-200})?⟧
   grep    ⟦grep¦query={str|regex}¦(regex={bool})?¦(pattern={glob})?¦(max={0-200})?⟧
   cmd     ⟦cmd¦run={str}¦(till={0-300})?⟧
-  todo    ⟦todo¦(id={1-99}¦title={str}¦status={wait|active|done}¦desc={str})+⟧
+  todoAdd ⟦todoAdd¦(id={1-99}¦title={str}¦status={wait|active|done}¦desc={str})+⟧ # TODO ADD
+  todo    ⟦todo¦(id={1-99}¦status={wait|active|done})+⟧  # TODO UPDATE
 
 CRITICAL: Tools are REAL. After tool call → STOP. Wait. Denied → ask why. Error → change approach once, escalate.
 </tool_format>

@@ -59,7 +59,7 @@ async function buildChatGPTRouter(parsedFetch, session, saveSession) {
       res.setHeader('Access-Control-Allow-Origin', '*')
 
       // Use ToolCompiler.Stream to parse tool calls from LLM output
-      const parser = new ToolCompiler.Stream(res, 'chatgpt', compiler)
+      const parser = new ToolCompiler.Stream(res, 'chatgpt', compiler, session)
 
       chatgptStreamHandler(res, stream, session, saveSession, parser)
     } catch (error) {
