@@ -1,6 +1,6 @@
 // Rate limiter: 5 calls per 10 seconds per provider, queues excess
-const RATE_LIMIT = 5
-const RATE_WINDOW = 10000 // ms
+const RATE_LIMIT = 3
+const RATE_WINDOW = 5000 // ms
 
 const _windows = new Map()
 

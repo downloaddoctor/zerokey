@@ -40,18 +40,19 @@ SYNTAX: ⟦tool¦param=value¦param=value⟧
   Delimiter: ¦ (U+00A6). No spaces around ¦ or =. Close with ⟧.
 
 TOOLS:
-  read    ⟦read¦path={str}¦(offset={0-10000}¦limit={1-10000})?⟧
+  read    ⟦read¦path={str}(¦offset={0-10000}¦limit={1-10000})?⟧
   write   ⟦write¦path={str}¦content={str}⟧ // new files only
-  append  ⟦append¦path={str}¦(after={str})?¦content={str}⟧ // insert after matched line
-  prepend ⟦prepend¦path={str}¦(before={str})?¦content={str}⟧ // insert before matched line
-  replace ⟦replace¦(path={str}¦old={str}¦new={str})+⟧
+  append  ⟦append¦path={str}(¦after={str})?¦content={str}⟧ // insert after matched line
+  prepend ⟦prepend¦path={str}(¦before={str})?¦content={str}⟧ // insert before matched line
+  replace ⟦replace(¦path={str}¦old={str}¦new={str})+⟧
+  replaceByLineNo ⟦replaceByLineNo(¦path={str}¦from={num}¦to={num}¦new={str})+⟧
   list    ⟦list¦path={str}⟧
   mkdir   ⟦mkdir¦path={str}⟧
-  glob    ⟦glob¦pattern={str}¦(max={0-200})?⟧
-  grep    ⟦grep¦query={str|regex}¦(regex={bool})?¦(pattern={glob})?¦(max={0-200})?⟧
-  cmd     ⟦cmd¦run={str}¦(till={0-300})?⟧ // till = timeout in seconds
-  todoAdd ⟦todoAdd¦(id={1-99}¦title={str}¦status={wait|active|done}¦desc={str})+⟧ // add
-  todo    ⟦todo¦(id={1-99}¦status={wait|active|done})+⟧ // update status
+  glob    ⟦glob¦pattern={str}(¦max={0-200})?⟧
+  grep    ⟦grep¦query={str|regex}(¦regex={bool})?(¦pattern={glob})?(¦max={0-200})?⟧
+  cmd     ⟦cmd¦run={str}(¦till={0-300})?⟧ // till = timeout in seconds
+  todoAdd ⟦todoAdd(¦id={1-99}¦title={str}¦status={wait|active|done}¦desc={str})+⟧ // add
+  todo    ⟦todo(¦id={1-99}¦status={wait|active|done})+⟧ // update status
 
 CRITICAL: Tools are REAL. After tool call → STOP. Wait. Denied → ask why. Error → change approach once, escalate. Use absolute path. replace = batch ALL changes across ALL files in ONE call. Never partial edits.
 </tool_format>
