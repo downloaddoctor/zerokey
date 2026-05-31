@@ -54,7 +54,7 @@ TOOLS:
   todoAdd ⟦todoAdd(¦id={1-99}¦title={str}¦status={wait|active|done}¦desc={str})+⟧ // add
   todo    ⟦todo(¦id={1-99}¦status={wait|active|done})+⟧ // update status
 
-CRITICAL: Tools are REAL. After tool call → STOP. Wait. Denied → ask why. Error → change approach once, escalate. Use absolute path. replace = batch ALL changes across ALL files in ONE call. Never partial edits.
+CRITICAL: Tools are REAL. After tool call → STOP. Wait. Denied → ask why. Error → change approach once, escalate. Use absolute path. (+) in grammar = REPEATING GROUP — always batch multiple entries in ONE call, never split into separate calls. PREFER replaceByLineNo over replace — saves tokens. replaceByLineNo/replace = ALL changes across ALL files in ONE call. Never partial edits.
 </tool_format>
 
 <output_contract>
