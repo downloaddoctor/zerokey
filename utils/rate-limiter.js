@@ -1,25 +1,36 @@
-const RATE_LIMIT = 2
-const RATE_WINDOW = 5000 // ms
-const INTERVAL = RATE_WINDOW / RATE_LIMIT // ms per call slot
+const RATE_LIMIT = 4
+const RATE_WINDOW = 10_000
 
-/** @type {{[label]: lastCallAt}} */
+// { [label]: { count, windowStart } }
 const _state = {}
 
-function acquireSlot(label = 'API') {
+function acquireSlot(label = 'API', reset = false) {
   const now = Date.now()
-  const last = _state[label] ?? 0
-  const elapsed = last > now ? 0 : now - last // guard against future timestamps
-  const wait = Math.max(0, INTERVAL - elapsed)
+  const s = _state[label] ?? (_state[label] = { count: 0, windowStart: now })
+
+  // reset window if expired or windowStart is in the future (clock skew)
+  if (now - s.windowStart >= RATE_WINDOW || s.windowStart > now) {
+    s.count = 0
+    s.windowStart = now
+  }
+
+  const wait = reset
+    ? RATE_WINDOW
+    : s.count < RATE_LIMIT
+      ? 0
+      : Math.max(0, RATE_WINDOW - (now - s.windowStart))
 
   if (wait === 0) {
-    _state[label] = now
+    s.count++
     return
   }
 
   console.log(`[${label}] Rate limit hit — waiting ${(wait / 1000).toFixed(1)}s`)
   return new Promise((resolve) => {
     setTimeout(() => {
-      _state[label] = Date.now()
+      s.count = 0
+      s.windowStart = Date.now()
+      s.count++
       resolve()
     }, wait)
   })

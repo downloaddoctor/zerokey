@@ -10,7 +10,7 @@ const { classifyError } = require('../../utils/errors')
  *   data: {"v":{"response":{...}}}           → message delta with metadata
  *   data: {"v":"text"}                       → bare text delta
  */
-function streamHandler(res, stream, session, parser, saveSession) {
+function streamHandler(res, stream, session, parser, saveSession, retry) {
   let finished = false
   const tokenUsage = {}
 
@@ -27,7 +27,21 @@ function streamHandler(res, stream, session, parser, saveSession) {
   const onData = (data) => {
     if (data.type === 'error') {
       console.error('[DeepSeek] Error event:', data.content)
-      sendFinalChunk()
+      if (retry) {
+        console.log('[DeepSeek] Retrying request...')
+        finished = true
+        retry()
+          .then((newStream) => {
+            finished = false
+            streamHandler(res, newStream, session, parser, saveSession, null)
+          })
+          .catch((err) => {
+            console.error('[DeepSeek] Retry failed:', err.message)
+            sendFinalChunk()
+          })
+      } else {
+        sendFinalChunk()
+      }
       return
     }
     if (data.o === 'SET') {

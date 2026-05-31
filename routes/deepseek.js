@@ -65,7 +65,20 @@ async function buildChatRouter(headers, session, saveSession) {
 
       const parser = new ToolCompiler.Stream(res, 'deepseek', compiler, session)
 
-      streamHandler(res, deepseekStream, session, parser, saveSession)
+      const retry = async () => {
+        await acquireSlot('DeepSeek', true)
+        return deepseekApi.chatCompletion(
+          headers,
+          session.chatSessionId,
+          prompt,
+          session.parentMessageId,
+          false,
+          true,
+          model_type,
+        )
+      }
+
+      streamHandler(res, deepseekStream, session, parser, saveSession, retry)
     } catch (error) {
       console.error('[DeepSeek Route] Error:', error.message)
       const err = toOpenAIError(error, 'DeepSeek')
