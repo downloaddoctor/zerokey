@@ -31,9 +31,19 @@ async function readSSE(stream, { onData, onDone, onError, isDone }) {
       return
     }
 
+    let data = dataStr
     try {
-      onData(JSON.parse(dataStr))
-    } catch {}
+      data = JSON.parse(dataStr)
+    } catch (_) {
+      return null
+    }
+
+    try {
+      onData(data)
+    } catch (err) {
+      console.error(err)
+      onError(err)
+    }
   }
 
   const processChunk = (chunk) => {
