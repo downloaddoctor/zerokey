@@ -148,7 +148,7 @@ module: utils/errors.js
  → classifyError → categorized error with action
  → toOpenAIError → OpenAI-compatible error response
 module: utils/rate-limiter.js
- → acquireSlot → 5 calls/10s sliding window rate limiter → Promise-based slot acquisition with wait queue
+ → acquireSlot → 5 calls/15s sliding window rate limiter → Promise-based slot acquisition with wait queue
 
 #RUNTIME-GRAPH
 server start

@@ -12,6 +12,7 @@ const { classifyError } = require('../../utils/errors')
  */
 function streamHandler(res, stream, session, parser, saveSession, retry) {
   let finished = false
+  let cancelled = false
   const tokenUsage = {}
 
   const sendFinalChunk = () => {
@@ -25,26 +26,33 @@ function streamHandler(res, stream, session, parser, saveSession, retry) {
   }
 
   const onData = (data) => {
+    if (cancelled) return
+
     if (data.type === 'error') {
       console.error('[DeepSeek] Error event:', data.content)
       if (retry) {
         console.log('[DeepSeek] Retrying request...')
+        // Mark this closure dead and kill the socket before retry
+        cancelled = true
         finished = true
+        try {
+          stream.destroy()
+        } catch (_) {}
+
         retry()
           .then((newStream) => {
-            finished = false
             streamHandler(res, newStream, session, parser, saveSession, null)
           })
           .catch((err) => {
             console.error('[DeepSeek] Retry failed:', err.message)
+            finished = false
             sendFinalChunk()
           })
       } else {
         sendFinalChunk()
       }
       return
-    }
-    if (data.o === 'SET') {
+    } else if (data.o === 'SET') {
       if (data.v === 'FINISHED') {
         sendFinalChunk()
       }

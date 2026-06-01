@@ -1,5 +1,5 @@
-const RATE_LIMIT = 4
-const RATE_WINDOW = 10_000
+const RATE_LIMIT = 5
+const RATE_WINDOW = 15_000
 
 // { [label]: { count, windowStart } }
 const _state = {}
@@ -22,7 +22,7 @@ function acquireSlot(label = 'API', reset = false) {
 
   if (wait === 0) {
     s.count++
-    return
+    return Promise.resolve()
   }
 
   console.log(`[${label}] Rate limit hit — waiting ${(wait / 1000).toFixed(1)}s`)
