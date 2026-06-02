@@ -8,6 +8,7 @@ const { classifyError } = require('../../utils/errors')
  *   data: {"type":"message_start","message":{...}}
  *   data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}
  *   data: {"type":"message_stop"}
+ *   data: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}
  */
 async function claudeStreamHandler(res, stream, session, saveSession, parser) {
   let finished = false
@@ -47,6 +48,18 @@ async function claudeStreamHandler(res, stream, session, saveSession, parser) {
             `[Claude] Limit: ${ml.type} | 5h: ${w5h ? (w5h.utilization * 100).toFixed(1) + '%' : 'n/a'} (resets ${w5h?.resets_at ? new Date(w5h.resets_at * 1000).toLocaleTimeString() : 'n/a'}) | 7d: ${w7d ? (w7d.utilization * 100).toFixed(1) + '%' : 'n/a'} (resets ${w7d?.resets_at ? new Date(w7d.resets_at * 1000).toLocaleTimeString() : 'n/a'})`,
           )
         }
+        break
+      }
+      case 'error': {
+        const err = parsed.error || {}
+        const classified = classifyError({ message: err.message, type: err.type }, 'Claude')
+        console.error(`[Claude Stream] Error: ${err.type} - ${err.message}`)
+        finished = true
+        parser.emit({}, 'error', {})
+        res.write(
+          `data: ${JSON.stringify({ error: { message: classified.message, action: classified.action, category: classified.category } })}\n\n`,
+        )
+        res.end()
         break
       }
       case 'message_stop': {

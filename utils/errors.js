@@ -2,14 +2,15 @@
  * OpenAI-compatible error factory with user-friendly messages.
  *
  * Error categories:
- *   - session_expired   → re-capture fetch from browser
- *   - rate_limited      → wait or switch sessions
- *   - cloudflare_block  → browser fingerprint rejected
- *   - auth_failed       → credentials invalid / session revoked
- *   - network           → connection failed / timeout
- *   - invalid_request   → bad input from client
- *   - provider_error    → upstream returned an error
- *   - internal          → unexpected server error
+ *   - overloaded         → provider is overloaded, try later or switch
+ *   - session_expired    → re-capture fetch from browser
+ *   - rate_limited       → wait or switch sessions
+ *   - cloudflare_block   → browser fingerprint rejected
+ *   - auth_failed        → credentials invalid / session revoked
+ *   - network            → connection failed / timeout
+ *   - invalid_request    → bad input from client
+ *   - provider_error     → upstream returned an error
+ *   - internal           → unexpected server error
  */
 
 /**
@@ -18,6 +19,21 @@
 function classifyError(error, provider) {
   const msg = (error?.message || String(error) || '').toLowerCase()
   const statusCode = error?.code || error?.statusCode || error?.status || 0
+
+  // ── Provider overloaded ───────────────────────────────
+  if (
+    msg.includes('overloaded') ||
+    msg.includes('overloaded_error') ||
+    msg.includes('over capacity')
+  ) {
+    return {
+      category: 'overloaded',
+      message: `${provider} is currently overloaded.`,
+      action:
+        'Try again in a few minutes, or switch to a different provider (restart the server to change).',
+      status: 529,
+    }
+  }
 
   // ── Session expired / auth failures ────────────────────
   if (
