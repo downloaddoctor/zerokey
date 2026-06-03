@@ -36,6 +36,7 @@ class SessionSelector {
 
     return {
       user: this.user.username,
+      userData: this.user,
       provider: this.provider,
       parsedFetch: this.user.parsedFetch || null,
       session: this.session,

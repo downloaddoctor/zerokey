@@ -1,6 +1,8 @@
 const { readSSE } = require('../../utils/sse-reader')
 const { classifyError } = require('../../utils/errors')
 
+const CLAUDE_FALLBACK_MODEL = 'claude-haiku-4-5-20251001'
+
 /**
  * Claude SSE Stream Handler
  *
@@ -10,7 +12,7 @@ const { classifyError } = require('../../utils/errors')
  *   data: {"type":"message_stop"}
  *   data: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}
  */
-async function claudeStreamHandler(res, stream, session, saveSession, parser) {
+async function claudeStreamHandler(res, stream, session, saveSession, parser, userData = null) {
   let finished = false
   const tokenUsage = {}
 
@@ -47,6 +49,27 @@ async function claudeStreamHandler(res, stream, session, saveSession, parser) {
           console.log(
             `[Claude] Limit: ${ml.type} | 5h: ${w5h ? (w5h.utilization * 100).toFixed(1) + '%' : 'n/a'} (resets ${w5h?.resets_at ? new Date(w5h.resets_at * 1000).toLocaleTimeString() : 'n/a'}) | 7d: ${w7d ? (w7d.utilization * 100).toFixed(1) + '%' : 'n/a'} (resets ${w7d?.resets_at ? new Date(w7d.resets_at * 1000).toLocaleTimeString() : 'n/a'})`,
           )
+
+          const windows = [w5h, w7d].filter((window) => window && window.utilization != null)
+          const nearLimit = windows.some((window) => window.utilization >= 0.95)
+          const resetTs = windows
+            .map((window) => (window?.resets_at ? window.resets_at * 1000 : Infinity))
+            .reduce((min, ts) => (ts < min ? ts : min), Infinity)
+
+          if (nearLimit && userData && userData.model !== CLAUDE_FALLBACK_MODEL) {
+            userData.model = CLAUDE_FALLBACK_MODEL
+            if (resetTs < Infinity) {
+              userData.modelFallbackExpiresAt = new Date(resetTs).toISOString()
+            }
+            userData.modelFallbackReason = ml.type
+            saveSession()
+            console.log(
+              `[Claude] Usage near limit; switched stored model to ${CLAUDE_FALLBACK_MODEL}` +
+                (userData.modelFallbackExpiresAt
+                  ? ` until ${userData.modelFallbackExpiresAt}`
+                  : ''),
+            )
+          }
         }
         break
       }

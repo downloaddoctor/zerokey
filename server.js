@@ -50,6 +50,7 @@ app.use('/', healthRouter)
         preSelected.session,
         preSelected.saveSession,
         preSelected.saveInstructions,
+        preSelected.userData,
       )
     } else {
       chatRouter = await buildChatRouter(

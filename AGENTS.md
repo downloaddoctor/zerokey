@@ -88,6 +88,7 @@ module: routes/claude.js
  → ../utils/errors → toOpenAIError
  → ../utils/rate-limiter → acquireSlot
  → ../lib/engine → ToolCompiler
+ → resolveClaudeModel(userData): expiry-aware fallback CLAUDE_DEFAULT_MODEL ↔ CLAUDE_FALLBACK_MODEL
 module: routes/health.js
  → express
 module: routes/models.js
@@ -116,6 +117,7 @@ module: core/claude/stream-handler.js
  → ../../utils/errors → classifyError
 module: core/session-selector.js
  → fs, path, inquirer
+ → select() returns { user, userData, provider, parsedFetch, session, saveSession, saveInstructions }
 module: utils/har-to-capture.js
  → fs, path
 module: lib/engine/index.js
@@ -123,6 +125,8 @@ module: lib/engine/index.js
  → ./tool-defs → getIDEMapper
  → ./stream → Stream
  → ./instructions.md (read at buildPrompt)
+ → formatPrompt(messages, isNewSession): passes isNewSession to user handler
+ → _handlers.user: (c, messages, isNewSession) signature
 module: lib/engine/tool-defs.js
  → fs
  → TOOLS: read, write, append, prepend, replace, list, mkdir, glob, grep, cmd, todo
@@ -131,6 +135,7 @@ module: lib/engine/tool-defs.js
  → applyTransform → reads file, computes new content, assigns params.new + params.old
  → getIDEMapper → resolves IDE-specific tool config, builds grammar prompt, returns { prompt, tools, reverseMap, user, tool }
  → IDES_PROMPT_OPTIMIZER: vscode, terax, opencode → { user, tool } message formatters
+  → vscode.user(prefix, content, messages, isNewSession): new session → full workspace_info+environment_info; existing → compact OS/Shell/CWD
  → NEW_SESSION_START_LENGTH: per-IDE session detection thresholds
  → getAllTags / getAllTagsArray: XML-like tag extraction helpers
 module: lib/engine/stream.js
@@ -167,7 +172,7 @@ server start
  → build provider chat router
    → deepseek: initDeepSeekAPI → createChatSession
    → chatgpt: initializeFromJSON → sentinel refresh
-   → claude: initializeFromJSON → extract orgId, pass saveInstructions
+   → claude: initializeFromJSON → extract orgId, pass saveInstructions, userData
  → app.use('/v1/chat/completions', chatRouter)
  → checkPort → find available port
  → app.listen(port)
@@ -186,6 +191,7 @@ POST /v1/chat/completions
  → set SSE headers
  → Stream(res, model, compiler) → parser with toolIndex from compiler.tools
  → streamHandler(res, rawStream, session, parser, saveSession)
+   → claudeStreamHandler: now accepts userData; on limit event at ≥95% utilization → sets userData.model=fallback, modelFallbackExpiresAt, saveSession()
    → readSSE: parse SSE lines → onData callbacks
    → parser.scan(text): 3-state FSM
      → outside: scan for tool-open → if found, emit prior text, enter toolStartFound
@@ -230,7 +236,7 @@ IDEMapping
  split: boolean # true → one call per array entry (terax multi_edit)
 
 IDES_PROMPT_OPTIMIZER entry (in tool-defs.js)
- user: (prefix, content, messages) → formatted user message string
+ user: (prefix, content, messages, isNewSession) → formatted user message string
  tool: (result) → formatted tool result string
 
 #ENV
