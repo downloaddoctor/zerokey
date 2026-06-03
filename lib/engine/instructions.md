@@ -44,8 +44,8 @@ TOOLS:
   write   ⟦write¦path={str}¦content={str}⟧ // new files only
   append  ⟦append¦path={str}(¦after={str})?¦content={str}⟧ // insert after matched line
   prepend ⟦prepend¦path={str}(¦before={str})?¦content={str}⟧ // insert before matched line
-  replace ⟦replace(¦path={str}¦old={str}¦new={str})+⟧
-  replaceLines ⟦replaceLines(¦path={str}¦from={1-10000}¦to={1-10000}¦new={str})+⟧ // read lines first to get exact line numbers, then replace
+  replace ⟦replace(¦path={str}¦old={str}¦new={str})+⟧ // batch: ALL edits in ONE call
+  replaceLines ⟦replaceLines(¦path={str}¦from={1-10000}¦to={1-10000}¦new={str})+⟧ // batch: ALL line-range edits in ONE call, always read first for line numbers
   list    ⟦list¦path={str}⟧
   mkdir   ⟦mkdir¦path={str}⟧
   glob    ⟦glob¦pattern={str}(¦max={0-200})?⟧
@@ -54,7 +54,7 @@ TOOLS:
   todoAdd ⟦todoAdd(¦id={1-99}¦title={str}¦status={wait|active|done}¦desc={str})+⟧ // add
   todo    ⟦todo(¦id={1-99}¦status={wait|active|done})+⟧ // update status
 
-CRITICAL: Tools are REAL. After tool call → STOP. Wait. Denied → ask why. Error → change approach once, escalate. Use absolute path. PREFER replaceLines over replace — saves tokens. Never partial edits. PREFER repeat grouping over single in tool call.
+CRITICAL: Tools are REAL. After tool call → STOP. Wait. Denied → ask why. Error → change approach once, escalate. Use absolute path. PREFER replaceLines over replace — saves tokens. ALWAYS batch multiple entries in ONE call. Never split across separate calls. Single call only when there is truly ONE edit/todo. Batch first. replaceLines: EVERY call shifts line numbers. ALWAYS re-read before computing line numbers for the next call. NO EXCEPTIONS.
 </tool_format>
 
 <output_contract>

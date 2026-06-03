@@ -135,9 +135,10 @@ module: lib/engine/tool-defs.js
  → getAllTags / getAllTagsArray: XML-like tag extraction helpers
 module: lib/engine/stream.js
  → Stream: state-machine SSE output parser
-  → scan(text): 3-state parser (outside ⟦, toolStartFound, inTool) → emits text deltas
-  → flush(): drains incomplete tool buffers → calls compiler.compile → emits OpenAI tool_call deltas
- → buildCall, buildToolDelta: OpenAI chunk helpers
+  → scan(text): 3-state parser (outside tool-open, toolStartFound, inTool) → emits text deltas; on tool-close found calls emitToolCalls immediately
+  → flush(): handles stream-end edge cases (incomplete tool, mid-name truncation) → emitToolCalls
+  → emitToolCalls(compiler, session, payloads, emit): compile payloads → buildCall → buildToolDelta → emit
+ → buildCall, buildToolDelta, emitToolCalls: OpenAI chunk helpers
 module: utils/cookie-jar.js
  → Map-based cookie store
  → parseSetCookie, seedFromHeader, captureFromFetchHeaders, captureFromRawHeaders, toString
@@ -148,7 +149,7 @@ module: utils/errors.js
  → classifyError → categorized error with action
  → toOpenAIError → OpenAI-compatible error response
 module: utils/rate-limiter.js
- → acquireSlot → 5 calls/15s sliding window rate limiter → Promise-based slot acquisition with wait queue
+ → acquireSlot → 9 calls/30s sliding window rate limiter → Promise-based slot acquisition with wait queue
 
 #RUNTIME-GRAPH
 server start
@@ -187,12 +188,10 @@ POST /v1/chat/completions
  → streamHandler(res, rawStream, session, parser, saveSession)
    → readSSE: parse SSE lines → onData callbacks
    → parser.scan(text): 3-state FSM
-     → outside: scan for ⟦ → if found, emit prior text, enter toolStartFound
-     → toolStartFound: scan for ¦ → validate tool name against toolIndex → enter inTool or emit as text
-     → inTool: scan for ⟧ → complete tool, push payload to toolBuffers, exit to outside
-   → parser.flush(): drain incomplete tool buffers
-     → compile(payload): parse → emit → IDE-specific tool call(s)
-     → buildOpenAI delta chunks with tool_calls array
+     → outside: scan for tool-open → if found, emit prior text, enter toolStartFound
+     → toolStartFound: scan for pipe → validate tool name against toolIndex → enter inTool or emit as text
+     → inTool: scan for tool-close → complete tool, call emitToolCalls immediately, exit to outside
+   → parser.flush(): handle stream-end edge cases → emitToolCalls
    → on [DONE]/finish → saveSession, res.end()
 
 #SCHEMA
@@ -218,7 +217,7 @@ ToolDefinition (in tool-defs.js TOOLS)
  vscode: IDEMapping
  terax: IDEMapping
  repeatable: object|null # for todo/replace batch
- transformer: function|null # for edit tools (append/prepend) — mutates params.path→params.old+new
+ transformer: function|null # for edit tools (append/prepend) → mutates params.path→params.old+new
 
 IDEMapping
  tool: string # IDE-specific tool name
