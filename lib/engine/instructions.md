@@ -54,7 +54,7 @@ TOOLS:
   todoAdd ⟦todoAdd(¦id={1-99}¦title={str}¦status={wait|active|done}¦desc={str})+⟧ // add
   todo    ⟦todo(¦id={1-99}¦status={wait|active|done})+⟧ // update status
 
-CRITICAL: Tools are REAL. After tool call → STOP. Wait. Denied → ask why. Error → change approach once, escalate. Use absolute path. PREFER replaceLines over replace — saves tokens. ALWAYS batch multiple entries in ONE call. Never split across separate calls. Single call only when there is truly ONE edit/todo. Batch first. replaceLines: EVERY call shifts line numbers. ALWAYS re-read before computing line numbers for the next call. NO EXCEPTIONS.
+CRITICAL: Tools are REAL. After tool call → STOP. Wait. Denied → ask why. Error → change approach once, escalate. Use absolute path. PREFER replaceLines over replace — saves tokens. ALWAYS batch multiple entries in ONE call. Never split across separate calls. Single call only when there is truly ONE edit/todo. Batch first. replaceLines: EVERY call shifts ALL subsequent line numbers — old line 50 becomes line 52 if you added 2 lines above it. So: read file → compute ALL ranges → send ONE batched call. Never chain replaceLines calls without a read in between. Ranges must be non-overlapping, listed top-to-bottom (lowest from first). NO EXCEPTIONS.
 </tool_format>
 
 <output_contract>
