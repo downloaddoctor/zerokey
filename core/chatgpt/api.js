@@ -117,7 +117,10 @@ class ChatGPTAPI {
 
     if (!res.ok) {
       const errText = await res.text()
-      throw new Error(`ChatGPT error ${res.status}: ${errText.slice(0, 300)}`)
+      const err = new Error(`ChatGPT error ${res.status}: ${errText.slice(0, 300)}`)
+      err.status = res.status
+      err.statusCode = res.status
+      throw err
     }
 
     this._captureResponseHeaders(res)
@@ -199,6 +202,8 @@ class ChatGPTAPI {
       const text = await res.text()
       const err = new Error(`Sentinel ${res.status}: ${text.slice(0, 200)}`)
       err.code = res.status
+      err.status = res.status
+      err.statusCode = res.status
       throw err
     }
 

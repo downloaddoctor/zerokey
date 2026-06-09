@@ -151,7 +151,10 @@ class ClaudeAPI {
 
     if (!res.ok) {
       const errText = await res.text()
-      throw new Error(`Claude HTTP ${res.status}: ${errText.slice(0, 500)}`)
+      const err = new Error(`Claude HTTP ${res.status}: ${errText.slice(0, 500)}`)
+      err.status = res.status
+      err.statusCode = res.status
+      throw err
     }
 
     this._captureResponseHeaders(res)

@@ -114,6 +114,8 @@ class DeepSeekAPI {
           res.on('end', () => {
             const err = new Error(`DeepSeek HTTP ${res.statusCode}: ${errorBody.slice(0, 300)}`)
             err.code = res.statusCode
+            err.status = res.statusCode
+            err.statusCode = res.statusCode
             reject(err)
           })
           return

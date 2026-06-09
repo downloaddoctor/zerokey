@@ -169,6 +169,7 @@ function toOpenAIError(error, provider, type, code) {
       code: code || classified.category || 'internal_error',
       action: classified.action,
       category: classified.category,
+      status: classified.status || 500,
     },
   }
 }
