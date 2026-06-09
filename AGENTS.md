@@ -129,11 +129,11 @@ module: lib/engine/index.js
  → _handlers.user: (c, messages, isNewSession) signature
 module: lib/engine/tool-defs.js
  → fs
- → TOOLS: read, write, append, prepend, replace, list, mkdir, glob, grep, cmd, todo
+ → TOOLS: read, write, append, prepend, replace, replaceLines, list, mkdir, glob, grep, cmd, todoAdd, todo
  → RAW_EDIT → factory for vscode/terax edit tool mappings
  → resolveAnchors → resolves anchor string with \n expansion, finds index in content
  → applyTransform → reads file, computes new content, assigns params.new + params.old
- → getIDEMapper → resolves IDE-specific tool config, builds grammar prompt, returns { prompt, tools, reverseMap, user, tool }
+ → getIDEMapper → resolves IDE-specific tool config, returns { tools, reverseMap, user, tool }
  → IDES_PROMPT_OPTIMIZER: vscode, terax, opencode → { user, tool } message formatters
   → vscode.user(prefix, content, messages, isNewSession): new session → full workspace_info+environment_info; existing → compact OS/Shell/CWD
  → NEW_SESSION_START_LENGTH: per-IDE session detection thresholds

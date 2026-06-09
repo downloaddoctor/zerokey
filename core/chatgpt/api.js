@@ -54,23 +54,27 @@ class ChatGPTAPI {
   async chatCompletion(prompt, chatSessionId, parentMessageId = 'client-created-root') {
     if (!this._ready) throw new Error('Not initialized')
 
+    const messageId = crypto.randomUUID()
+    const partialQuery = {
+      id: messageId,
+      author: { role: 'user' },
+      content: { content_type: 'text', parts: [prompt] },
+    }
+
     await this._refreshSentinel()
 
     // Always prepare conversation before sending — matches browser HAR flow.
     // First turn: gets initial conduit_token. Follow-up turns: gets refreshed conduit_token.
-    await this._prepareConversation(chatSessionId, parentMessageId)
+    await this._prepareConversation(chatSessionId, parentMessageId, partialQuery)
 
-    const messageId = crypto.randomUUID()
     const now = Date.now() / 1000
 
     const body = JSON.parse(JSON.stringify(this._bodyTemplate))
     body.action = 'next'
     body.messages = [
       {
-        id: messageId,
-        author: { role: 'user' },
+        ...partialQuery,
         create_time: now,
-        content: { content_type: 'text', parts: [prompt] },
         metadata: {
           selected_github_repos: [],
           selected_all_github_repos: false,
@@ -80,10 +84,13 @@ class ChatGPTAPI {
     ]
     body.conversation_id = chatSessionId
     body.parent_message_id = parentMessageId
-    body.client_prepare_state = 'success'
+    body.client_prepare_state = parentMessageId ? 'success' : 'sent'
     if (body.client_contextual_info) {
       body.client_contextual_info.time_since_loaded =
-        (body.client_contextual_info.time_since_loaded || 0) + 1
+        (body.client_contextual_info.time_since_loaded || 0) + parseInt(Math.random() * 100)
+
+      this._bodyTemplate.client_contextual_info.time_since_loaded =
+        body.client_contextual_info.time_since_loaded
     }
 
     console.log('[PROMPT] REQ', {
@@ -123,14 +130,15 @@ class ChatGPTAPI {
   // First call sends "x-conduit-token: no-token". Subsequent calls
   // send the previously returned conduit_token.
 
-  async _prepareConversation(conversationId, parentMessageId) {
+  async _prepareConversation(conversationId, parentMessageId, partialQuery) {
     const url = `${this.BASE_URL}/backend-api/f/conversation/prepare`
     const body = {
       action: 'next',
       fork_from_shared_post: false,
       parent_message_id: parentMessageId || 'client-created-root',
       model: 'auto',
-      client_prepare_state: conversationId ? 'success' : 'none',
+      client_prepare_state: partialQuery ? 'success' : 'none',
+      partial_query: partialQuery,
       timezone_offset_min: 420,
       timezone: 'America/Los_Angeles',
       conversation_mode: { kind: 'primary_assistant' },
