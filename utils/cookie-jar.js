@@ -91,16 +91,6 @@ class CookieJar {
   get size() {
     return this._jar.size
   }
-
-  /** Check if a cookie exists */
-  has(name) {
-    return this._jar.has(name)
-  }
-
-  /** Get a specific cookie value */
-  get(name) {
-    return this._jar.get(name)
-  }
 }
 
 module.exports = { CookieJar }

@@ -1,5 +1,5 @@
 const { readSSE } = require('../../utils/sse-reader')
-const { classifyError } = require('../../utils/errors')
+const { createSendFinalChunk, createOnError } = require('../../utils/stream-helpers')
 
 /**
  * DeepSeek SSE Stream Handler
@@ -11,19 +11,11 @@ const { classifyError } = require('../../utils/errors')
  *   data: {"v":"text"}                       → bare text delta
  */
 function streamHandler(res, stream, session, parser, saveSession, retry) {
+  const tokenUsage = {}
+  const sendFinalChunk = createSendFinalChunk(res, session, saveSession, parser, tokenUsage)
+  const onError = createOnError(res, parser, 'DeepSeek')
   let finished = false
   let cancelled = false
-  const tokenUsage = {}
-
-  const sendFinalChunk = () => {
-    if (finished) return
-    finished = true
-    parser.flush()
-    parser.emit({}, 'stop', tokenUsage)
-    res.write('data: [DONE]\n\n')
-    res.end()
-    saveSession()
-  }
 
   const onData = (data) => {
     if (cancelled) return
@@ -32,7 +24,6 @@ function streamHandler(res, stream, session, parser, saveSession, retry) {
       console.error('[DeepSeek] Error event:', data.content)
       if (retry) {
         console.log('[DeepSeek] Retrying request...')
-        // Mark this closure dead and kill the socket before retry
         cancelled = true
         finished = true
         try {
@@ -83,16 +74,7 @@ function streamHandler(res, stream, session, parser, saveSession, retry) {
   readSSE(stream, {
     onData,
     onDone: sendFinalChunk,
-    onError: (err) => {
-      const classified = classifyError(err, 'DeepSeek')
-      console.error(`[DeepSeek Stream] ${classified.category}: ${err.message}`)
-      if (!res.writableEnded) {
-        res.write(
-          `data: ${JSON.stringify({ error: { message: classified.message, action: classified.action, category: classified.category } })}\n\n`,
-        )
-        res.end()
-      }
-    },
+    onError,
     isDone: () => finished,
   })
 }

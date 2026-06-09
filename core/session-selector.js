@@ -7,6 +7,10 @@ class SessionSelector {
     this._dataDir = path.join(__dirname, '..', 'temp')
     this._usersFile = path.join(this._dataDir, 'users.json')
     this.TIMEOUT_MS = 0
+    // Ensure data directory exists before any reads/writes
+    if (!fs.existsSync(this._dataDir)) {
+      fs.mkdirSync(this._dataDir, { recursive: true })
+    }
   }
 
   async select() {

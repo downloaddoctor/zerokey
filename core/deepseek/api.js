@@ -160,7 +160,6 @@ class DeepSeekAPI {
           'Content-Length': Buffer.byteLength(postData),
         },
         agent: keepAliveAgent,
-        rejectUnauthorized: false,
         timeout: 30000,
       }
 

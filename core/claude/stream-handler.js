@@ -1,5 +1,5 @@
 const { readSSE } = require('../../utils/sse-reader')
-const { classifyError } = require('../../utils/errors')
+const { createSendFinalChunk, createOnError } = require('../../utils/stream-helpers')
 
 const CLAUDE_FALLBACK_MODEL = 'claude-haiku-4-5-20251001'
 
@@ -13,19 +13,9 @@ const CLAUDE_FALLBACK_MODEL = 'claude-haiku-4-5-20251001'
  *   data: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}
  */
 async function claudeStreamHandler(res, stream, session, saveSession, parser, userData = null) {
-  let finished = false
   const tokenUsage = {}
-
-  const sendFinalChunk = () => {
-    if (finished) return
-    finished = true
-    parser.flush()
-    parser.emit({}, 'stop', tokenUsage)
-    res.write('data: [DONE]\n\n')
-    res.end()
-    session.lastUsed = new Date().toISOString()
-    saveSession()
-  }
+  const sendFinalChunk = createSendFinalChunk(res, session, saveSession, parser, tokenUsage)
+  const onError = createOnError(res, parser, 'Claude')
 
   const onData = (parsed) => {
     switch (parsed.type) {
@@ -75,14 +65,7 @@ async function claudeStreamHandler(res, stream, session, saveSession, parser, us
       }
       case 'error': {
         const err = parsed.error || {}
-        const classified = classifyError({ message: err.message, type: err.type }, 'Claude')
-        console.error(`[Claude Stream] Error: ${err.type} - ${err.message}`)
-        finished = true
-        parser.emit({}, 'error', {})
-        res.write(
-          `data: ${JSON.stringify({ error: { message: classified.message, action: classified.action, category: classified.category } })}\n\n`,
-        )
-        res.end()
+        onError({ message: err.message, type: err.type })
         break
       }
       case 'message_stop': {
@@ -95,19 +78,8 @@ async function claudeStreamHandler(res, stream, session, saveSession, parser, us
   await readSSE(stream, {
     onData,
     onDone: sendFinalChunk,
-    onError: (err) => {
-      const classified = classifyError(err, 'Claude')
-      console.error(`[Claude Stream] ${classified.category}: ${err.message}`)
-      if (finished) return
-
-      finished = true
-      parser.emit({}, 'error', {})
-      res.write(
-        `data: ${JSON.stringify({ error: { message: classified.message, action: classified.action, category: classified.category } })}\n\n`,
-      )
-      res.end()
-    },
-    isDone: () => finished,
+    onError,
+    isDone: () => false,
   })
 }
 

@@ -6,15 +6,34 @@ const { buildChatRouter } = require('./routes/deepseek')
 const { buildChatGPTRouter } = require('./routes/chatgpt')
 const { buildClaudeRouter } = require('./routes/claude')
 const { SessionSelector } = require('./core/session-selector')
+const { toOpenAIError } = require('./utils/errors')
 
 const app = express()
 
 app.use(express.json({ limit: '50mb' }))
 
+// Middleware: request logging
+app.use((req, res, next) => {
+  const start = Date.now()
+  res.on('finish', () => {
+    const duration = Date.now() - start
+    const bodySize = req.body?.messages?.length ? `${req.body.messages.length} msgs` : '-'
+    console.log(
+      `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} → ${res.statusCode} (${duration}ms) | IDE: ${req.ide || '?'} | body: ${bodySize}`,
+    )
+  })
+  next()
+})
+
+const VALID_IDES = new Set(['vscode', 'terax', 'opencode'])
+
 // Middleware: extract IDE from Authorization header per-request
 app.use((req, res, next) => {
   const authHeader = req.headers.authorization || ''
-  req.ide = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim().toLowerCase() : 'vscode'
+  const rawIde = authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7).trim().toLowerCase()
+    : 'vscode'
+  req.ide = VALID_IDES.has(rawIde) ? rawIde : 'vscode'
   next()
 })
 
@@ -62,6 +81,18 @@ app.use('/', healthRouter)
 
     app.use('/v1/chat/completions', chatRouter)
 
+    // Error-handling middleware (must be last, after all routes)
+    app.use((err, req, res, _next) => {
+      console.error('[Server] Unhandled error:', err.message || err)
+      const openaiErr = toOpenAIError(err, preSelected.provider || 'server')
+      const status = openaiErr.error?.status || err.statusCode || err.status || 500
+      if (!res.headersSent) {
+        res.status(status).json(openaiErr)
+      } else {
+        res.end()
+      }
+    })
+
     // Check if desired port is available, find next free one if not
     const checkPort = async (p) => {
       try {
@@ -87,7 +118,7 @@ app.use('/', healthRouter)
       console.warn(`\n⚠ Port ${desiredPort} is already in use. Using port ${port} instead.`)
     }
 
-    app.listen(port, () => {
+    const server = app.listen(port, () => {
       console.log(`\n✅ ZeroKey running on http://localhost:${port}`)
       console.log('Endpoints:')
       console.log(`  GET  http://localhost:${port}/`)
@@ -96,6 +127,22 @@ app.use('/', healthRouter)
       console.log(`  POST http://localhost:${port}/v1/chat/completions`)
       console.log(`\n  IDE from Authorization: Bearer <vscode|terax|opencode> (default: vscode)\n`)
     })
+
+    // Graceful shutdown
+    const shutdown = (signal) => {
+      console.log(`\n[Server] ${signal} received — shutting down...`)
+      server.close(() => {
+        console.log('[Server] Closed.')
+        process.exit(0)
+      })
+      // Force exit after 5s if still hanging
+      setTimeout(() => {
+        console.error('[Server] Forced shutdown after timeout.')
+        process.exit(1)
+      }, 5000)
+    }
+    process.on('SIGINT', () => shutdown('SIGINT'))
+    process.on('SIGTERM', () => shutdown('SIGTERM'))
   } catch (error) {
     console.error('Failed to start server:', error)
     process.exit(1)

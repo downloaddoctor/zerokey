@@ -44,13 +44,16 @@ utils/: shared utilities
  cookie-jar.js: CookieJar → parse, seed, capture, serialize cookies
  errors.js: classifyError, toOpenAIError → OpenAI-compatible errors
  har-to-capture.js: HAR file parser
- sse-reader.js: readSSE → unified SSE reader for Web & Node.js streams
+ rate-limiter.js: acquireSlot → sliding window rate limiter
+ sse-reader.js: readSSE → unified SSE reader for Web & Node.js streams; 1MB buffer cap
+ stream-helpers.js: createSendFinalChunk, createOnError → shared stream handler factories
 docs/: static documentation
  logos/: provider logos
-server.js: Express app entry, IDE middleware, startup wizard
+server.js: Express app entry, IDE middleware, request logger, error handler, graceful shutdown
 start.bat: Windows batch launcher
-nodemon.json: nodemon config
+nodemon.json: nodemon config (watches core/, routes/, lib/, utils/, config/)
 package.json: dependencies, scripts
+package-lock.json: lockfile (lockfileVersion 3)
 
 #ENTRYPOINTS
 start: node server.js → interactive wizard → Express server on PORT
@@ -67,6 +70,11 @@ module: server.js
  → ./routes/chatgpt → buildChatGPTRouter
  → ./routes/claude → buildClaudeRouter
  → ./core/session-selector → SessionSelector
+ → ./utils/errors → toOpenAIError
+ # IDE_WHITELIST: vscode, terax, opencode (unknown → vscode)
+ # request logger: method, url, status, duration, IDE, body size
+ # error middleware: catches unhandled errors → OpenAI-compatible JSON
+ # graceful shutdown: SIGINT/SIGTERM → server.close() → 5s force-kill
 module: routes/deepseek.js
  → express
  → ../core/deepseek/api → DeepSeekAPI
@@ -101,22 +109,23 @@ module: core/deepseek/api.js
  → ./pow → DeepSeekPOW
 module: core/deepseek/stream-handler.js
  → ../../utils/sse-reader → readSSE
- → ../../utils/errors → classifyError
+ → ../../utils/stream-helpers → createSendFinalChunk, createOnError
 module: core/chatgpt/api.js
  → crypto
  → ./pow → ChatGPTProofOfWork
  → ../../utils/cookie-jar → CookieJar
 module: core/chatgpt/stream-handler.js
  → ../../utils/sse-reader → readSSE
- → ../../utils/errors → classifyError
+ → ../../utils/stream-helpers → createSendFinalChunk, createOnError
 module: core/claude/api.js
  → crypto
  → ../../utils/cookie-jar → CookieJar
 module: core/claude/stream-handler.js
  → ../../utils/sse-reader → readSSE
- → ../../utils/errors → classifyError
+ → ../../utils/stream-helpers → createSendFinalChunk, createOnError
 module: core/session-selector.js
  → fs, path, inquirer
+ → constructor ensures temp/ directory exists (mkdirSync recursive)
  → select() returns { user, userData, provider, parsedFetch, session, saveSession, saveInstructions }
 module: utils/har-to-capture.js
  → fs, path
@@ -124,14 +133,13 @@ module: lib/engine/index.js
  → fs, path
  → ./tool-defs → getIDEMapper
  → ./stream → Stream
- → ./instructions.md (read at buildPrompt)
+ → ./instructions.md (cached in memory; fs.watch invalidates on change)
  → formatPrompt(messages, isNewSession): passes isNewSession to user handler
  → _handlers.user: (c, messages, isNewSession) signature
 module: lib/engine/tool-defs.js
  → fs
  → TOOLS: read, write, append, prepend, replace, replaceLines, list, mkdir, glob, grep, cmd, todoAdd, todo
- → RAW_EDIT → factory for vscode/terax edit tool mappings
- → resolveAnchors → resolves anchor string with \n expansion, finds index in content
+ → RAW_EDIT → factory for vscode/terax/opencode edit tool mappings
  → applyTransform → reads file, computes new content, assigns params.new + params.old
  → getIDEMapper → resolves IDE-specific tool config, returns { tools, reverseMap, user, tool }
  → IDES_PROMPT_OPTIMIZER: vscode, terax, opencode → { user, tool } message formatters
@@ -149,12 +157,16 @@ module: utils/cookie-jar.js
  → parseSetCookie, seedFromHeader, captureFromFetchHeaders, captureFromRawHeaders, toString
 module: utils/sse-reader.js
  → Readable (Node.js stream)
+ → MAX_BUFFER_SIZE: 1MB cap on single-line buffer growth
  → readSSE: unified SSE reader for Web ReadableStream + Node.js stream; isDone guard in processChunk loop
 module: utils/errors.js
  → classifyError → categorized error with action
  → toOpenAIError → OpenAI-compatible error response
 module: utils/rate-limiter.js
  → acquireSlot → 9 calls/30s sliding window rate limiter → Promise-based slot acquisition with wait queue
+module: utils/stream-helpers.js
+ → createSendFinalChunk(res, session, saveSession, parser, tokenUsage) → () => void
+ → createOnError(res, parser, provider) → (err) => void
 
 #RUNTIME-GRAPH
 server start
@@ -183,7 +195,7 @@ POST /v1/chat/completions
    → getIDEMapper(ide) → { tools, prompt, reverseMap, user, tool }
    → _handlers: system→prefix, assistant→prefix, user→IDES_PROMPT_OPTIMIZER user(), tool→IDES_PROMPT_OPTIMIZER tool() + reverseMap
  → formatPrompt(messages): extract last message → handler → formatted string
- → if !session.parentMessageId && !saveInstructions → buildPrompt(userPrompt) → instructions.md + USER: prompt
+ → if session.parentMessageId == null && !saveInstructions → buildPrompt(userPrompt) → instructions.md + USER: prompt
  → provider.chatCompletion(prompt, session, ...)
    → deepseek: POW challenge → https POST → raw stream
    → chatgpt: prepareConversation → fetch POST → ReadableStream

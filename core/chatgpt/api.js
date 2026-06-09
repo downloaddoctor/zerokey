@@ -352,10 +352,6 @@ class ChatGPTAPI {
   async _fetch(url, options = {}) {
     return fetch(url, { ...options, redirect: 'follow' })
   }
-
-  isReady() {
-    return this._ready
-  }
 }
 
 module.exports = { ChatGPTAPI }

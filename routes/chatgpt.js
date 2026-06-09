@@ -38,7 +38,7 @@ async function buildChatGPTRouter(parsedFetch, session, saveSession) {
 
     // ToolCompiler created per-request with IDE from auth header
     const compiler = new ToolCompiler(req.ide, 'chatgpt')
-    const isNewSession = !session.parentMessageId
+    const isNewSession = session.parentMessageId == null
     let prompt = compiler.formatPrompt(messages, isNewSession)
 
     if (isNewSession) {

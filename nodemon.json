@@ -1,5 +1,5 @@
 {
-  "watch": ["server.js", "src"],
-  "ignore": ["data", "node_modules"],
-  "ext": "js,json"
+  "watch": ["server.js", "core/", "routes/", "lib/", "utils/", "config/"],
+  "ignore": ["temp", "data", "node_modules"],
+  "ext": "js,json,md"
 }

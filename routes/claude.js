@@ -74,7 +74,7 @@ async function buildClaudeRouter(
 
     // ToolCompiler created per-request with IDE from auth header
     const compiler = new ToolCompiler(req.ide, 'claude')
-    const isNewSession = !session.parentMessageId
+    const isNewSession = session.parentMessageId == null
     let prompt = compiler.formatPrompt(messages, isNewSession)
 
     // Prepend system prompt for first message in conversation
