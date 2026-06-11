@@ -1,11 +1,11 @@
 # ZeroKey
 
-OpenAI-compatible local AI proxy for **DeepSeek**, **ChatGPT**, and **Claude** — pipe any of them into VS Code or Terax using your real browser session. No API key. No subscription. Just paste a fetch().
+OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** — pipe any of them into VS Code or Terax using your real browser session. No API key. No subscription. Just paste a fetch().
 
 ## Features
 
 - **OpenAI-compatible** — drop-in replacement for `/v1/models` and `/v1/chat/completions`
-- **Three providers** — DeepSeek, ChatGPT, and Claude — switch at startup
+- **Three providers** — DeepSeek, Claude, and ChatGPT — switch at startup
 - **Real browser fingerprint** — POW solving, sentinel tokens, conversation prepare, Cloudflare-safe header ordering, cookie management
 - **Streaming** — SSE response streaming for all providers
 - **Multi-IDE** — per-request IDE selection via `Authorization: Bearer <vscode|terax>`
@@ -22,7 +22,7 @@ npm start
 ```
 
 On startup, the interactive wizard guides you through:
-1. **Provider** — DeepSeek, ChatGPT, or Claude
+1. **Provider** — DeepSeek, Claude, or ChatGPT
 2. **User** — paste a `fetch()` call from browser DevTools (captures headers + browser fingerprint)
 3. **Session** — pick or create a chat session
 
@@ -97,7 +97,7 @@ The `Authorization: Bearer <ide>` header maps the request to the correct IDE's t
 server.js               → Express app, startup wizard, provider dispatch, port selection
 config/
   constants.js          → PORT, MODELS
-routes/                 → chatgpt.js, claude.js, deepseek.js, models.js, health.js
+routes/                 → deepseek.js, claude.js, chatgpt.js, models.js, health.js
 core/
   deepseek/             → api.js (POW + HTTPS), pow.js (WASM SHA3-512), stream-handler.js
   chatgpt/              → api.js (sentinel + conduit), pow.js (pure JS SHA3-512), stream-handler.js

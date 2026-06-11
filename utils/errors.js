@@ -155,7 +155,7 @@ function getProviderURL(provider) {
  * Build a full OpenAI-compatible error response with user-friendly details.
  *
  * @param {Error|object} error - Raw error from provider
- * @param {string} provider - 'deepseek' | 'chatgpt' | 'claude'
+ * @param {string} provider - 'deepseek' | 'claude' | 'chatgpt'
  * @param {string} type - OpenAI error type
  * @param {string} code - OpenAI error code
  */

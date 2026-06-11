@@ -40,8 +40,8 @@ class SessionSelector {
   async _stepProviderSelection() {
     const choices = [
       { name: '  DeepSeek', value: 'deepseek' },
-      { name: '  ChatGPT', value: 'chatgpt' },
       { name: '  Claude', value: 'claude' },
+      { name: '  ChatGPT (not recommended)', value: 'chatgpt' },
     ]
 
     const { provider } = await inquirer.prompt([

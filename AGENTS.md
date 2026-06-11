@@ -3,7 +3,7 @@ zerokey v1.0.0
 language: javascript
 runtime: node.js
 package-manager: npm
-description: OpenAI-compatible AI proxy for DeepSeek, ChatGPT & Claude — no API keys, real browser sessions
+description: OpenAI-compatible AI proxy for DeepSeek, Claude & ChatGPT — no API keys, real browser sessions
 
 #DIRECTORY
 config/: server configuration
@@ -14,33 +14,32 @@ core/: provider API clients
   api.js: DeepSeekAPI → https.request, POW, cookie-jar
   pow.js: DeepSeekPOW WASM solver
   stream-handler.js: SSE stream parser for DeepSeek
+ claude/: Claude provider
+  api.js: ClaudeAPI → fetch, org-based, conversation UUID
+  stream-handler.js: SSE stream parser for Claude
+  set-instructions.js: setClaudeInstructions → PUT account_profile with getFull(), hash-cached, fire-and-forget
  chatgpt/: ChatGPT provider
   api.js: ChatGPTAPI → fetch, sentinel POW, conversation prepare
   pow.js: ChatGPTProofOfWork solver
   stream-handler.js: SSE stream parser for ChatGPT
   set-instructions.js: setChatGPTInstructions → PATCH user_system_messages with getBase(), hash-cached, fire-and-forget
- claude/: Claude provider
-  api.js: ClaudeAPI → fetch, org-based, conversation UUID
-  stream-handler.js: SSE stream parser for Claude
-  set-instructions.js: setClaudeInstructions → PUT account_profile with getFull(), hash-cached, fire-and-forget
  session-selector.js: inquirer-based provider/user/session selector
 lib/: tool compilation engine
  engine/: ToolCompiler + Stream parser
   index.js: ToolCompiler → formatPrompt, buildPrompt, parse, emit, compile, inferType
   stream.js: Stream → scans LLM output for ⟦tool¦params⟧, builds OpenAI tool_call deltas
   tool-defs.js: TOOLS registry, getIDEMapper → IDE-specific tool mappings + prompt optimizer
- templates/: IDE config templates
   instructions.md: base system prompt ≤1500 chars (role, code_style, tool_format) — used by ChatGPT custom instructions
-  skills-extra.md: extra prompt blocks (memory, save_workflow) — prepended to ChatGPT first prompt; combined with base for Claude/DeepSeek
+  skills-extra.md: extra prompt blocks (memory, save_workflow) — prepended to ChatGPT first prompt; combined with base for DeepSeek/Claude
   instructions.js: Instructions class → getBase(), getExtra(), getFull(), getHash(), invalidate() — single source for all providers
   templates/: IDE config templates
    opencode.json: opencode IDE config
    terax.json: terax IDE config
    vscode.json: vscode IDE config
 routes/: Express route handlers
- chatgpt.js: POST /v1/chat/completions → ChatGPT; on new session → setChatGPTInstructions
- claude.js: POST /v1/chat/completions → Claude; on new session → setClaudeInstructions; saveInstructions removed
  deepseek.js: POST /v1/chat/completions → DeepSeek
+ claude.js: POST /v1/chat/completions → Claude; on new session → setClaudeInstructions; saveInstructions removed
+ chatgpt.js: POST /v1/chat/completions → ChatGPT; on new session → setChatGPTInstructions
  health.js: GET /, GET /health
  models.js: GET /v1/models, GET /v1/models/:model
 temp/: runtime session data
@@ -72,8 +71,8 @@ module: server.js
  → ./routes/models
  → ./routes/health
  → ./routes/deepseek → buildChatRouter
- → ./routes/chatgpt → buildChatGPTRouter
  → ./routes/claude → buildClaudeRouter
+ → ./routes/chatgpt → buildChatGPTRouter
  → ./core/session-selector → SessionSelector
  → ./utils/errors → toOpenAIError
  # IDE_WHITELIST: vscode, terax, opencode (unknown → vscode)
@@ -87,6 +86,14 @@ module: routes/deepseek.js
  → ../utils/errors → toOpenAIError
  → ../utils/rate-limiter → acquireSlot
  → ../lib/engine → ToolCompiler
+module: routes/claude.js
+ → express
+ → ../core/claude/api → ClaudeAPI
+ → ../core/claude/stream-handler → claudeStreamHandler
+ → ../utils/errors → toOpenAIError
+ → ../utils/rate-limiter → acquireSlot
+ → ../lib/engine → ToolCompiler
+ → resolveClaudeModel(userData): expiry-aware fallback CLAUDE_DEFAULT_MODEL ↔ CLAUDE_FALLBACK_MODEL
 module: routes/chatgpt.js
  → express
  → ../lib/engine/instructions → Instructions singleton
@@ -96,14 +103,6 @@ module: routes/chatgpt.js
  → ../utils/rate-limiter → acquireSlot
  → ../lib/engine → ToolCompiler
  # on new session: setChatGPTInstructions + prepend getExtra() to prompt
-module: routes/claude.js
- → express
- → ../core/claude/api → ClaudeAPI
- → ../core/claude/stream-handler → claudeStreamHandler
- → ../utils/errors → toOpenAIError
- → ../utils/rate-limiter → acquireSlot
- → ../lib/engine → ToolCompiler
- → resolveClaudeModel(userData): expiry-aware fallback CLAUDE_DEFAULT_MODEL ↔ CLAUDE_FALLBACK_MODEL
 module: routes/health.js
  → express
 module: routes/models.js
@@ -117,17 +116,17 @@ module: core/deepseek/api.js
 module: core/deepseek/stream-handler.js
  → ../../utils/sse-reader → readSSE
  → ../../utils/stream-helpers → createSendFinalChunk, createOnError
+module: core/claude/api.js
+ → crypto
+ → ../../utils/cookie-jar → CookieJar
+module: core/claude/stream-handler.js
+ → ../../utils/sse-reader → readSSE
+ → ../../utils/stream-helpers → createSendFinalChunk, createOnError
 module: core/chatgpt/api.js
  → crypto
  → ./pow → ChatGPTProofOfWork
  → ../../utils/cookie-jar → CookieJar
 module: core/chatgpt/stream-handler.js
- → ../../utils/sse-reader → readSSE
- → ../../utils/stream-helpers → createSendFinalChunk, createOnError
-module: core/claude/api.js
- → crypto
- → ../../utils/cookie-jar → CookieJar
-module: core/claude/stream-handler.js
  → ../../utils/sse-reader → readSSE
  → ../../utils/stream-helpers → createSendFinalChunk, createOnError
 module: core/session-selector.js
@@ -189,15 +188,15 @@ server start
  → mount IDE middleware: req.ide ← Authorization Bearer header
  → mount /v1/models, / health routes
  → SessionSelector.select()
-   → _stepProviderSelection: inquirer list deepseek|chatgpt|claude
+   → _stepProviderSelection: inquirer list deepseek|claude|chatgpt
    → _stepUserLogin: load temp/users.json, prompt or create new
      → _promptNewUser: username + fetch() paste → _parseFetchDirect
    → _stepSessionSelection: list, create, delete sessions
    → return { user, provider, parsedFetch, session, saveSession }
  → build provider chat router
    → deepseek: initDeepSeekAPI → createChatSession
-   → chatgpt: initializeFromJSON → sentinel refresh
    → claude: initializeFromJSON → extract orgId, pass userData
+   → chatgpt: initializeFromJSON → sentinel refresh
  → app.use('/v1/chat/completions', chatRouter)
  → checkPort → find available port
  → app.listen(port)
@@ -208,11 +207,11 @@ POST /v1/chat/completions
    → getIDEMapper(ide) → { tools, prompt, reverseMap, user, tool }
    → _handlers: system→prefix, assistant→prefix, user→IDES_PROMPT_OPTIMIZER user(), tool→IDES_PROMPT_OPTIMIZER tool() + reverseMap
  → formatPrompt(messages): extract last message → handler → formatted string
- → if session.parentMessageId == null → buildPrompt(userPrompt) → instructions.md + USER: prompt; ChatGPT/Claude also call setInstructions API (hash-cached)
+ → if session.parentMessageId == null → buildPrompt(userPrompt) → instructions.md + USER: prompt; Claude/ChatGPT also call setInstructions API (hash-cached)
  → provider.chatCompletion(prompt, session, ...)
    → deepseek: POW challenge → https POST → raw stream
-   → chatgpt: prepareConversation → fetch POST → ReadableStream
    → claude: fetch POST → ReadableStream
+   → chatgpt: prepareConversation → fetch POST → ReadableStream
  → set SSE headers
  → Stream(res, model, compiler) → parser with toolIndex from compiler.tools
  → streamHandler(res, rawStream, session, parser, saveSession)
@@ -227,7 +226,7 @@ POST /v1/chat/completions
 
 #SCHEMA
 User (stored in users.json by provider)
- provider: string # deepseek|chatgpt|claude
+ provider: string # deepseek|claude|chatgpt
   username: string
    parsedFetch: { headers: object, body: object, url: string }
    sessions: Session[]
