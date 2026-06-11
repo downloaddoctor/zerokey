@@ -72,7 +72,8 @@ server.js
  → utils/errors → toOpenAIError
  # IDE_WHITELIST: vscode, terax, opencode (unknown → vscode)
  # request logger: method/url/status/duration/IDE/body-size
- # error middleware: unhandled → OpenAI-compatible JSON
+ # error middleware: unhandled → OpenAI-compatible JSON; res.headersSent guard
+ # route catch blocks: res.headersSent guard before JSON error response
  # graceful shutdown: SIGINT/SIGTERM → server.close() → 5s force-kill
 
 routes/claude.js
@@ -194,4 +195,5 @@ IDEMapping
  split: boolean  # true → one call per array entry
 
 #ENV
+engines.node: >=18.0.0
 PORT: server port (default 8000)

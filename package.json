@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "OpenAI-compatible AI proxy for DeepSeek, Claude & ChatGPT — no API keys, real browser sessions",
   "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node server.js"
   },

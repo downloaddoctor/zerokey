@@ -69,6 +69,7 @@ async function buildChatGPTRouter(parsedFetch, session, saveSession, userData = 
 
       chatgptStreamHandler(res, stream, session, saveSession, parser)
     } catch (error) {
+      if (res.headersSent) return
       console.error('[ChatGPT Route] Error:', error.message)
       const err = toOpenAIError(error, 'ChatGPT')
       return res.status(err.error.status || 500).json(err)

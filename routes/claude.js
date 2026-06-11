@@ -81,12 +81,12 @@ async function buildClaudeRouter(parsedFetch, session, saveSession, userData = n
 
       claudeStreamHandler(res, stream, session, saveSession, parser, userData)
     } catch (error) {
+      if (res.headersSent) return
       console.error('[Claude Route] Error:', error.message)
 
       try {
         const errorObj = JSON.parse(error.message).error
 
-        // Persist rate-limit reset time so the session selector skips this user
         if (errorObj.type === 'rate_limit_error') {
           const hourLimit = JSON.parse(errorObj.message).windows['5h']
           userData.waitUntil = hourLimit.resets_at * 1000
