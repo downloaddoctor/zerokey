@@ -1,90 +1,49 @@
-const https = require('https')
-const fs = require('fs')
-const path = require('path')
-const crypto = require('crypto')
-
-let _cachedHash = null
-
-function getInstructionsHash() {
-  if (_cachedHash) return _cachedHash
-  const instructions = fs.readFileSync(
-    path.join(__dirname, '..', '..', 'lib', 'engine', 'instructions.md'),
-    'utf8',
-  )
-  _cachedHash = crypto.createHash('sha256').update(instructions).digest('hex')
-  return _cachedHash
-}
+const instructions = require('../../lib/engine/instructions')
 
 /**
  * Set Claude custom instructions via the account_profile API.
  * Only fires when instructions.md hash differs from last applied state.
- * Hash is cached at startup — instructions.md changes require a server restart.
+ * Uses claudeApi._buildHeaders() to ensure all Cloudflare/Anthropic fingerprint
+ * headers are present — same as real chat requests.
  */
-async function setClaudeInstructions(parsedFetch, userData, saveSession) {
-  const currentHash = getInstructionsHash()
+async function setClaudeInstructions(claudeApi, userData, saveSession) {
+  if (!userData) return false
+
+  const currentHash = instructions.getHash()
 
   // Skip if already applied with same hash
   if (userData.instructionsHash === currentHash) {
     return false
   }
 
-  const { headers } = parsedFetch
-  const bearer = headers.authorization || headers.Authorization || ''
-  const cookies = headers.cookie || headers.Cookie || ''
+  const payload = JSON.stringify({ conversation_preferences: instructions.getFull() })
 
-  const instructions = fs.readFileSync(
-    path.join(__dirname, '..', '..', 'lib', 'engine', 'instructions.md'),
-    'utf8',
-  )
+  const headers = claudeApi._buildHeaders({ accept: '*/*' }, '/api/account_profile')
 
-  const payload = {
-    conversation_preferences: instructions,
-  }
-
-  const postData = JSON.stringify(payload)
-
-  const options = {
-    hostname: 'claude.ai',
-    path: '/api/account_profile',
-    method: 'PUT',
-    headers: {
-      accept: '*/*',
-      'accept-language': 'en-US,en;q=0.9',
-      authorization: bearer,
-      'content-type': 'application/json',
-      cookie: cookies,
-      Referer: 'https://claude.ai/new',
-    },
-  }
-
-  return new Promise((resolve, reject) => {
-    const req = https.request(options, (res) => {
-      let data = ''
-      res.on('data', (chunk) => {
-        data += chunk
-      })
-      res.on('end', () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          userData.instructionsHash = currentHash
-          userData.instructionsAppliedAt = new Date().toISOString()
-          saveSession()
-          console.log('[Claude] Custom instructions set successfully')
-          resolve(true)
-        } else {
-          console.warn(`[Claude] Failed to set instructions: ${res.statusCode} ${data}`)
-          resolve(false)
-        }
-      })
+  try {
+    const res = await fetch('https://claude.ai/api/account_profile', {
+      method: 'PUT',
+      headers,
+      body: payload,
+      redirect: 'follow',
     })
 
-    req.on('error', (err) => {
-      console.warn('[Claude] Instructions API error:', err.message)
-      resolve(false)
-    })
+    const data = await res.text()
 
-    req.write(postData)
-    req.end()
-  })
+    if (res.ok) {
+      userData.instructionsHash = currentHash
+      userData.instructionsAppliedAt = new Date().toISOString()
+      saveSession()
+      console.log('[Claude] Custom instructions set successfully')
+      return true
+    } else {
+      console.warn(`[Claude] Failed to set instructions: ${res.status} ${data}`)
+      return false
+    }
+  } catch (err) {
+    console.warn('[Claude] Instructions API error:', err.message)
+    return false
+  }
 }
 
 module.exports = { setClaudeInstructions }

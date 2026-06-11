@@ -70,13 +70,12 @@ async function buildClaudeRouter(parsedFetch, session, saveSession, userData = n
     // ToolCompiler created per-request with IDE from auth header
     const compiler = new ToolCompiler(req.ide, 'claude')
     const isNewSession = session.parentMessageId == null
-    let prompt = compiler.formatPrompt(messages, isNewSession)
+    const prompt = compiler.formatPrompt(messages, isNewSession)
 
-    // Prepend system prompt for first message in conversation
+    // Sync instructions.md to Claude custom instructions on new session (hash-cached, fire-and-forget)
+    // Do NOT prepend instructions.md to prompt — Claude receives it via account_profile API
     if (isNewSession) {
-      prompt = compiler.buildPrompt(prompt)
-      // Sync instructions.md to Claude custom instructions (hash-cached, fire-and-forget)
-      await setClaudeInstructions(parsedFetch, userData, saveSession)
+      await setClaudeInstructions(claudeApi, userData, saveSession)
     }
 
     await acquireSlot('Claude')

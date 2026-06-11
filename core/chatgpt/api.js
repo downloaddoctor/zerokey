@@ -266,11 +266,13 @@ class ChatGPTAPI {
     h.push(['accept', overrides.accept || '*/*'])
     h.push(['accept-encoding', 'gzip, deflate, br, zstd'])
     h.push(['accept-language', src['accept-language'] || 'en-US,en;q=0.9'])
+    h.push(['authorization', src['authorization']])
+
     h.push(['cache-control', 'no-cache'])
     // content-length is set automatically by fetch()
     h.push(['content-type', overrides['content-type'] || 'application/json'])
 
-    // ── Block 9: Cookies from jar (last before overrides) ──
+    // ── Block 1.1: Cookies from jar (last before overrides) ──
     const cookieStr = this._cookies.toString()
     if (cookieStr) {
       h.push(['cookie', cookieStr])

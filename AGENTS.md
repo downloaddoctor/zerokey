@@ -18,18 +18,21 @@ core/: provider API clients
   api.js: ChatGPTAPI → fetch, sentinel POW, conversation prepare
   pow.js: ChatGPTProofOfWork solver
   stream-handler.js: SSE stream parser for ChatGPT
-  set-instructions.js: setChatGPTInstructions → PATCH user_system_messages, hash-cached, fire-and-forget
+  set-instructions.js: setChatGPTInstructions → PATCH user_system_messages with getBase(), hash-cached, fire-and-forget
  claude/: Claude provider
   api.js: ClaudeAPI → fetch, org-based, conversation UUID
   stream-handler.js: SSE stream parser for Claude
-  set-instructions.js: setClaudeInstructions → PUT account_profile, hash-cached, fire-and-forget
+  set-instructions.js: setClaudeInstructions → PUT account_profile with getFull(), hash-cached, fire-and-forget
  session-selector.js: inquirer-based provider/user/session selector
 lib/: tool compilation engine
  engine/: ToolCompiler + Stream parser
   index.js: ToolCompiler → formatPrompt, buildPrompt, parse, emit, compile, inferType
   stream.js: Stream → scans LLM output for ⟦tool¦params⟧, builds OpenAI tool_call deltas
   tool-defs.js: TOOLS registry, getIDEMapper → IDE-specific tool mappings + prompt optimizer
-  instructions.md: full system prompt with output contract, enforcement, save workflow
+ templates/: IDE config templates
+  instructions.md: base system prompt ≤1500 chars (role, code_style, tool_format) — used by ChatGPT custom instructions
+  skills-extra.md: extra prompt blocks (memory, save_workflow) — prepended to ChatGPT first prompt; combined with base for Claude/DeepSeek
+  instructions.js: Instructions class → getBase(), getExtra(), getFull(), getHash(), invalidate() — single source for all providers
   templates/: IDE config templates
    opencode.json: opencode IDE config
    terax.json: terax IDE config
@@ -86,11 +89,13 @@ module: routes/deepseek.js
  → ../lib/engine → ToolCompiler
 module: routes/chatgpt.js
  → express
+ → ../lib/engine/instructions → Instructions singleton
  → ../core/chatgpt/api → ChatGPTAPI
  → ../core/chatgpt/stream-handler → chatgptStreamHandler
  → ../utils/errors → toOpenAIError
  → ../utils/rate-limiter → acquireSlot
  → ../lib/engine → ToolCompiler
+ # on new session: setChatGPTInstructions + prepend getExtra() to prompt
 module: routes/claude.js
  → express
  → ../core/claude/api → ClaudeAPI
@@ -132,12 +137,19 @@ module: core/session-selector.js
 module: utils/har-to-capture.js
  → fs, path
 module: lib/engine/index.js
- → fs, path
+ → ./instructions → Instructions singleton
  → ./tool-defs → getIDEMapper
  → ./stream → Stream
- → ./instructions.md (cached in memory; fs.watch invalidates on change)
  → formatPrompt(messages, isNewSession): passes isNewSession to user handler
+ → buildPrompt(userPrompt): instructions.getFull() + userPrompt
  → _handlers.user: (c, messages, isNewSession) signature
+module: lib/engine/instructions.js
+ → fs, path, crypto
+ → Instructions singleton → getBase(), getExtra(), getFull(), getHash(), invalidate()
+ → getBase(): reads instructions.md
+ → getExtra(): reads skills-extra.md
+ → getFull(): base + extra combined
+ → getHash(): SHA-256 of base only
 module: lib/engine/tool-defs.js
  → fs
  → TOOLS: read, write, append, prepend, replace, replaceLines, list, mkdir, glob, grep, cmd, todoAdd, todo

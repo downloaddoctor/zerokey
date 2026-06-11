@@ -1,4 +1,5 @@
 const express = require('express')
+const instructions = require('../lib/engine/instructions')
 const { ChatGPTAPI } = require('../core/chatgpt/api')
 const { chatgptStreamHandler } = require('../core/chatgpt/stream-handler')
 const { toOpenAIError } = require('../utils/errors')
@@ -42,10 +43,11 @@ async function buildChatGPTRouter(parsedFetch, session, saveSession, userData = 
     const isNewSession = session.parentMessageId == null
     let prompt = compiler.formatPrompt(messages, isNewSession)
 
+    // Sync instructions.md to ChatGPT custom instructions on new session (hash-cached, fire-and-forget)
+    // Do NOT prepend instructions.md to prompt — ChatGPT receives it via user_system_messages API
     if (isNewSession) {
-      prompt = compiler.buildPrompt(prompt)
-      // Sync instructions.md to ChatGPT custom instructions (hash-cached, fire-and-forget)
-      await setChatGPTInstructions(parsedFetch, userData, saveSession)
+      await setChatGPTInstructions(chatgptApi, userData, saveSession)
+      prompt = instructions.getExtra() + '\n\n' + prompt
     }
 
     await acquireSlot('ChatGPT')
