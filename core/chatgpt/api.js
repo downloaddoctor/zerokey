@@ -356,8 +356,38 @@ class ChatGPTAPI {
     return base
   }
 
-  async _fetch(url, options = {}) {
-    return fetch(url, { ...options, redirect: 'follow' })
+  async _fetch(url, options = {}, parseJSON = false, timeoutMs = 300_000) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+    let res
+    try {
+      res = await fetch(url, { ...options, redirect: 'follow', signal: controller.signal })
+    } catch (err) {
+      clearTimeout(timer)
+      if (err.name === 'AbortError') {
+        const errorObj = {
+          error: {
+            type: 'request_timeout',
+            message: `Request timed out after ${timeoutMs / 1000}s`,
+          },
+        }
+        const te = new Error(JSON.stringify(errorObj))
+        te.status = 504
+        te.statusCode = 504
+        throw te
+      }
+      throw err
+    }
+    clearTimeout(timer)
+
+    if (parseJSON && res.ok) {
+      this._captureResponseHeaders(res)
+      const json = await res.json()
+      return { ok: true, status: res.status, data: json }
+    }
+
+    return res
   }
 }
 

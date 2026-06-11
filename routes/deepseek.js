@@ -50,7 +50,6 @@ async function buildChatRouter(headers, session, saveSession) {
 
     try {
       const deepseekStream = await deepseekApi.chatCompletion(
-        headers,
         session.chatSessionId,
         prompt,
         session.parentMessageId,
@@ -69,7 +68,6 @@ async function buildChatRouter(headers, session, saveSession) {
       const retry = async () => {
         await acquireSlot('DeepSeek', true)
         return deepseekApi.chatCompletion(
-          headers,
           session.chatSessionId,
           prompt,
           session.parentMessageId,
@@ -107,7 +105,7 @@ async function initDeepSeekAPI(session, headers, saveSession) {
     )
   }
 
-  const chatSessionId = await deepseekApi.createChatSession(headers)
+  const chatSessionId = await deepseekApi.createChatSession()
   session.chatSessionId = chatSessionId
   saveSession()
   console.log(`[CHAT] Session "${session.name}" created with chatSessionId: ${chatSessionId}`)

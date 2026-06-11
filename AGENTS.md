@@ -13,7 +13,7 @@ core/: provider API clients
  deepseek/: DeepSeek provider
   api.js: DeepSeekAPI → https.request, POW, cookie-jar
   pow.js: DeepSeekPOW WASM solver
-  stream-handler.js: SSE stream parser for DeepSeek
+  stream-handler.js: SSE stream parser; SET/BATCH/text delta dispatch; token usage capture; error retry
  claude/: Claude provider
   api.js: ClaudeAPI → fetch, org-based, conversation UUID; _buildHeaders preserves exact HAR order
   stream-handler.js: SSE stream parser; message_limit → fallback model switch
@@ -49,7 +49,7 @@ utils/: shared utilities
  errors.js: classifyError (9 categories), toOpenAIError → OpenAI-compatible error response
  har-to-capture.js: HAR file parser → parsedFetch format
  rate-limiter.js: acquireSlot → 9 calls/30s sliding window; per-label, promise-based queue
- sse-reader.js: readSSE → Web ReadableStream + Node.js stream; 1MB buffer cap; isDone guard
+ sse-reader.js: readSSE → Web ReadableStream (fetch body); 1MB buffer cap; [DONE] detection
  stream-helpers.js: createSendFinalChunk (once-guard, flush+emit+[DONE]+saveSession); createOnError
 docs/: static documentation
  logos/: provider logos
@@ -114,10 +114,10 @@ lib/engine/stream.js → Stream
  # callCounter: global monotonic ID for call_XXXX_toolname IDs
 
 utils/sse-reader.js → readSSE
- # Web stream: getReader() + TextDecoder loop
- # Node stream: on(data/end/error) promise
+ # getReader() + TextDecoder loop → processChunk → processLine
  # processChunk: split on \n, keep trailing partial in buffer
- # isDone() guard checked before each line + inner loop break
+ # processLine: skips event:, parses data: JSON, handles [DONE] → onDone
+ # 1MB buffer cap; onDone on stream end or error
 
 utils/stream-helpers.js
  # createSendFinalChunk: once-guard; parser.flush() → emit stop → [DONE] → res.end() → saveSession

@@ -17,7 +17,6 @@ async function chatgptStreamHandler(res, stream, session, saveSession, parser) {
   const tokenUsage = {}
   const sendFinalChunk = createSendFinalChunk(res, session, saveSession, parser, tokenUsage)
   const onError = createOnError(res, parser, 'ChatGPT')
-  let finished = false
 
   const onData = (data) => {
     if (!data) return
@@ -56,7 +55,6 @@ async function chatgptStreamHandler(res, stream, session, saveSession, parser) {
     // batch patch → parse array, scan text, finish on status
     if (data.o === 'patch' && Array.isArray(data.v)) {
       for (const op of data.v) {
-        if (finished) break
         if (op.p === '/message/content/parts/0' && op.o === 'append') {
           parser.scan(op.v)
         }
@@ -71,7 +69,6 @@ async function chatgptStreamHandler(res, stream, session, saveSession, parser) {
     onData,
     onDone: sendFinalChunk,
     onError,
-    isDone: () => finished,
   })
 }
 

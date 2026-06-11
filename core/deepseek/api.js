@@ -1,27 +1,21 @@
-const https = require('https')
 const { CookieJar } = require('../../utils/cookie-jar')
-
-// Keep-alive agent — reuses TCP connections, avoids TLS handshake per request
-const keepAliveAgent = new https.Agent({
-  keepAlive: true,
-  keepAliveMsecs: 30000,
-  maxSockets: 10,
-  maxFreeSockets: 5,
-  timeout: 60000,
-})
 const { DeepSeekPOW } = require('./pow')
 
 class DeepSeekAPI {
-  static BASE_URL_OBJ = new URL('https://chat.deepseek.com/api/v0')
+  static BASE_URL = 'https://chat.deepseek.com/api/v0'
 
   constructor() {
     this.powSolver = null
     this._cookies = new CookieJar()
+    this._headers = {}
   }
 
   async initialize(headers = {}) {
     this.powSolver = new DeepSeekPOW()
     await this.powSolver.initialize()
+
+    // Store all captured headers for later reuse
+    this._headers = { ...headers }
 
     // Seed cookie jar from initial headers if present
     const initialCookie = headers.cookie || headers.Cookie || ''
@@ -33,13 +27,20 @@ class DeepSeekAPI {
     }
   }
 
-  async createChatSession(headers) {
+  async createChatSession() {
     try {
-      const response = await this._makeRequest('POST', '/chat_session/create', headers, {
-        character_id: null,
-      })
+      const resp = await this._fetch(
+        `${DeepSeekAPI.BASE_URL}/chat_session/create`,
+        {
+          method: 'POST',
+          headers: this._buildHeaders(),
+          body: JSON.stringify({ character_id: null }),
+        },
+        true,
+      )
 
-      const id = response.data.biz_data.id || response.data.biz_data.chat_session.id
+      const body = resp.data
+      const id = body.data.biz_data.id || body.data.biz_data.chat_session.id
 
       console.log('[DeepSeekAPI] NEW SESSION:', id)
       return id
@@ -49,10 +50,9 @@ class DeepSeekAPI {
   }
 
   /**
-   * Send a chat completion request. Returns the raw HTTPS response stream.
+   * Send a chat completion request. Returns a Web ReadableStream.
    */
   async chatCompletion(
-    headers,
     chatSessionId,
     prompt,
     parentMessageId = null,
@@ -60,7 +60,7 @@ class DeepSeekAPI {
     searchEnabled = false,
     modelType = null,
   ) {
-    const challenge = await this._getPowChallenge(headers)
+    const challenge = await this._getPowChallenge()
     const powResponse = await this.powSolver.solveChallenge(challenge)
 
     const jsonData = {
@@ -80,118 +80,103 @@ class DeepSeekAPI {
       promptLength: prompt.length,
     })
 
-    const postData = JSON.stringify(jsonData)
-
-    // Inject cookies from jar
-    const requestHeaders = { ...headers }
-    const cookieStr = this._cookies.toString()
-    if (cookieStr) {
-      requestHeaders.cookie = cookieStr
-    }
-
-    const options = {
-      hostname: DeepSeekAPI.BASE_URL_OBJ.hostname,
-      port: 443,
-      path: DeepSeekAPI.BASE_URL_OBJ.pathname + '/chat/completion',
-      method: 'POST',
-      headers: {
-        ...requestHeaders,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData),
-        'x-ds-pow-response': powResponse,
+    const res = await this._fetch(
+      `${DeepSeekAPI.BASE_URL}/chat/completion`,
+      {
+        method: 'POST',
+        headers: this._buildHeaders({ 'x-ds-pow-response': powResponse }),
+        body: JSON.stringify(jsonData),
       },
-      agent: keepAliveAgent,
+      false,
+    )
+
+    if (!res.ok) {
+      const errText = await res.text()
+      const err = new Error(`DeepSeek HTTP ${res.status}: ${errText.slice(0, 300)}`)
+      err.status = res.status
+      err.statusCode = res.status
+      throw err
     }
 
-    return new Promise((resolve, reject) => {
-      const req = https.request(options, (res) => {
-        // Capture cookies from streaming response too
-        this._cookies.captureFromRawHeaders(res.headers, ' DeepSeek')
+    this._captureResponseHeaders(res)
 
-        if (res.statusCode !== 200) {
-          let errorBody = ''
-          res.on('data', (chunk) => (errorBody += chunk))
-          res.on('end', () => {
-            const err = new Error(`DeepSeek HTTP ${res.statusCode}: ${errorBody.slice(0, 300)}`)
-            err.code = res.statusCode
-            err.status = res.statusCode
-            err.statusCode = res.statusCode
-            reject(err)
-          })
-          return
-        }
-        resolve(res)
-      })
-      req.on('error', reject)
-      req.write(postData)
-      req.end()
-    })
+    return res.body
   }
 
   // ─── Internal ───
-  async _getPowChallenge(headers) {
+  async _getPowChallenge() {
     try {
-      const response = await this._makeRequest('POST', '/chat/create_pow_challenge', headers, {
-        target_path: '/api/v0/chat/completion',
-      })
-      return response.data.biz_data.challenge
+      const resp = await this._fetch(
+        `${DeepSeekAPI.BASE_URL}/chat/create_pow_challenge`,
+        {
+          method: 'POST',
+          headers: this._buildHeaders(),
+          body: JSON.stringify({ target_path: '/api/v0/chat/completion' }),
+        },
+        true,
+      )
+      const body = resp.data
+      return body.data.biz_data.challenge
     } catch (error) {
       throw new Error('Failed to get POW challenge: ' + error.message)
     }
   }
 
-  _makeRequest(method, endpoint, headers, jsonData) {
-    return new Promise((resolve, reject) => {
-      const postData = JSON.stringify(jsonData)
+  // ─── Response header capture ─────────────────────────────────
 
-      // Inject cookie jar into request headers
-      const requestHeaders = { ...headers }
-      const cookieStr = this._cookies.toString()
-      if (cookieStr) {
-        requestHeaders.cookie = cookieStr
+  _captureResponseHeaders(res) {
+    this._cookies.captureFromFetchHeaders(res.headers, ' DeepSeek')
+  }
+
+  // ─── Headers builder ─────────────────────────────────────────
+  _buildHeaders(overrides = {}) {
+    const cookieStr = this._cookies.toString()
+    const h = { ...this._headers }
+
+    // Always override these
+    h['content-type'] = 'application/json'
+    if (cookieStr) h['cookie'] = cookieStr
+
+    // Apply overrides (e.g. pow response)
+    Object.assign(h, overrides)
+
+    return h
+  }
+
+  // ─── HTTP fetch ───────────────────────────────────────────────
+
+  async _fetch(url, options = {}, parseJSON = false, timeoutMs = 300_000) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+    let res
+    try {
+      res = await fetch(url, { ...options, redirect: 'follow', signal: controller.signal })
+    } catch (err) {
+      clearTimeout(timer)
+      if (err.name === 'AbortError') {
+        const errorObj = {
+          error: {
+            type: 'request_timeout',
+            message: `Request timed out after ${timeoutMs / 1000}s`,
+          },
+        }
+        const te = new Error(JSON.stringify(errorObj))
+        te.status = 504
+        te.statusCode = 504
+        throw te
       }
+      throw err
+    }
+    clearTimeout(timer)
 
-      const options = {
-        hostname: DeepSeekAPI.BASE_URL_OBJ.hostname,
-        port: 443,
-        path: DeepSeekAPI.BASE_URL_OBJ.pathname + endpoint,
-        method,
-        headers: {
-          ...requestHeaders,
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(postData),
-        },
-        agent: keepAliveAgent,
-        timeout: 30000,
-      }
+    if (parseJSON && res.ok) {
+      this._captureResponseHeaders(res)
+      const json = await res.json()
+      return { ok: true, status: res.status, data: json }
+    }
 
-      const req = https.request(options, (res) => {
-        // Capture cookies from response
-        this._cookies.captureFromRawHeaders(res.headers, ' DeepSeek')
-
-        const chunks = []
-        res.on('data', (chunk) => chunks.push(chunk))
-        res.on('end', () => {
-          const body = Buffer.concat(chunks).toString()
-          try {
-            if (res.statusCode >= 400) {
-              return reject(new Error(body, res.statusCode))
-            }
-            resolve(JSON.parse(body))
-          } catch (e) {
-            reject(new Error('Invalid JSON response'))
-          }
-        })
-      })
-
-      req.on('error', (e) => reject(new Error(e.message)))
-      req.on('timeout', () => {
-        req.destroy()
-        reject(new Error('Request timeout'))
-      })
-      req.write(postData)
-      req.end()
-    })
+    return res
   }
 }
 

@@ -74,7 +74,6 @@ async function claudeStreamHandler(res, stream, session, saveSession, parser, us
     onData,
     onDone: sendFinalChunk,
     onError,
-    isDone: () => false,
   })
 }
 

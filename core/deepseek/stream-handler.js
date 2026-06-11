@@ -14,7 +14,6 @@ function streamHandler(res, stream, session, parser, saveSession, retry) {
   const tokenUsage = {}
   const sendFinalChunk = createSendFinalChunk(res, session, saveSession, parser, tokenUsage)
   const onError = createOnError(res, parser, 'DeepSeek')
-  let finished = false
   let cancelled = false
 
   const onData = (data) => {
@@ -25,7 +24,6 @@ function streamHandler(res, stream, session, parser, saveSession, retry) {
       if (retry) {
         console.log('[DeepSeek] Retrying request...')
         cancelled = true
-        finished = true
         try {
           stream.destroy()
         } catch (_) {}
@@ -36,7 +34,6 @@ function streamHandler(res, stream, session, parser, saveSession, retry) {
           })
           .catch((err) => {
             console.error('[DeepSeek] Retry failed:', err.message)
-            finished = false
             sendFinalChunk()
           })
       } else {
@@ -75,7 +72,6 @@ function streamHandler(res, stream, session, parser, saveSession, retry) {
     onData,
     onDone: sendFinalChunk,
     onError,
-    isDone: () => finished,
   })
 }
 
