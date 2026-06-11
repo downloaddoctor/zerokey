@@ -7,35 +7,23 @@ class SessionSelector {
     this._dataDir = path.join(__dirname, '..', 'temp')
     this._usersFile = path.join(this._dataDir, 'users.json')
     this.TIMEOUT_MS = 0
-    // Ensure data directory exists before any reads/writes
     if (!fs.existsSync(this._dataDir)) {
       fs.mkdirSync(this._dataDir, { recursive: true })
     }
   }
 
   async select() {
-    // Step 1: Provider selection
     this.provider = await this._stepProviderSelection()
     if (!this.provider) return null
 
-    // Step 2: User login (scoped to this provider)
     this.user = await this._stepUserLogin()
     if (!this.user) return null
 
-    // Initialize sessions array if needed
     if (!this.user.sessions) this.user.sessions = []
 
-    // Step 3: Claude — ask whether instructions are saved in Web UI
-    this.saveInstructions = false
-    if (this.provider === 'claude') {
-      this.saveInstructions = await this._stepClaudeInstructions()
-    }
-
-    // Step 4: Session selection
     this.session = await this._stepSessionSelection()
     if (!this.session) return null
 
-    // Save back
     this._saveUser(this.provider, this.user.username, this.user)
 
     return {
@@ -45,7 +33,6 @@ class SessionSelector {
       parsedFetch: this.user.parsedFetch || null,
       session: this.session,
       sessionName: this.session.name,
-      saveInstructions: this.saveInstructions,
       saveSession: () => this._saveUser(this.provider, this.user.username, this.user),
     }
   }
@@ -118,7 +105,6 @@ class SessionSelector {
     const fetchStr = await this._stepFetchInput()
     if (!fetchStr) return null
 
-    // Parse immediately — one method for both providers
     const parsedFetch = this._parseFetchDirect(fetchStr)
 
     const user = { username, parsedFetch, sessions: [] }
@@ -289,49 +275,6 @@ class SessionSelector {
     }
   }
 
-  async _stepClaudeInstructions() {
-    const { action } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'action',
-        message: 'Save custom instructions in Claude Web UI to save tokens?',
-        choices: [
-          { name: '  ✅ Yes — already saved, skip injection', value: 'yes' },
-          { name: "  📋 Let's do it — open instructions.md, I'll paste it", value: 'open' },
-          { name: '  ❌ No — inject on every first chat message', value: 'no' },
-        ],
-      },
-    ])
-
-    if (action === 'yes') return true
-    if (action === 'no') return false
-
-    // "Let's do it" — open instructions.md in Notepad
-    const { execSync } = require('child_process')
-    const path = require('path')
-    const instPath = path.join(__dirname, '..', 'lib', 'engine', 'instructions.md')
-
-    console.log('\n📋 Opening instructions.md in Notepad...')
-    console.log('   Copy the content and paste it into:')
-    console.log('   Claude Web UI → Settings → Custom Instructions\n')
-    try {
-      execSync(`notepad "${instPath}"`)
-    } catch {
-      console.log('   Could not open Notepad. File is at: ' + instPath)
-    }
-
-    const { pasted } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'pasted',
-        message: 'Did you paste the instructions into Claude Web UI settings?',
-        default: true,
-      },
-    ])
-
-    return pasted
-  }
-
   async _promptSessionName() {
     const defaultName = new Date().toISOString().slice(0, 19).replace('T', ' ')
     const { name } = await inquirer.prompt([
@@ -341,13 +284,11 @@ class SessionSelector {
   }
 
   async _confirmDeleteAll(count) {
-    // Make Enter confirm by default and clarify cancellation keys
     const { confirm } = await inquirer.prompt([
       {
         type: 'confirm',
         name: 'confirm',
         message: `Delete all ${count} sessions? (Enter = Yes, Esc = Cancel)`,
-        // default true so pressing Enter without typing explicitly will confirm
         default: true,
       },
     ])

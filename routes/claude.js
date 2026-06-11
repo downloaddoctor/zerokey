@@ -3,6 +3,7 @@ const { ClaudeAPI } = require('../core/claude/api')
 const { claudeStreamHandler } = require('../core/claude/stream-handler')
 const { toOpenAIError } = require('../utils/errors')
 const ToolCompiler = require('../lib/engine')
+const { setClaudeInstructions } = require('../core/claude/set-instructions')
 
 const CLAUDE_DEFAULT_MODEL = 'claude-sonnet-4-6'
 const CLAUDE_FALLBACK_MODEL = 'claude-haiku-4-5-20251001'
@@ -38,13 +39,7 @@ function resolveClaudeModel(userData) {
  * Build the Claude router.
  * IDE extracted per-request from Authorization: Bearer <ide> header (req.ide).
  */
-async function buildClaudeRouter(
-  parsedFetch,
-  session,
-  saveSession,
-  saveInstructions = false,
-  userData = null,
-) {
+async function buildClaudeRouter(parsedFetch, session, saveSession, userData = null) {
   if (!parsedFetch || !parsedFetch.headers) {
     throw new Error('parsedFetch with headers is required')
   }
@@ -78,9 +73,10 @@ async function buildClaudeRouter(
     let prompt = compiler.formatPrompt(messages, isNewSession)
 
     // Prepend system prompt for first message in conversation
-    // Skip if user saved instructions in Claude Web UI (saves tokens)
-    if (isNewSession && !saveInstructions) {
+    if (isNewSession) {
       prompt = compiler.buildPrompt(prompt)
+      // Sync instructions.md to Claude custom instructions (hash-cached, fire-and-forget)
+      await setClaudeInstructions(parsedFetch, userData, saveSession)
     }
 
     await acquireSlot('Claude')

@@ -62,13 +62,13 @@ app.use('/', healthRouter)
         preSelected.parsedFetch,
         preSelected.session,
         preSelected.saveSession,
+        preSelected.userData,
       )
     } else if (preSelected.provider === 'claude') {
       chatRouter = await buildClaudeRouter(
         preSelected.parsedFetch,
         preSelected.session,
         preSelected.saveSession,
-        preSelected.saveInstructions,
         preSelected.userData,
       )
     } else {

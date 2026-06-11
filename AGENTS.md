@@ -18,10 +18,12 @@ core/: provider API clients
   api.js: ChatGPTAPI → fetch, sentinel POW, conversation prepare
   pow.js: ChatGPTProofOfWork solver
   stream-handler.js: SSE stream parser for ChatGPT
+  set-instructions.js: setChatGPTInstructions → PATCH user_system_messages, hash-cached, fire-and-forget
  claude/: Claude provider
   api.js: ClaudeAPI → fetch, org-based, conversation UUID
   stream-handler.js: SSE stream parser for Claude
- session-selector.js: inquirer-based provider/user/session selector + Claude instructions prompt
+  set-instructions.js: setClaudeInstructions → PUT account_profile, hash-cached, fire-and-forget
+ session-selector.js: inquirer-based provider/user/session selector
 lib/: tool compilation engine
  engine/: ToolCompiler + Stream parser
   index.js: ToolCompiler → formatPrompt, buildPrompt, parse, emit, compile, inferType
@@ -33,8 +35,8 @@ lib/: tool compilation engine
    terax.json: terax IDE config
    vscode.json: vscode IDE config
 routes/: Express route handlers
- chatgpt.js: POST /v1/chat/completions → ChatGPT
- claude.js: POST /v1/chat/completions → Claude
+ chatgpt.js: POST /v1/chat/completions → ChatGPT; on new session → setChatGPTInstructions
+ claude.js: POST /v1/chat/completions → Claude; on new session → setClaudeInstructions; saveInstructions removed
  deepseek.js: POST /v1/chat/completions → DeepSeek
  health.js: GET /, GET /health
  models.js: GET /v1/models, GET /v1/models/:model
@@ -126,7 +128,7 @@ module: core/claude/stream-handler.js
 module: core/session-selector.js
  → fs, path, inquirer
  → constructor ensures temp/ directory exists (mkdirSync recursive)
- → select() returns { user, userData, provider, parsedFetch, session, saveSession, saveInstructions }
+ → select() returns { user, userData, provider, parsedFetch, session, saveSession }
 module: utils/har-to-capture.js
  → fs, path
 module: lib/engine/index.js
@@ -178,13 +180,12 @@ server start
    → _stepProviderSelection: inquirer list deepseek|chatgpt|claude
    → _stepUserLogin: load temp/users.json, prompt or create new
      → _promptNewUser: username + fetch() paste → _parseFetchDirect
-   → if claude → _stepClaudeInstructions: ask if instructions saved in Web UI
    → _stepSessionSelection: list, create, delete sessions
-   → return { user, provider, parsedFetch, session, saveInstructions, saveSession }
+   → return { user, provider, parsedFetch, session, saveSession }
  → build provider chat router
    → deepseek: initDeepSeekAPI → createChatSession
    → chatgpt: initializeFromJSON → sentinel refresh
-   → claude: initializeFromJSON → extract orgId, pass saveInstructions, userData
+   → claude: initializeFromJSON → extract orgId, pass userData
  → app.use('/v1/chat/completions', chatRouter)
  → checkPort → find available port
  → app.listen(port)
@@ -195,7 +196,7 @@ POST /v1/chat/completions
    → getIDEMapper(ide) → { tools, prompt, reverseMap, user, tool }
    → _handlers: system→prefix, assistant→prefix, user→IDES_PROMPT_OPTIMIZER user(), tool→IDES_PROMPT_OPTIMIZER tool() + reverseMap
  → formatPrompt(messages): extract last message → handler → formatted string
- → if session.parentMessageId == null && !saveInstructions → buildPrompt(userPrompt) → instructions.md + USER: prompt
+ → if session.parentMessageId == null → buildPrompt(userPrompt) → instructions.md + USER: prompt; ChatGPT/Claude also call setInstructions API (hash-cached)
  → provider.chatCompletion(prompt, session, ...)
    → deepseek: POW challenge → https POST → raw stream
    → chatgpt: prepareConversation → fetch POST → ReadableStream
@@ -218,6 +219,8 @@ User (stored in users.json by provider)
   username: string
    parsedFetch: { headers: object, body: object, url: string }
    sessions: Session[]
+   instructionsHash: string|null # SHA-256 of instructions.md last applied
+   instructionsAppliedAt: ISO8601|null # when custom instructions were last set via API
 
 Session
  name: string

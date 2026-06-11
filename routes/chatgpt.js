@@ -4,6 +4,7 @@ const { chatgptStreamHandler } = require('../core/chatgpt/stream-handler')
 const { toOpenAIError } = require('../utils/errors')
 const ToolCompiler = require('../lib/engine')
 const { acquireSlot } = require('../utils/rate-limiter')
+const { setChatGPTInstructions } = require('../core/chatgpt/set-instructions')
 
 const chatgptApi = new ChatGPTAPI()
 
@@ -11,7 +12,7 @@ const chatgptApi = new ChatGPTAPI()
  * Build the ChatGPT router.
  * IDE extracted per-request from Authorization: Bearer <ide> header (req.ide).
  */
-async function buildChatGPTRouter(parsedFetch, session, saveSession) {
+async function buildChatGPTRouter(parsedFetch, session, saveSession, userData = null) {
   if (!parsedFetch || !parsedFetch.headers || !parsedFetch.body) {
     throw new Error('parsedFetch with headers and body is required')
   }
@@ -43,6 +44,8 @@ async function buildChatGPTRouter(parsedFetch, session, saveSession) {
 
     if (isNewSession) {
       prompt = compiler.buildPrompt(prompt)
+      // Sync instructions.md to ChatGPT custom instructions (hash-cached, fire-and-forget)
+      await setChatGPTInstructions(parsedFetch, userData, saveSession)
     }
 
     await acquireSlot('ChatGPT')
