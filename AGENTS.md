@@ -15,223 +15,155 @@ core/: provider API clients
   pow.js: DeepSeekPOW WASM solver
   stream-handler.js: SSE stream parser for DeepSeek
  claude/: Claude provider
-  api.js: ClaudeAPI → fetch, org-based, conversation UUID
-  stream-handler.js: SSE stream parser for Claude
-  set-instructions.js: setClaudeInstructions → PUT account_profile with getFull(), hash-cached, fire-and-forget
+  api.js: ClaudeAPI → fetch, org-based, conversation UUID; _buildHeaders preserves exact HAR order
+  stream-handler.js: SSE stream parser; message_limit → fallback model switch
+  set-instructions.js: setClaudeInstructions → PUT account_profile; hash-cached, fire-and-forget
  chatgpt/: ChatGPT provider
   api.js: ChatGPTAPI → fetch, sentinel POW, conversation prepare
   pow.js: ChatGPTProofOfWork solver
   stream-handler.js: SSE stream parser for ChatGPT
-  set-instructions.js: setChatGPTInstructions → PATCH user_system_messages with getBase(), hash-cached, fire-and-forget
- session-selector.js: inquirer-based provider/user/session selector
+  set-instructions.js: setChatGPTInstructions → PATCH user_system_messages; hash-cached, fire-and-forget
+ session-selector.js: inquirer-based provider/user/session selector; saves temp/users.json atomically
 lib/: tool compilation engine
  engine/: ToolCompiler + Stream parser
-  index.js: ToolCompiler → formatPrompt, buildPrompt, parse, emit, compile, inferType
-  stream.js: Stream → scans LLM output for ⟦tool¦params⟧, builds OpenAI tool_call deltas
-  tool-defs.js: TOOLS registry, getIDEMapper → IDE-specific tool mappings + prompt optimizer
-  instructions.md: base system prompt ≤1500 chars (role, code_style, tool_format) — used by ChatGPT custom instructions
-  skills-extra.md: extra prompt blocks (memory, save_workflow) — prepended to ChatGPT first prompt; combined with base for DeepSeek/Claude
-  instructions.js: Instructions class → getBase(), getExtra(), getFull(), getHash(), invalidate() — single source for all providers
+  index.js: ToolCompiler(ide, provider) singleton per ide:provider pair; formatPrompt, buildPrompt, parse, emit, compile, inferType
+  stream.js: Stream 3-state FSM (outside / toolStartFound / inTool); emits text deltas + batched tool_calls on close ⟧
+  tool-defs.js: TOOLS registry; getIDEMapper(ide) → {tools, reverseMap, user, tool}; IDES_PROMPT_OPTIMIZER; TOOL_OUTPUT_LIMITS
+  instructions.md: base system prompt ≤1500 chars — used as ChatGPT/Claude custom instructions
+  skills-extra.md: extra prompt blocks (memory, save_workflow)
+  instructions.js: Instructions singleton → getBase(), getExtra(), getFull(), getHash(), invalidate(); lazy-loaded, SHA-256 hash
   templates/: IDE config templates
    opencode.json: opencode IDE config
    terax.json: terax IDE config
    vscode.json: vscode IDE config
 routes/: Express route handlers
  deepseek.js: POST /v1/chat/completions → DeepSeek
- claude.js: POST /v1/chat/completions → Claude; on new session → setClaudeInstructions; saveInstructions removed
- chatgpt.js: POST /v1/chat/completions → ChatGPT; on new session → setChatGPTInstructions
+ claude.js: POST /v1/chat/completions → Claude; resolveClaudeModel() expiry-aware fallback; setClaudeInstructions on new session
+ chatgpt.js: POST /v1/chat/completions → ChatGPT; setChatGPTInstructions + prepend getExtra() on new session
  health.js: GET /, GET /health
  models.js: GET /v1/models, GET /v1/models/:model
 temp/: runtime session data
- users.json: persisted sessions per provider per user
+ users.json: persisted sessions per provider per user (atomic write via .tmp rename)
 utils/: shared utilities
- cookie-jar.js: CookieJar → parse, seed, capture, serialize cookies
- errors.js: classifyError, toOpenAIError → OpenAI-compatible errors
- har-to-capture.js: HAR file parser
- rate-limiter.js: acquireSlot → sliding window rate limiter
- sse-reader.js: readSSE → unified SSE reader for Web & Node.js streams; 1MB buffer cap
- stream-helpers.js: createSendFinalChunk, createOnError → shared stream handler factories
+ cookie-jar.js: CookieJar → seedFromHeader, captureFromFetchHeaders, captureFromRawHeaders, toString
+ errors.js: classifyError (9 categories), toOpenAIError → OpenAI-compatible error response
+ har-to-capture.js: HAR file parser → parsedFetch format
+ rate-limiter.js: acquireSlot → 9 calls/30s sliding window; per-label, promise-based queue
+ sse-reader.js: readSSE → Web ReadableStream + Node.js stream; 1MB buffer cap; isDone guard
+ stream-helpers.js: createSendFinalChunk (once-guard, flush+emit+[DONE]+saveSession); createOnError
 docs/: static documentation
  logos/: provider logos
-server.js: Express app entry, IDE middleware, request logger, error handler, graceful shutdown
+server.js: Express entry; IDE middleware (Bearer header); request logger; SessionSelector wizard; provider router mount; graceful shutdown
 start.bat: Windows batch launcher
 nodemon.json: nodemon config (watches core/, routes/, lib/, utils/, config/)
 package.json: dependencies, scripts
-package-lock.json: lockfile (lockfileVersion 3)
 
 #ENTRYPOINTS
-start: node server.js → interactive wizard → Express server on PORT
+start: node server.js → interactive wizard → Express on PORT
 dev: npx nodemon server.js → auto-reload
 win: start.bat → node server.js
 
 #MODULES
-module: server.js
+server.js
  → express
- → ./config/constants → CONFIG, MODELS
- → ./routes/models
- → ./routes/health
- → ./routes/deepseek → buildChatRouter
- → ./routes/claude → buildClaudeRouter
- → ./routes/chatgpt → buildChatGPTRouter
- → ./core/session-selector → SessionSelector
- → ./utils/errors → toOpenAIError
+ → config/constants → CONFIG, MODELS
+ → routes/models, routes/health, routes/deepseek, routes/claude, routes/chatgpt
+ → core/session-selector → SessionSelector
+ → utils/errors → toOpenAIError
  # IDE_WHITELIST: vscode, terax, opencode (unknown → vscode)
- # request logger: method, url, status, duration, IDE, body size
- # error middleware: catches unhandled errors → OpenAI-compatible JSON
+ # request logger: method/url/status/duration/IDE/body-size
+ # error middleware: unhandled → OpenAI-compatible JSON
  # graceful shutdown: SIGINT/SIGTERM → server.close() → 5s force-kill
-module: routes/deepseek.js
- → express
- → ../core/deepseek/api → DeepSeekAPI
- → ../core/deepseek/stream-handler → streamHandler
- → ../utils/errors → toOpenAIError
- → ../utils/rate-limiter → acquireSlot
- → ../lib/engine → ToolCompiler
-module: routes/claude.js
- → express
- → ../core/claude/api → ClaudeAPI
- → ../core/claude/stream-handler → claudeStreamHandler
- → ../utils/errors → toOpenAIError
- → ../utils/rate-limiter → acquireSlot
- → ../lib/engine → ToolCompiler
- → resolveClaudeModel(userData): expiry-aware fallback CLAUDE_DEFAULT_MODEL ↔ CLAUDE_FALLBACK_MODEL
-module: routes/chatgpt.js
- → express
- → ../lib/engine/instructions → Instructions singleton
- → ../core/chatgpt/api → ChatGPTAPI
- → ../core/chatgpt/stream-handler → chatgptStreamHandler
- → ../utils/errors → toOpenAIError
- → ../utils/rate-limiter → acquireSlot
- → ../lib/engine → ToolCompiler
- # on new session: setChatGPTInstructions + prepend getExtra() to prompt
-module: routes/health.js
- → express
-module: routes/models.js
- → express
- → ../config/constants → MODELS
-module: core/deepseek/api.js
- → https (keep-alive agent)
- → crypto
- → ../../utils/cookie-jar → CookieJar
- → ./pow → DeepSeekPOW
-module: core/deepseek/stream-handler.js
- → ../../utils/sse-reader → readSSE
- → ../../utils/stream-helpers → createSendFinalChunk, createOnError
-module: core/claude/api.js
- → crypto
- → ../../utils/cookie-jar → CookieJar
-module: core/claude/stream-handler.js
- → ../../utils/sse-reader → readSSE
- → ../../utils/stream-helpers → createSendFinalChunk, createOnError
-module: core/chatgpt/api.js
- → crypto
- → ./pow → ChatGPTProofOfWork
- → ../../utils/cookie-jar → CookieJar
-module: core/chatgpt/stream-handler.js
- → ../../utils/sse-reader → readSSE
- → ../../utils/stream-helpers → createSendFinalChunk, createOnError
-module: core/session-selector.js
- → fs, path, inquirer
- → constructor ensures temp/ directory exists (mkdirSync recursive)
- → select() returns { user, userData, provider, parsedFetch, session, saveSession }
-module: utils/har-to-capture.js
- → fs, path
-module: lib/engine/index.js
- → ./instructions → Instructions singleton
- → ./tool-defs → getIDEMapper
- → ./stream → Stream
- → formatPrompt(messages, isNewSession): passes isNewSession to user handler
- → buildPrompt(userPrompt): instructions.getFull() + userPrompt
- → _handlers.user: (c, messages, isNewSession) signature
-module: lib/engine/instructions.js
- → fs, path, crypto
- → Instructions singleton → getBase(), getExtra(), getFull(), getHash(), invalidate()
- → getBase(): reads instructions.md
- → getExtra(): reads skills-extra.md
- → getFull(): base + extra combined
- → getHash(): SHA-256 of base only
-module: lib/engine/tool-defs.js
- → fs
- → TOOLS: read, write, append, prepend, replace, replaceLines, list, mkdir, glob, grep, cmd, todoAdd, todo
- → RAW_EDIT → factory for vscode/terax/opencode edit tool mappings
- → applyTransform → reads file, computes new content, assigns params.new + params.old
- → getIDEMapper → resolves IDE-specific tool config, returns { tools, reverseMap, user, tool }
- → IDES_PROMPT_OPTIMIZER: vscode, terax, opencode → { user, tool } message formatters
-  → vscode.user(prefix, content, messages, isNewSession): new session → full workspace_info+environment_info; existing → compact OS/Shell/CWD
- → NEW_SESSION_START_LENGTH: per-IDE session detection thresholds
- → getAllTags / getAllTagsArray: XML-like tag extraction helpers
-module: lib/engine/stream.js
- → Stream: state-machine SSE output parser
-  → scan(text): 3-state parser (outside tool-open, toolStartFound, inTool) → emits text deltas; on tool-close found calls emitToolCalls immediately
-  → flush(): handles stream-end edge cases (incomplete tool, mid-name truncation) → emitToolCalls
-  → emitToolCalls(compiler, session, payloads, emit): compile payloads → buildCall → buildToolDelta → emit
- → buildCall, buildToolDelta, emitToolCalls: OpenAI chunk helpers
-module: utils/cookie-jar.js
- → Map-based cookie store
- → parseSetCookie, seedFromHeader, captureFromFetchHeaders, captureFromRawHeaders, toString
-module: utils/sse-reader.js
- → Readable (Node.js stream)
- → MAX_BUFFER_SIZE: 1MB cap on single-line buffer growth
- → readSSE: unified SSE reader for Web ReadableStream + Node.js stream; isDone guard in processChunk loop
-module: utils/errors.js
- → classifyError → categorized error with action
- → toOpenAIError → OpenAI-compatible error response
-module: utils/rate-limiter.js
- → acquireSlot → 9 calls/30s sliding window rate limiter → Promise-based slot acquisition with wait queue
-module: utils/stream-helpers.js
- → createSendFinalChunk(res, session, saveSession, parser, tokenUsage) → () => void
- → createOnError(res, parser, provider) → (err) => void
+
+routes/claude.js
+ → core/claude/api → ClaudeAPI singleton
+ → core/claude/stream-handler → claudeStreamHandler
+ → core/claude/set-instructions → setClaudeInstructions
+ → lib/engine → ToolCompiler (per-request, ide:claude keyed singleton)
+ → utils/rate-limiter → acquireSlot
+ → utils/errors → toOpenAIError
+ # resolveClaudeModel: checks modelFallbackExpiresAt; auto-resets to default when expired
+
+routes/chatgpt.js
+ → lib/engine/instructions → Instructions singleton
+ → core/chatgpt/api → ChatGPTAPI
+ → core/chatgpt/stream-handler → chatgptStreamHandler
+ → core/chatgpt/set-instructions → setChatGPTInstructions
+ → lib/engine → ToolCompiler
+ → utils/rate-limiter → acquireSlot
+ # new session: setChatGPTInstructions + prepend getExtra() to prompt
+
+lib/engine/index.js → ToolCompiler
+ → lib/engine/instructions → Instructions singleton
+ → lib/engine/tool-defs → getIDEMapper, TOOL_OUTPUT_LIMITS
+ → lib/engine/stream → Stream
+ # singleton cache: ToolCompiler.objects[ide:provider]
+ # _handlers: system, assistant, user (IDES_PROMPT_OPTIMIZER), tool (truncated per TOOL_OUTPUT_LIMITS)
+ # formatPrompt: dispatches last message to handler
+ # buildPrompt: getFull() + userPrompt (new session only)
+ # compile: parse → emit → IDE-specific tool call
+ # parse: split ¦, infer types, handle repeatable groups ($array)
+ # emit: map generic→IDE fields, handle array/split, run transformer+transform
+ # _mergeTodo: merges delta items into session.todos by id
+
+lib/engine/stream.js → Stream
+ # 3-state FSM: outside → toolStartFound → inTool
+ # scan(text): appends to buffer; detects ⟦ (enter toolStartFound) → ¦ (validate name) → ⟧ (complete, push toolBuffers)
+ # flush(): forces ⟧ if mid-tool; calls emitToolCalls; emits dangling plain text
+ # emitToolCalls: compiler.compile → buildCall → buildToolDelta → emit
+ # callCounter: global monotonic ID for call_XXXX_toolname IDs
+
+utils/sse-reader.js → readSSE
+ # Web stream: getReader() + TextDecoder loop
+ # Node stream: on(data/end/error) promise
+ # processChunk: split on \n, keep trailing partial in buffer
+ # isDone() guard checked before each line + inner loop break
+
+utils/stream-helpers.js
+ # createSendFinalChunk: once-guard; parser.flush() → emit stop → [DONE] → res.end() → saveSession
+ # createOnError: once-guard; classifyError → emit error chunk → res.end
+
+utils/rate-limiter.js
+ # 9 req / 30s sliding window per label
+ # expired or future windowStart → reset
+ # wait queue: single setTimeout resolves promise after window remainder
+
+utils/errors.js
+ # classifyError: 9 categories (overloaded, session_expired, rate_limited, cloudflare_block, auth_failed, network, invalid_request, provider_error, internal)
+ # toOpenAIError: wraps classified into {error:{message,type,code,action,category,status}}
 
 #RUNTIME-GRAPH
 server start
- → require config/constants → CONFIG, MODELS
- → create Express app
- → mount IDE middleware: req.ide ← Authorization Bearer header
- → mount /v1/models, / health routes
- → SessionSelector.select()
-   → _stepProviderSelection: inquirer list deepseek|claude|chatgpt
-   → _stepUserLogin: load temp/users.json, prompt or create new
-     → _promptNewUser: username + fetch() paste → _parseFetchDirect
-   → _stepSessionSelection: list, create, delete sessions
-   → return { user, provider, parsedFetch, session, saveSession }
- → build provider chat router
-   → deepseek: initDeepSeekAPI → createChatSession
-   → claude: initializeFromJSON → extract orgId, pass userData
-   → chatgpt: initializeFromJSON → sentinel refresh
- → app.use('/v1/chat/completions', chatRouter)
- → checkPort → find available port
+ → SessionSelector.select() → provider/user/session wizard → returns {user, userData, provider, parsedFetch, session, saveSession}
+ → build provider router (deepseek|claude|chatgpt)
+ → mount /v1/chat/completions
+ → checkPort → find free port starting at CONFIG.PORT
  → app.listen(port)
 
 POST /v1/chat/completions
- → validate messages array
- → ToolCompiler(req.ide) → singleton per IDE
-   → getIDEMapper(ide) → { tools, prompt, reverseMap, user, tool }
-   → _handlers: system→prefix, assistant→prefix, user→IDES_PROMPT_OPTIMIZER user(), tool→IDES_PROMPT_OPTIMIZER tool() + reverseMap
- → formatPrompt(messages): extract last message → handler → formatted string
- → if session.parentMessageId == null → buildPrompt(userPrompt) → instructions.md + USER: prompt; Claude/ChatGPT also call setInstructions API (hash-cached)
- → provider.chatCompletion(prompt, session, ...)
-   → deepseek: POW challenge → https POST → raw stream
-   → claude: fetch POST → ReadableStream
-   → chatgpt: prepareConversation → fetch POST → ReadableStream
- → set SSE headers
- → Stream(res, model, compiler) → parser with toolIndex from compiler.tools
- → streamHandler(res, rawStream, session, parser, saveSession)
-   → claudeStreamHandler: now accepts userData; on limit event at ≥95% utilization → sets userData.model=fallback, modelFallbackExpiresAt, saveSession()
-   → readSSE: parse SSE lines → onData callbacks
-   → parser.scan(text): 3-state FSM
-     → outside: scan for tool-open → if found, emit prior text, enter toolStartFound
-     → toolStartFound: scan for pipe → validate tool name against toolIndex → enter inTool or emit as text
-     → inTool: scan for tool-close → complete tool, call emitToolCalls immediately, exit to outside
-   → parser.flush(): handle stream-end edge cases → emitToolCalls
-   → on [DONE]/finish → saveSession, res.end()
+ → validate messages[]
+ → ToolCompiler(req.ide, provider) → singleton
+ → formatPrompt(messages, isNewSession)
+ → if new session: buildPrompt (prepend instructions); setProviderInstructions (hash-cached)
+ → acquireSlot(provider)
+ → provider.chatCompletion(prompt, session, model, tools)
+ → SSE headers
+ → Stream(res, model, compiler, session) → FSM parser
+ → streamHandler(res, stream, session, saveSession, parser, userData)
+   → readSSE → onData → parser.scan(text)
+   → message_limit (Claude) → sets waitUntil on userData; session-selector skips blocked users
+   → message_stop / [DONE] → sendFinalChunk → flush + [DONE] + saveSession
 
 #SCHEMA
-User (stored in users.json by provider)
- provider: string # deepseek|claude|chatgpt
-  username: string
-   parsedFetch: { headers: object, body: object, url: string }
-   sessions: Session[]
-   instructionsHash: string|null # SHA-256 of instructions.md last applied
-   instructionsAppliedAt: ISO8601|null # when custom instructions were last set via API
+User (temp/users.json keyed by provider.username)
+ username: string
+ parsedFetch: {headers, body, url}
+ sessions: Session[]
+ instructionsHash: string|null
+ instructionsAppliedAt: ISO8601|null
+ model: string|null
+ waitUntil: timestamp|null  # ms epoch; set by rate-limit/usage-limit errors
+ waitReason: string|null
 
 Session
  name: string
@@ -239,31 +171,27 @@ Session
  parentMessageId: string|null
  createdAt: ISO8601
  lastUsed: ISO8601
+ todos: {[id]: TodoItem}|undefined
 
-ToolDefinition (in tool-defs.js TOOLS)
- name: string # tool key
+ToolDefinition (TOOLS in tool-defs.js)
+ name: string
  desc: string
- grammar: string # param spec with | separator
- keys: object # valid param keys (merged from params + repeatable)
- eg: array # usage examples
- vscode: IDEMapping
- terax: IDEMapping
- repeatable: object|null # for todo/replace batch
- transformer: function|null # for edit tools (append/prepend) → mutates params.path→params.old+new
+ grammar: string
+ keys: object
+ eg: array
+ transformer: (params) => void
+ repeatable: object|null
+ vscode/terax/opencode: IDEMapping
 
 IDEMapping
- tool: string # IDE-specific tool name
- params: object # generic→IDE field mapping
- default: object # default argument values
- transform: function # optional post-process (args, internal)
- array: object|null # for multi-edit/todo repeating groups
-  key: string # array key name in IDE args
-  fields: object # generic→IDE field mapping per item
- split: boolean # true → one call per array entry (terax multi_edit)
-
-IDES_PROMPT_OPTIMIZER entry (in tool-defs.js)
- user: (prefix, content, messages, isNewSession) → formatted user message string
- tool: (result) → formatted tool result string
+ tool: string
+ params: object  # generic→IDE field map
+ default: object
+ keys: object  # merged at getIDEMapper time
+ transformer: (params) => void  # merged at getIDEMapper time
+ transform: (args, internal) => void
+ array: {key, fields}|null
+ split: boolean  # true → one call per array entry
 
 #ENV
 PORT: server port (default 8000)

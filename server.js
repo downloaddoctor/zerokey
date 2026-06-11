@@ -93,15 +93,27 @@ app.use('/', healthRouter)
       }
     })
 
-    // Check if desired port is available, find next free one if not
-    const checkPort = async (p) => {
-      try {
-        const res = await fetch(`http://localhost:${p}`)
-        return false
-      } catch (e) {
-        return true
-      }
-    }
+    // Check if desired port is available using a raw TCP connect — avoids false positives from DNS/proxy errors
+    const checkPort = (p) =>
+      new Promise((resolve) => {
+        const net = require('net')
+        const sock = new net.Socket()
+        sock.setTimeout(400)
+        sock
+          .once('connect', () => {
+            sock.destroy()
+            resolve(false)
+          }) // port in use
+          .once('error', () => {
+            sock.destroy()
+            resolve(true)
+          }) // port free
+          .once('timeout', () => {
+            sock.destroy()
+            resolve(true)
+          }) // port free
+          .connect(p, '127.0.0.1')
+      })
 
     let port = CONFIG.PORT
     const desiredPort = CONFIG.PORT

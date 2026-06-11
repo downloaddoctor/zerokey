@@ -2,6 +2,8 @@
 
 const { Readable } = require('stream')
 
+const MAX_BUFFER_SIZE = 1024 * 1024 // 1MB cap on single-line buffer growth
+
 /**
  * Shared SSE reader for both Web Streams and Node.js streams.
  *
@@ -48,6 +50,11 @@ async function readSSE(stream, { onData, onDone, onError, isDone }) {
 
   const processChunk = (chunk) => {
     buffer += chunk
+    if (buffer.length > MAX_BUFFER_SIZE) {
+      console.warn('[SSE] Buffer exceeded 1MB cap — dropping malformed line')
+      buffer = ''
+      return
+    }
     const lines = buffer.split('\n')
     buffer = lines.pop() || ''
     for (const line of lines) {

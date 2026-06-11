@@ -6,34 +6,9 @@ const ToolCompiler = require('../lib/engine')
 const { setClaudeInstructions } = require('../core/claude/set-instructions')
 
 const CLAUDE_DEFAULT_MODEL = 'claude-sonnet-4-6'
-const CLAUDE_FALLBACK_MODEL = 'claude-haiku-4-5-20251001'
 
 const claudeApi = new ClaudeAPI()
 const { acquireSlot } = require('../utils/rate-limiter')
-
-function resolveClaudeModel(userData) {
-  if (!userData) return CLAUDE_DEFAULT_MODEL
-
-  const expiresAt = userData.modelFallbackExpiresAt
-    ? Date.parse(userData.modelFallbackExpiresAt)
-    : null
-  const now = Date.now()
-
-  if (expiresAt && expiresAt <= now) {
-    if (userData.model === CLAUDE_FALLBACK_MODEL) {
-      userData.model = CLAUDE_DEFAULT_MODEL
-    }
-    delete userData.modelFallbackExpiresAt
-    delete userData.modelFallbackReason
-    return userData.model || CLAUDE_DEFAULT_MODEL
-  }
-
-  if (expiresAt && expiresAt > now) {
-    return CLAUDE_FALLBACK_MODEL
-  }
-
-  return userData.model || CLAUDE_DEFAULT_MODEL
-}
 
 /**
  * Build the Claude router.
@@ -65,7 +40,7 @@ async function buildClaudeRouter(parsedFetch, session, saveSession, userData = n
         )
     }
 
-    const model = resolveClaudeModel(userData)
+    const model = CLAUDE_DEFAULT_MODEL
 
     // ToolCompiler created per-request with IDE from auth header
     const compiler = new ToolCompiler(req.ide, 'claude')
@@ -107,6 +82,19 @@ async function buildClaudeRouter(parsedFetch, session, saveSession, userData = n
       claudeStreamHandler(res, stream, session, saveSession, parser, userData)
     } catch (error) {
       console.error('[Claude Route] Error:', error.message)
+
+      try {
+        const errorObj = JSON.parse(error.message).error
+
+        // Persist rate-limit reset time so the session selector skips this user
+        if (errorObj.type === 'rate_limit_error') {
+          const hourLimit = JSON.parse(errorObj.message).windows['5h']
+          userData.waitUntil = hourLimit.resets_at * 1000
+          userData.waitReason = 'rate_limit_error'
+          saveSession()
+        }
+      } catch (parseErr) {}
+
       const err = toOpenAIError(error, 'Claude')
       return res.status(err.error.status || 500).json(err)
     }

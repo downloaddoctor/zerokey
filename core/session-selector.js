@@ -21,6 +21,54 @@ class SessionSelector {
 
     if (!this.user.sessions) this.user.sessions = []
 
+    if (this.provider === 'claude') {
+      const allProviders = this._loadAll()
+      const providerUsers = allProviders[this.provider] || {}
+
+      // Auto-clear expired waitUntil for all users
+      for (const u of Object.values(providerUsers)) {
+        if (u.waitUntil && u.waitUntil <= Date.now()) {
+          delete u.waitUntil
+          delete u.waitReason
+        }
+      }
+
+      const waitUntil = this.user.waitUntil || null
+      if (waitUntil && waitUntil > Date.now()) {
+        const mins = Math.ceil((waitUntil - Date.now()) / 60000)
+        const resetsAt = new Date(waitUntil).toLocaleTimeString()
+        console.warn(
+          `\n⚠  User "${this.user.username}" is at limit. Resets at ${resetsAt} (~${mins} min).`,
+        )
+
+        // Check if any other user is available
+        const availableUsers = Object.values(providerUsers).filter(
+          (u) => u.username !== this.user.username && (!u.waitUntil || u.waitUntil <= Date.now()),
+        )
+
+        if (availableUsers.length > 0) {
+          console.log('  Switching to another user...\n')
+          this.user = await this._stepUserLogin()
+          if (!this.user) return null
+        } else {
+          // All users at limit — find soonest reset
+          const soonest = Object.values(providerUsers)
+            .map((u) => ({ username: u.username, ts: u.waitUntil }))
+            .filter((u) => u.ts)
+            .sort((a, b) => a.ts - b.ts)[0]
+          const minsLeft = Math.ceil((soonest.ts - Date.now()) / 60000)
+          const resetsAtSoonest = new Date(soonest.ts).toLocaleTimeString()
+          console.error(
+            `\n🚫 All Claude users are at their usage limit.\n` +
+              `   Soonest reset: "${soonest.username}" at ${resetsAtSoonest} (~${minsLeft} min).\n` +
+              `   Please select a different provider.\n`,
+          )
+
+          return this.select()
+        }
+      }
+    }
+
     this.session = await this._stepSessionSelection()
     if (!this.session) return null
 
@@ -160,7 +208,7 @@ class SessionSelector {
   }
 
   _parseFetchDirect(fetchStr) {
-    const urlMatch = fetchStr.match(/fetch\("([^"]+)"\s*,/)
+    const urlMatch = fetchStr.match(/fetch\((['"`])([^'"` ]+)\1\s*,/)
     if (!urlMatch) throw new Error('Could not parse fetch URL')
 
     const afterUrl = fetchStr.slice(urlMatch[0].length)
@@ -210,7 +258,7 @@ class SessionSelector {
         body = {}
       }
     }
-    return { headers, body, url: urlMatch[1] }
+    return { headers, body, url: urlMatch[2] }
   }
 
   async _stepFetchInput() {

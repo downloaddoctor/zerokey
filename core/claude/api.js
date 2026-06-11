@@ -151,10 +151,7 @@ class ClaudeAPI {
 
     if (!res.ok) {
       const errText = await res.text()
-      const err = new Error(`Claude HTTP ${res.status}: ${errText.slice(0, 500)}`)
-      err.status = res.status
-      err.statusCode = res.status
-      throw err
+      throw new Error(errText)
     }
 
     this._captureResponseHeaders(res)
@@ -266,8 +263,31 @@ class ClaudeAPI {
 
   // ─── HTTP fetch ───────────────────────────────────────────────
 
-  async _fetch(url, options = {}, parseJSON = false) {
-    const res = await fetch(url, { ...options, redirect: 'follow' })
+  async _fetch(url, options = {}, parseJSON = false, timeoutMs = 300_000) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+    let res
+    try {
+      res = await fetch(url, { ...options, redirect: 'follow', signal: controller.signal })
+    } catch (err) {
+      clearTimeout(timer)
+      if (err.name === 'AbortError') {
+        const errorObj = {
+          error: {
+            type: 'request_timeout',
+            message: `Request timed out after ${timeoutMs / 1000}s`,
+          },
+        }
+
+        const te = new Error(JSON.stringify(errorObj))
+        te.status = 504
+        te.statusCode = 504
+        throw te
+      }
+      throw err
+    }
+    clearTimeout(timer)
 
     if (parseJSON && res.ok) {
       this._captureResponseHeaders(res)

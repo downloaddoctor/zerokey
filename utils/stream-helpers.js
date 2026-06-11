@@ -32,7 +32,7 @@ function createOnError(res, parser, provider) {
     parser.emit({}, 'error', {})
     if (!res.writableEnded) {
       res.write(
-        `data: ${JSON.stringify({ error: { message: classified.message, action: classified.action, category: classified.category } })}\\n\\n`,
+        `data: ${JSON.stringify({ error: { message: classified.message, action: classified.action, category: classified.category } })}\n\n`,
       )
       res.end()
     }

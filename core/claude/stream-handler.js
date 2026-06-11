@@ -1,8 +1,6 @@
 const { readSSE } = require('../../utils/sse-reader')
 const { createSendFinalChunk, createOnError } = require('../../utils/stream-helpers')
 
-const CLAUDE_FALLBACK_MODEL = 'claude-haiku-4-5-20251001'
-
 /**
  * Claude SSE Stream Handler
  *
@@ -46,18 +44,15 @@ async function claudeStreamHandler(res, stream, session, saveSession, parser, us
             .map((window) => (window?.resets_at ? window.resets_at * 1000 : Infinity))
             .reduce((min, ts) => (ts < min ? ts : min), Infinity)
 
-          if (nearLimit && userData && userData.model !== CLAUDE_FALLBACK_MODEL) {
-            userData.model = CLAUDE_FALLBACK_MODEL
+          if (nearLimit && userData) {
             if (resetTs < Infinity) {
-              userData.modelFallbackExpiresAt = new Date(resetTs).toISOString()
+              userData.waitUntil = new Date(resetTs).toISOString()
             }
-            userData.modelFallbackReason = ml.type
+            userData.waitReason = ml.type
             saveSession()
             console.log(
-              `[Claude] Usage near limit; switched stored model to ${CLAUDE_FALLBACK_MODEL}` +
-                (userData.modelFallbackExpiresAt
-                  ? ` until ${userData.modelFallbackExpiresAt}`
-                  : ''),
+              `[Claude] Usage near limit; marked waitUntil` +
+                (userData.waitUntil ? ` ${userData.waitUntil}` : ''),
             )
           }
         }
