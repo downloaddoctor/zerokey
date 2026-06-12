@@ -7,20 +7,13 @@ const { acquireSlot } = require('../utils/rate-limiter')
 
 const deepseekApi = new DeepSeekAPI()
 
-/**
- * Build the chat router with pre-resolved model + session baked in via closure.
- * IDE extracted per-request from Authorization: Bearer <ide> header (req.ide).
- */
-async function buildChatRouter(headers, session, saveSession) {
-  if (!saveSession) saveSession = () => {}
-  await initDeepSeekAPI(session, headers, saveSession)
+async function buildChatRouter(headers, session) {
+  await initDeepSeekAPI(session, headers)
 
   const router = express.Router()
 
-  // POST /v1/chat/completions
   router.post('/', async (req, res) => {
-    const { messages = [], tools } = req.body
-    // require('fs').writeFile('temp/tools.json', JSON.stringify(tools, null, 1), () => {})
+    const { messages = [] } = req.body
 
     if (!messages || messages.length === 0) {
       return res
@@ -35,7 +28,6 @@ async function buildChatRouter(headers, session, saveSession) {
         )
     }
 
-    // ToolCompiler created per-request with IDE from auth header
     const compiler = new ToolCompiler(req.ide, 'deepseek')
     const isNewSession = session.parentMessageId == null
     let prompt = compiler.formatPrompt(messages, isNewSession)
@@ -77,7 +69,7 @@ async function buildChatRouter(headers, session, saveSession) {
         )
       }
 
-      streamHandler(res, deepseekStream, session, parser, saveSession, retry)
+      streamHandler(res, deepseekStream, session, parser, retry)
     } catch (error) {
       if (res.headersSent) return
       console.error('[DeepSeek Route] Error:', error.message)
@@ -89,16 +81,11 @@ async function buildChatRouter(headers, session, saveSession) {
   return router
 }
 
-/**
- * Initialize the DeepSeek API and resolve session.
- */
-async function initDeepSeekAPI(session, headers, saveSession) {
+async function initDeepSeekAPI(session, headers) {
   await deepseekApi.initialize(headers)
   console.log('[API] initialized successfully')
 
-  if (!session) {
-    throw new Error('No session provided')
-  }
+  if (!session) throw new Error('No session provided')
 
   if (session.chatSessionId) {
     return console.log(
@@ -108,7 +95,6 @@ async function initDeepSeekAPI(session, headers, saveSession) {
 
   const chatSessionId = await deepseekApi.createChatSession()
   session.chatSessionId = chatSessionId
-  saveSession()
   console.log(`[CHAT] Session "${session.name}" created with chatSessionId: ${chatSessionId}`)
 }
 

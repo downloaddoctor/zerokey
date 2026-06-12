@@ -9,8 +9,9 @@ OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** �
 - **Real browser fingerprint** — POW solving, sentinel tokens, conversation prepare, Cloudflare-safe header ordering, cookie management
 - **Streaming** — SSE response streaming for all providers
 - **Multi-IDE** — per-request IDE selection via `Authorization: Bearer <vscode|terax>`
-- **Session persistence** — save & resume chat sessions across restarts
+- **Session persistence** — in-memory session tracking; flushed to disk on graceful shutdown or Claude auto-switch
 - **Tool call support** — integrated ToolCompiler translates OpenAI-style function calling into provider-compatible prompt grammar
+- **Claude auto-switch** — automatic fallback to next available user when rate-limited, with inline summary context preservation
 
 ## Quick Start
 
@@ -100,9 +101,10 @@ config/
 routes/                 → deepseek.js, claude.js, chatgpt.js, models.js, health.js
 core/
   deepseek/             → api.js (POW + HTTPS), pow.js (WASM SHA3-512), stream-handler.js
-  chatgpt/              → api.js (sentinel + conduit), pow.js (pure JS SHA3-512), stream-handler.js
-  claude/               → api.js (HAR auth + Cloudflare headers), stream-handler.js
-  session-selector.js   → inquirer wizard, fetch() parser, users.json persistence
+  chatgpt/              → api.js (sentinel + conduit), pow.js (pure JS SHA3-512), stream-handler.js, set-instructions.js
+  claude/               → api.js (HAR auth + Cloudflare headers), stream-handler.js, set-instructions.js
+  chat-router.js        → per-request provider dispatch, Claude auto-switch middleware, hot-swap on rate-limit
+  session-selector.js   → inquirer wizard, fetch() parser, users.json persistence, switchToNextAvailable
 lib/engine/
   index.js              → ToolCompiler singleton: formatPrompt, buildPrompt, parse, emit, compile, inferType
   tool-defs.js          → TOOLS registry, getIDEMapper, IDES_PROMPT_OPTIMIZER, RAW_EDIT, reverseMap
@@ -112,12 +114,14 @@ lib/engine/
 utils/
   cookie-jar.js         → shared cookie management for all providers
   errors.js             → OpenAI-format error factory
+  rate-limiter.js       → 9 req/30s sliding window per provider
   sse-reader.js         → unified SSE reader for Web ReadableStream + Node.js streams
+  stream-helpers.js     → sendFinalChunk (flush+emit+[DONE]), createOnError
 ```
 
 ## Session Storage
 
-Sessions and credentials are stored in `temp/users.json` (gitignored). Each user entry contains the captured browser headers and a list of named sessions with conversation IDs.
+Sessions and credentials are stored in `temp/users.json` (gitignored). Each user entry contains the captured browser headers and a list of named sessions with conversation IDs. Sessions are tracked in-memory during runtime and flushed to disk on graceful shutdown (`SIGINT`/`SIGTERM`) or when Claude auto-switches to another user. No per-request disk writes.
 
 ## License
 

@@ -9,11 +9,7 @@ const { setChatGPTInstructions } = require('../core/chatgpt/set-instructions')
 
 const chatgptApi = new ChatGPTAPI()
 
-/**
- * Build the ChatGPT router.
- * IDE extracted per-request from Authorization: Bearer <ide> header (req.ide).
- */
-async function buildChatGPTRouter(parsedFetch, session, saveSession, userData = null) {
+async function buildChatGPTRouter(parsedFetch, session, userData = null) {
   if (!parsedFetch || !parsedFetch.headers || !parsedFetch.body) {
     throw new Error('parsedFetch with headers and body is required')
   }
@@ -38,15 +34,12 @@ async function buildChatGPTRouter(parsedFetch, session, saveSession, userData = 
         )
     }
 
-    // ToolCompiler created per-request with IDE from auth header
     const compiler = new ToolCompiler(req.ide, 'chatgpt')
     const isNewSession = session.parentMessageId == null
     let prompt = compiler.formatPrompt(messages, isNewSession)
 
-    // Sync instructions.md to ChatGPT custom instructions on new session (hash-cached, fire-and-forget)
-    // Do NOT prepend instructions.md to prompt — ChatGPT receives it via user_system_messages API
     if (isNewSession) {
-      await setChatGPTInstructions(chatgptApi, userData, saveSession)
+      await setChatGPTInstructions(chatgptApi, userData)
       prompt = instructions.getExtra() + '\n\n' + prompt
     }
 
@@ -64,10 +57,9 @@ async function buildChatGPTRouter(parsedFetch, session, saveSession, userData = 
       res.setHeader('Connection', 'keep-alive')
       res.setHeader('Access-Control-Allow-Origin', '*')
 
-      // Use ToolCompiler.Stream to parse tool calls from LLM output
       const parser = new ToolCompiler.Stream(res, 'chatgpt', compiler, session)
 
-      chatgptStreamHandler(res, stream, session, saveSession, parser)
+      chatgptStreamHandler(res, stream, session, parser)
     } catch (error) {
       if (res.headersSent) return
       console.error('[ChatGPT Route] Error:', error.message)

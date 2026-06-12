@@ -72,6 +72,7 @@ class SessionSelector {
     this.session = await this._stepSessionSelection()
     if (!this.session) return null
 
+    // Write initial selection to disk immediately (only time we write eagerly)
     this._saveUser(this.provider, this.user.username, this.user)
 
     return {
@@ -81,7 +82,68 @@ class SessionSelector {
       parsedFetch: this.user.parsedFetch || null,
       session: this.session,
       sessionName: this.session.name,
-      saveSession: () => this._saveUser(this.provider, this.user.username, this.user),
+    }
+  }
+
+  /**
+   * Flush current in-memory user state to disk.
+   * Called by server.js on shutdown and before auto-switch.
+   */
+  flush() {
+    if (this.provider && this.user) {
+      this._saveUser(this.provider, this.user.username, this.user)
+    }
+  }
+
+  /**
+   * Non-interactively switch to the next available Claude user.
+   * Finds the first user without an active waitUntil, creates a fresh session,
+   * updates internal state, and returns a new selected object.
+   * @param {string} [pendingSummary] - summary text to inject into the new session
+   * Returns null if no available user found.
+   */
+  switchToNextAvailable(pendingSummary) {
+    if (this.provider !== 'claude') return null
+
+    const all = this._loadAll()
+    const providerUsers = all['claude'] || {}
+    const now = Date.now()
+
+    const nextUser = Object.values(providerUsers).find((u) => {
+      if (u.username === this.user.username) return false
+      const wu = u.waitUntil
+      if (!wu) return true
+      const ts = typeof wu === 'number' ? wu : new Date(wu).getTime()
+      return ts <= now
+    })
+
+    if (!nextUser) return null
+
+    console.log(`[SessionSelector] 🔄 Auto-switching to user: ${nextUser.username}`)
+
+    const newSession = {
+      name: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      chatSessionId: null,
+      parentMessageId: null,
+      createdAt: new Date().toISOString(),
+      lastUsed: new Date().toISOString(),
+      pendingSummary: pendingSummary || undefined,
+    }
+
+    if (!nextUser.sessions) nextUser.sessions = []
+    nextUser.sessions.push(newSession)
+
+    // Update internal state
+    this.user = nextUser
+    this.session = newSession
+
+    return {
+      user: nextUser.username,
+      userData: nextUser,
+      provider: 'claude',
+      parsedFetch: nextUser.parsedFetch || null,
+      session: newSession,
+      sessionName: newSession.name,
     }
   }
 

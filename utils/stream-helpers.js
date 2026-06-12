@@ -2,9 +2,10 @@ const { classifyError } = require('./errors')
 
 /**
  * Factory for sendFinalChunk — shared by all stream handlers.
- * Closes stream, emits final tool calls, writes [DONE], saves session.
+ * Closes stream, emits final tool calls, writes [DONE].
+ * Session mutations (lastUsed etc.) happen in-memory — flushed to disk on shutdown via selector.flush().
  */
-function createSendFinalChunk(res, session, saveSession, parser, tokenUsage) {
+function createSendFinalChunk(res, session, parser, tokenUsage) {
   let finished = false
   return () => {
     if (finished) return
@@ -14,13 +15,11 @@ function createSendFinalChunk(res, session, saveSession, parser, tokenUsage) {
     res.write('data: [DONE]\\n\\n')
     res.end()
     session.lastUsed = new Date().toISOString()
-    saveSession()
   }
 }
 
 /**
  * Factory for onError — shared by all stream handlers.
- * Classifies the error, writes OpenAI-compatible SSE error, ends response.
  */
 function createOnError(res, parser, provider) {
   let finished = false

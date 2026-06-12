@@ -10,9 +10,9 @@ const { createSendFinalChunk, createOnError } = require('../../utils/stream-help
  *   data: {"v":{"response":{...}}}           → message delta with metadata
  *   data: {"v":"text"}                       → bare text delta
  */
-function streamHandler(res, stream, session, parser, saveSession, retry) {
+function streamHandler(res, stream, session, parser, retry) {
   const tokenUsage = {}
-  const sendFinalChunk = createSendFinalChunk(res, session, saveSession, parser, tokenUsage)
+  const sendFinalChunk = createSendFinalChunk(res, session, parser, tokenUsage)
   const onError = createOnError(res, parser, 'DeepSeek')
   let cancelled = false
 
@@ -27,10 +27,9 @@ function streamHandler(res, stream, session, parser, saveSession, retry) {
         try {
           stream.destroy()
         } catch (_) {}
-
         retry()
           .then((newStream) => {
-            streamHandler(res, newStream, session, parser, saveSession, null)
+            streamHandler(res, newStream, session, parser, null)
           })
           .catch((err) => {
             console.error('[DeepSeek] Retry failed:', err.message)
@@ -41,9 +40,7 @@ function streamHandler(res, stream, session, parser, saveSession, retry) {
       }
       return
     } else if (data.o === 'SET') {
-      if (data.v === 'FINISHED') {
-        sendFinalChunk()
-      }
+      if (data.v === 'FINISHED') sendFinalChunk()
     } else if (data.o === 'BATCH') {
       const usageEntry = data.v?.find((e) => e.p === 'accumulated_token_usage')
       const statusEntry = data.v?.find((e) => e.p === 'quasi_status')
@@ -68,11 +65,7 @@ function streamHandler(res, stream, session, parser, saveSession, retry) {
     }
   }
 
-  readSSE(stream, {
-    onData,
-    onDone: sendFinalChunk,
-    onError,
-  })
+  readSSE(stream, { onData, onDone: sendFinalChunk, onError })
 }
 
 module.exports = { streamHandler }
