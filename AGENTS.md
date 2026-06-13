@@ -31,7 +31,7 @@ lib/: tool compilation engine
   dynamic-tools.js: syncDynamicTools→hash reqTools[],filter inbuilts via reverseMap,register passthrough entries in compiler.tools,store hash on session,cache grammar as session._dynamicGrammarCache; grammarFromSchema builds grammar from OpenAI input_schema
   stream.js: Stream 3-state FSM (outside / toolStartFound / inTool); emits text deltas + batched tool_calls on close ⟧
   tool-defs.js: TOOLS registry; getIDEMapper(ide) → {tools, reverseMap, user, tool}; IDES_PROMPT_OPTIMIZER; TOOL_OUTPUT_LIMITS
-  instructions.md: base system prompt ≤1500 chars — used as ChatGPT/Claude custom instructions
+  instructions.md: base system prompt ≤1500 chars — used as ChatGPT/Claude custom instructions; includes OUTPUT CONTRACT + TOOLS + EXAMPLES + CODE STYLE
   skills-extra.md: extra prompt blocks (memory, save_workflow)
   instructions.js: Instructions singleton → getBase(), getExtra(), getFull(), getHash(), invalidate(); lazy-loaded, SHA-256 hash
   templates/: IDE config templates
@@ -215,24 +215,25 @@ Session
  pendingSummary: string|null  # injected into first prompt of switched session
 
 ToolDefinition (TOOLS in tool-defs.js)
- name: string
+ name: string  # read, write, replace, patch, list, mkdir, glob, grep, cmd, todoAdd, todo
  desc: string
  grammar: string
  keys: object
  eg: array
- transformer: (params) => void
- repeatable: object|null
- vscode/terax/opencode: IDEMapping
+ transformer: (params) => void  # merged at getIDEMapper time
+ repeatable: object|null  # {id:true, ...} for todoAdd/todo; {path:true, old:true, new:true} for replace
+ vscode/terax/opencode: IDEMapping  # shared via EDIT()/TODO() spread
 
 IDEMapping
  tool: string
  params: object  # generic→IDE field map
- default: object
- keys: object  # merged at getIDEMapper time
+ default: object  # default {} if absent
+ keys: object  # merged at getIDEMapper time (params + repeatable)
  transformer: (params) => void  # merged at getIDEMapper time
  transform: (args, internal) => void
- array: {key, fields}|null
+ array: {key, fields}|null  # bundle into single call (vscode multi_replace, todos)
  split: boolean  # true → one call per array entry
+ repeatable: object  # merged for repeatable tools
 
 #ENV
 engines.node: >=18.0.0

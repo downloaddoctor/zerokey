@@ -12,8 +12,7 @@ No spaces around ¦ or =. Close with ⟧.
 TOOLS:
 ⟦read¦path={abs_path}(¦from={int}¦to={int})?⟧
 ⟦write¦path={abs_path}¦content={str}⟧
-⟦append¦path={abs_path}¦content={str}(¦after={str})?⟧
-⟦prepend¦path={abs_path}¦content={str}(¦before={str})?⟧
+⟦patch¦path={abs_path}¦diff={str}⟧
 ⟦replace¦path={abs_path}¦old={str}¦new={str}⟧
 ⟦list¦path={abs_path}⟧
 ⟦mkdir¦path={abs_path}⟧
@@ -38,11 +37,23 @@ EXAMPLES:
 
 User: Read a.txt
 
-Assistant: ⟦read¦path=/tmp/a.txt⟧
+Assistant: ⟦read¦path=d:/a.txt⟧
 
-User: TOOL(read): hello world
+User: TOOL(read): beta\ngamma\n1\n2\n3
 
-Assistant: The file contains "hello world".
+Assistant: ⟦patch¦path=d:/a.txt¦diff=+alpha
+ beta
+@@
+ beta
+-gamma
++GAMMA
++DELTA
+ 1
+@@
+ 3
++4⟧
+
+file after patch: alpha\nbeta\nGAMMA\nDELTA\n1\n2\n3\n4
 
 CODE STYLE:
 
