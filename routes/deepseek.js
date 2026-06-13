@@ -30,11 +30,14 @@ async function buildChatRouter(headers, session) {
 
     const compiler = new ToolCompiler(req.ide, 'deepseek')
     const isNewSession = session.parentMessageId == null
+
+    const { dynamicGrammar } = compiler.syncDynamicTools(req.body.tools || [], session)
+
     let prompt = compiler.formatPrompt(messages, isNewSession)
     let model_type = null
 
     if (isNewSession) {
-      prompt = compiler.buildPrompt(prompt)
+      prompt = compiler.buildPrompt(prompt, dynamicGrammar)
       model_type = 'expert'
     }
 

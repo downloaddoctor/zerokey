@@ -43,6 +43,8 @@ async function buildClaudeRouter(parsedFetch, session, userData = null, onSwitch
     const compiler = new ToolCompiler(req.ide, 'claude')
     const isNewSession = session.parentMessageId == null
 
+    const { dynamicGrammar } = compiler.syncDynamicTools(req.body.tools || [], session)
+
     let prompt = compiler.formatPrompt(messages, isNewSession)
 
     // On first request of a switched-in session, prepend summary directly into prompt
@@ -54,7 +56,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null, onSwitch
     }
 
     if (isNewSession) {
-      await setClaudeInstructions(claudeApi, userData)
+      await setClaudeInstructions(claudeApi, userData, dynamicGrammar)
     }
 
     await acquireSlot('Claude')

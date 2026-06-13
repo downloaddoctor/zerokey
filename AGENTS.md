@@ -27,7 +27,8 @@ core/: provider API clients + session management
   set-instructions.js: setChatGPTInstructions → PATCH user_system_messages; hash-cached (no saveSession)
 lib/: tool compilation engine
  engine/: ToolCompiler + Stream parser
-  index.js: ToolCompiler(ide, provider) singleton per ide:provider pair; formatPrompt, buildPrompt, parse, emit, compile, inferType
+  index.js: ToolCompiler(ide, provider) singleton per ide:provider pair; formatPrompt, buildPrompt(userPrompt,dynamicGrammar), syncDynamicTools(reqTools,session), parse, emit(_passthrough→raw args), compile, inferType
+  dynamic-tools.js: syncDynamicTools→hash reqTools[],filter inbuilts via reverseMap,register passthrough entries in compiler.tools,store hash on session,cache grammar as session._dynamicGrammarCache; grammarFromSchema builds grammar from OpenAI input_schema
   stream.js: Stream 3-state FSM (outside / toolStartFound / inTool); emits text deltas + batched tool_calls on close ⟧
   tool-defs.js: TOOLS registry; getIDEMapper(ide) → {tools, reverseMap, user, tool}; IDES_PROMPT_OPTIMIZER; TOOL_OUTPUT_LIMITS
   instructions.md: base system prompt ≤1500 chars — used as ChatGPT/Claude custom instructions
