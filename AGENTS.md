@@ -30,7 +30,7 @@ lib/: tool compilation engine
   index.js: ToolCompiler(ide, provider) singleton per ide:provider pair; formatPrompt, buildPrompt(userPrompt,dynamicGrammar), syncDynamicTools(reqTools,session), parse, emit(_passthrough→raw args), compile, inferType
   dynamic-tools.js: syncDynamicTools→hash reqTools[],filter inbuilts via reverseMap,register passthrough entries in compiler.tools,store hash on session,cache grammar as session._dynamicGrammarCache; grammarFromSchema builds grammar from OpenAI input_schema
   stream.js: Stream 3-state FSM (outside / toolStartFound / inTool); emits text deltas + batched tool_calls on close ⟧
-  tool-defs.js: TOOLS registry; getIDEMapper(ide) → {tools, reverseMap, user, tool}; IDES_PROMPT_OPTIMIZER; TOOL_OUTPUT_LIMITS
+  tool-defs.js: TOOLS registry; getIDEMapper(ide) → {tools, reverseMap, user, tool}; IDES_PROMPT_OPTIMIZER; TOOL_OUTPUT_LIMITS;
   instructions.md: base system prompt ≤1500 chars — used as ChatGPT/Claude custom instructions; includes OUTPUT CONTRACT + TOOLS + EXAMPLES + CODE STYLE
   skills-extra.md: extra prompt blocks (memory, save_workflow)
   instructions.js: Instructions singleton → getBase(), getExtra(), getFull(), getHash(), invalidate(); lazy-loaded, SHA-256 hash
@@ -215,7 +215,7 @@ Session
  pendingSummary: string|null  # injected into first prompt of switched session
 
 ToolDefinition (TOOLS in tool-defs.js)
- name: string  # read, write, replace, patch, list, mkdir, glob, grep, cmd, todoAdd, todo
+ name: string  # read, strPatch, linePatch, replace, write, list, mkdir, glob, grep, cmd, todoAdd, todo
  desc: string
  grammar: string
  keys: object

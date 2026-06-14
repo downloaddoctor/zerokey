@@ -15,32 +15,40 @@ function streamHandler(res, stream, session, parser, retry) {
   const sendFinalChunk = createSendFinalChunk(res, session, parser, tokenUsage)
   const onError = createOnError(res, parser, 'DeepSeek')
   let cancelled = false
+  let finished = false
+
+  const doRetry = (reason) => {
+    cancelled = true
+    console.error('[DeepSeek] Error event:', reason)
+    if (retry) {
+      console.log('[DeepSeek] Retrying request...')
+      try {
+        stream.destroy()
+      } catch (_) {}
+      retry()
+        .then((newStream) => {
+          streamHandler(res, newStream, session, parser, retry)
+        })
+        .catch((err) => {
+          console.error('[DeepSeek] Retry failed:', err.message)
+          sendFinalChunk()
+        })
+      return
+    }
+    sendFinalChunk()
+  }
 
   const onData = (data) => {
     if (cancelled) return
 
     if (data.type === 'error') {
-      console.error('[DeepSeek] Error event:', data.content)
-      if (retry) {
-        console.log('[DeepSeek] Retrying request...')
-        cancelled = true
-        try {
-          stream.destroy()
-        } catch (_) {}
-        retry()
-          .then((newStream) => {
-            streamHandler(res, newStream, session, parser, null)
-          })
-          .catch((err) => {
-            console.error('[DeepSeek] Retry failed:', err.message)
-            sendFinalChunk()
-          })
-      } else {
-        sendFinalChunk()
-      }
+      doRetry(data.content)
       return
     } else if (data.o === 'SET') {
-      if (data.v === 'FINISHED') sendFinalChunk()
+      if (data.v === 'FINISHED') {
+        finished = true
+        sendFinalChunk()
+      }
     } else if (data.o === 'BATCH') {
       const usageEntry = data.v?.find((e) => e.p === 'accumulated_token_usage')
       const statusEntry = data.v?.find((e) => e.p === 'quasi_status')
@@ -65,7 +73,13 @@ function streamHandler(res, stream, session, parser, retry) {
     }
   }
 
-  readSSE(stream, { onData, onDone: sendFinalChunk, onError })
+  const onDone = () => {
+    if (cancelled) return
+    if (finished) return
+    doRetry('stream closed unexpectedly')
+  }
+
+  readSSE(stream, { onData, onDone, onError })
 }
 
 module.exports = { streamHandler }

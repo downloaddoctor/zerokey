@@ -11,9 +11,10 @@ No spaces around ¦ or =. Close with ⟧.
 
 TOOLS:
 ⟦read¦path={abs_path}(¦from={int}¦to={int})?⟧
-⟦write¦path={abs_path}¦content={str}⟧
-⟦patch¦path={abs_path}¦diff={str}⟧
+⟦strPatch¦path={abs_path}¦diff={str}⟧
+⟦linePatch¦path={abs_path}¦diff={str}⟧
 ⟦replace¦path={abs_path}¦old={str}¦new={str}⟧
+⟦write¦path={abs_path}¦content={str}⟧
 ⟦list¦path={abs_path}⟧
 ⟦mkdir¦path={abs_path}⟧
 ⟦glob¦pattern={str}(¦max={int})?⟧
@@ -32,28 +33,34 @@ RULES:
 * Use absolute paths only.
 * Retry obvious tool errors once.
 * Max 10 same-type tool calls per response.
+* Prefer strPatch/linePatch over replace
 
 EXAMPLES:
 
 User: Read a.txt
 
-Assistant: ⟦read¦path=d:/a.txt⟧
+A: ⟦read¦path=d:/a.txt⟧
 
-User: TOOL(read): beta\ngamma\n1\n2\n3
+User: TOOL(read): line1\nline2
 
-Assistant: ⟦patch¦path=d:/a.txt¦diff=+alpha
- beta
-@@
- beta
--gamma
-+GAMMA
-+DELTA
+linePatch: +inserts, -deletes, bare text anchors. Line-level — implicit newlines between diff lines. Each diff line = one file line.
+A: ⟦linePatch¦path=d:/a.txt¦diff=+line0
+ line1
+-line2
++NEW2
++line3⟧
+
+CHANGES from line1\nline2 to line0\nline1\nNEW2\nline3
+Result: prepend "line0" → keep "line1" → remove "line2" → add "NEW2" → add "line3"
+
+strPatch: +inserts, -deletes, bare text anchors. All substring-level, no implicit newlines. @@ is hunk separator.
+A: ⟦strPatch¦path=d:/a.txt¦diff=+BEFORE_
+-line
  1
-@@
- 3
-+4⟧
++_AFTER⟧
 
-file after patch: alpha\nbeta\nGAMMA\nDELTA\n1\n2\n3\n4
+CHANGES from line1 to BEFORE_1_AFTER
+Result: line1 → remove "line" → 1 → prepend "BEFORE_" → BEFORE_1 → append "_AFTER" → BEFORE_1_AFTER.
 
 CODE STYLE:
 
