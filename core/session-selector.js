@@ -265,8 +265,39 @@ class SessionSelector {
     const confirmed = await this._confirmDeleteAll(count)
     if (!confirmed) return this._stepSessionSelection()
 
+    // Delete server-side sessions for DeepSeek
+    if (this.provider === 'deepseek') {
+      try {
+        await this._deleteDeepSeekSessions(this.user.parsedFetch?.headers || {})
+      } catch (e) {
+        console.warn('[SessionSelector] DeepSeek delete_all failed (non-fatal):', e.message)
+      }
+    }
+
     this.user.sessions = []
     return this._createNewSession()
+  }
+
+  async _deleteDeepSeekSessions(headers) {
+    const h = {
+      'accept': '*/*',
+      'accept-language': 'en-US,en;q=0.9',
+      ...headers,
+    }
+
+    console.log('[SessionSelector] Deleting all DeepSeek sessions...')
+    const res = await fetch('https://chat.deepseek.com/api/v0/chat_session/delete_all', {
+      method: 'POST',
+      headers: h,
+      body: null,
+    })
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
+    }
+
+    console.log('[SessionSelector] DeepSeek sessions deleted successfully')
   }
 
   _parseFetchDirect(fetchStr) {

@@ -42,8 +42,8 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
     let prompt = compiler.formatPrompt(messages, isNewSession)
 
     if (isNewSession) {
-      await setChatGPTInstructions(chatgptApi, userData)
-      prompt = instructions.getExtra() + '\n\n' + dynamicGrammar + '\n\n' + prompt
+      // await setChatGPTInstructions(chatgptApi, userData)
+      prompt = instructions.getFull() + '\n\n' + dynamicGrammar + '\n\n' + prompt
     }
 
     await acquireSlot('ChatGPT')

@@ -12,6 +12,7 @@ config/: server configuration
 core/: provider API clients + session management
  chat-router.js: ChatRouter → per-request provider route dispatch; autoSwitchMiddleware for Claude rate-limit; hot-swap on signal
  session-selector.js: SessionSelector → inquirer wizard; _stepProviderSelection, _stepUserSelection, _stepSessionSelection; switchToNextAvailable; flush
+ # _deleteDeepSeekSessions: POST delete_all via fetch; called on "Delete all sessions"; non-fatal
  deepseek/: DeepSeek provider
   api.js: DeepSeekAPI → https.request, POW, cookie-jar
   pow.js: DeepSeekPOW WASM solver
@@ -30,8 +31,8 @@ lib/: tool compilation engine
   index.js: ToolCompiler(ide, provider) singleton per ide:provider pair; formatPrompt, buildPrompt(userPrompt,dynamicGrammar), syncDynamicTools(reqTools,session), parse, emit(_passthrough→raw args), compile, inferType
   dynamic-tools.js: syncDynamicTools→hash reqTools[],filter inbuilts via reverseMap,register passthrough entries in compiler.tools,store hash on session,cache grammar as session._dynamicGrammarCache; grammarFromSchema builds grammar from OpenAI input_schema
   stream.js: Stream 3-state FSM (outside / toolStartFound / inTool); emits text deltas + batched tool_calls on close ⟧
-  tool-defs.js: TOOLS registry; getIDEMapper(ide) → {tools, reverseMap, user, tool}; IDES_PROMPT_OPTIMIZER; TOOL_OUTPUT_LIMITS;
-  instructions.md: base system prompt ≤1500 chars — used as ChatGPT/Claude custom instructions; includes OUTPUT CONTRACT + TOOLS + EXAMPLES + CODE STYLE
+  tool-defs.js: TOOLS registry (read, patch, chunk, replace, write, ls, mkdir, glob, grep, cmd, todo+, todo!); getIDEMapper(ide) → {tools, reverseMap, user, tool}; IDES_PROMPT_OPTIMIZER; TOOL_OUTPUT_LIMITS; user mes format: SYSTEM: OS / SHELL / CWD; USER: prefix on messages
+  instructions.md: base system prompt — tool runtime format (SYNTAX/RULES/EXTRA); includes <tool_format> + <code_style> + CRITICAL + SYSTEM prefix
   skills-extra.md: extra prompt blocks (memory, save_workflow)
   instructions.js: Instructions singleton → getBase(), getExtra(), getFull(), getHash(), invalidate(); lazy-loaded, SHA-256 hash
   templates/: IDE config templates
@@ -98,6 +99,9 @@ session-selector.js → SessionSelector
  # flush(): _saveUser current in-memory state to disk
  # _loadAll(), _saveUser(): atomic read/write with .tmp rename
  # _stepSessionSelection: creates new named session or reuses existing; sets waitUntil/waitReason cleared if expired
+ # _deleteAllSessions: deletes server-side DeepSeek sessions (if provider=deepseek) via POST delete_all; clears local sessions; returns to _createNewSession
+ # _deleteDeepSeekSessions(headers): fetch POST https://chat.deepseek.com/api/v0/chat_session/delete_all; non-fatal on error
+ # _deleteAllSessions: deletes server-side DeepSeek sessions if provider=deepseek; then clears local; returns to _createNewSession
 
 claude.js
  → core/claude/api → ClaudeAPI singleton
@@ -116,7 +120,7 @@ chatgpt.js
  → core/chatgpt/set-instructions → setChatGPTInstructions
  → lib/engine → ToolCompiler
  → utils/rate-limiter → acquireSlot
- # new session: setChatGPTInstructions + prepend getExtra() to prompt
+ # new session: instructions.getFull() + dynamicGrammar prepended to prompt (setChatGPTInstructions disabled)
 
 index.js → ToolCompiler
  → lib/engine/instructions → Instructions singleton
@@ -215,13 +219,13 @@ Session
  pendingSummary: string|null  # injected into first prompt of switched session
 
 ToolDefinition (TOOLS in tool-defs.js)
- name: string  # read, strPatch, linePatch, replace, write, list, mkdir, glob, grep, cmd, todoAdd, todo
+ name: string  # read, patch, chunk, replace, write, ls, mkdir, glob, grep, cmd, todo+, todo!
  desc: string
  grammar: string
  keys: object
  eg: array
  transformer: (params) => void  # merged at getIDEMapper time
- repeatable: object|null  # {id:true, ...} for todoAdd/todo; {path:true, old:true, new:true} for replace
+ repeatable: object|null  # {id:true, ...} for todo+/todo!; {path:true, old:true, new:true} for replace
  vscode/terax/opencode: IDEMapping  # shared via EDIT()/TODO() spread
 
 IDEMapping
