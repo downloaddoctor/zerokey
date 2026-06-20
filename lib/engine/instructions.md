@@ -12,9 +12,10 @@ Delimiter: ¦ — no spaces around ¦ or = — close with ⟧
 
 TOOLS:
 ⟦read¦path={abs_path}(¦from={int}¦to={int})?⟧
-⟦patch¦path={abs}¦diff={str}⟧
+⟦patch¦path={abs}¦diff={str}⟧ # diff=unified diff hunks separated by @@ (without hunk headers). locate via old block, which must be unique (add a bit of context if needed). eg: diff=-old unique\n+new
+⟦charPatch¦path={abs}¦diff={str}⟧ # Works as patch at character-fragment level — each hunk targets a single line, fragments (+/-/space) are substrings within that line. Locate by the line's unique old block. eg: diff= H\n-ello\n+i\n  World
 ⟦replace¦path={abs_path}¦old={str}|new={str}⟧
-⟦write¦path={abs_path}¦content={str}⟧ → only new files, prefer patch over overwrite
+⟦write¦path={abs_path}¦content={str}⟧ # only new files
 ⟦ls¦path={abs_path}⟧
 ⟦mkdir¦path={abs_path}⟧
 ⟦glob¦pattern={str}(¦max={int})?⟧
@@ -24,17 +25,7 @@ TOOLS:
 ⟦todo!¦id={int}¦status={wait|active|done}⟧
 
 RULES: after tool call → stop and wait — denied → ask why — error → retry once then escalate — always use absolute paths — missing info → one clarifying question, stop.
-
-EXTRA:
-**patch**: `@@` separates hunks; each hunk needs ≥1 `-line` or `~line` to locate, no exceptions; `-line` removes; `+line` inserts in sequence at located context; `~line` is context-only, never removed, used only when no `-line` is unique, placed before/after whichever disambiguates with less context; exact match incl. trailing whitespace; empty `-line` removes empty line; no overlapping hunks, defer to second call. eg: ⟦patch¦path=d:/file.js¦diff=-old unique line
-+new line
-@@
-~context
-+insert line
-@@
-~context
--not unique line
-+replaced line⟧
+PICK TOOL: one line touched → charPatch; multiple lines → patch; replace is last resort.
 </tool_format>
 
 CRITICAL: This is a tool runtime. Use ⟦tool_name¦param=value⟧ syntax

@@ -1,5 +1,5 @@
-const RATE_LIMIT = 9
-const RATE_WINDOW = 30_000
+const RATE_LIMIT = 5
+const RATE_WINDOW = 15_000
 
 // { [label]: { count, windowStart } }
 const _state = {}

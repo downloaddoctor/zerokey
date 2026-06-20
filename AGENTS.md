@@ -31,7 +31,7 @@ lib/: tool compilation engine
   index.js: ToolCompiler(ide, provider) singleton per ide:provider pair; formatPrompt, buildPrompt(userPrompt,dynamicGrammar), syncDynamicTools(reqTools,session), parse, emit(_passthrough→raw args), compile, inferType
   dynamic-tools.js: syncDynamicTools→hash reqTools[],filter inbuilts via reverseMap,register passthrough entries in compiler.tools,store hash on session,cache grammar as session._dynamicGrammarCache; grammarFromSchema builds grammar from OpenAI input_schema
   stream.js: Stream 3-state FSM (outside / toolStartFound / inTool); emits text deltas + batched tool_calls on close ⟧
-  tool-defs.js: TOOLS registry (read, patch, chunk, replace, write, ls, mkdir, glob, grep, cmd, todo+, todo!); getIDEMapper(ide) → {tools, reverseMap, user, tool}; IDES_PROMPT_OPTIMIZER; TOOL_OUTPUT_LIMITS; user mes format: SYSTEM: OS / SHELL / CWD; USER: prefix on messages
+  tool-defs.js: TOOLS registry (read, patch, charPatch, replace, write, ls, mkdir, glob, grep, cmd, todo+, todo!); getIDEMapper(ide) → {tools, reverseMap, user, tool}; IDES_PROMPT_OPTIMIZER; TOOL_OUTPUT_LIMITS; user mes format: SYSTEM: OS / SHELL / CWD; USER: prefix on messages
   instructions.md: base system prompt — tool runtime format (SYNTAX/RULES/EXTRA); includes <tool_format> + <code_style> + CRITICAL + SYSTEM prefix
   skills-extra.md: extra prompt blocks (memory, save_workflow)
   instructions.js: Instructions singleton → getBase(), getExtra(), getFull(), getHash(), invalidate(); lazy-loaded, SHA-256 hash
@@ -51,7 +51,7 @@ utils/: shared utilities
  cookie-jar.js: CookieJar → seedFromHeader, captureFromFetchHeaders, captureFromRawHeaders, toString
  errors.js: classifyError (9 categories), toOpenAIError → OpenAI-compatible error response
  har-to-capture.js: HAR file parser → parsedFetch format
- rate-limiter.js: acquireSlot → 9 calls/30s sliding window; per-label, promise-based queue
+ rate-limiter.js: acquireSlot → 5 calls/15s sliding window; per-label, promise-based queue
  sse-reader.js: readSSE → Web ReadableStream (fetch body); 1MB buffer cap; [DONE] detection
  stream-helpers.js: createSendFinalChunk (once-guard, flush+emit+[DONE]+lastUsed, no saveSession); createOnError
 docs/: static documentation
@@ -153,7 +153,7 @@ stream-helpers.js
  # createOnError: once-guard; classifyError → emit error chunk → res.end
 
 rate-limiter.js
- # 9 req / 30s sliding window per label
+ # 5 req / 15s sliding window per label
  # expired or future windowStart → reset
  # wait queue: single setTimeout resolves promise after window remainder
 
@@ -219,7 +219,7 @@ Session
  pendingSummary: string|null  # injected into first prompt of switched session
 
 ToolDefinition (TOOLS in tool-defs.js)
- name: string  # read, patch, chunk, replace, write, ls, mkdir, glob, grep, cmd, todo+, todo!
+ name: string  # read, patch, charPatch, replace, write, ls, mkdir, glob, grep, cmd, todo+, todo!
  desc: string
  grammar: string
  keys: object
