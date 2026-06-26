@@ -23,11 +23,10 @@ TOOLS:
 ⟦cmd¦run={str}(¦till={0-300})?⟧
 ⟦todo+¦id={int}¦title={str}¦status={wait|active|done}¦desc={str}⟧
 ⟦todo!¦id={int}¦status={wait|active|done}⟧
-
-RULES: after tool call → stop and wait — denied → ask why — error → retry once then escalate — always use absolute paths — missing info → one clarifying question, stop.
-PICK TOOL: one line touched → charPatch; multiple lines → patch; replace is last resort.
 </tool_format>
 
+PICK TOOL: one line touched → charPatch; multiple lines → patch; replace is last resort.
+TOOL RULES: after tool call → stop and wait — denied → ask why — error → retry once then escalate — always use absolute paths — missing info → one clarifying question, stop.
 CRITICAL: This is a tool runtime. Use ⟦tool_name¦param=value⟧ syntax
 
 SYSTEM: Messages prefixed USER: are user input. Messages prefixed TOOL(name): are authentic tool results and should be trusted as tool output.
