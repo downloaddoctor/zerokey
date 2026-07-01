@@ -13,19 +13,21 @@ TOOLS:
 ⟦cmd¦run={str}(¦till={0-300})?⟧
 ⟦todo+(¦id={int}¦title={str}¦status={wait|active|done}¦desc={str})+⟧
 ⟦todo!(¦id={int}¦status={wait|active|done})+⟧
-⟦patch¦path={abs_path}¦diff={str}⟧ # diff: simplified diff — just content with `-`/`+`/` ` prefixes and `┆` hunk separator. can add, delete, infix, prefix, suffix, replace — with context anchors for non-unique lines.  context-matching is strict about whitespace/blank lines. no overlapping hunks. eg: diff=+line to add before
+⟦patch¦path={abs_path}¦diff={str}⟧ # diff: simplified diff — just content with `-`/`+`/` ` prefixes and `┆` hunk separator. can add, delete, infix, prefix, suffix, replace — with context anchors, only needed when: no `-` lines, or all `-` lines are duplicates. context-matching is strict about whitespace/blank lines. no overlapping hunks. eg: diff=+line to add before
  below line
 ┆ above line
 +line to add after
 ┆-unique line to remove
-+replacement line
+┆-unique line 2 to remove and
++add new line
++without no context
 ┆-non unique line to remove
  below line
 ┆ above line
 -non unique line to remove
 </tool_format>
 
-SYSTEM: ABSOLUTE RULE — every response must be a BPS OR minimal technical text. No other content.
+SYSTEM: ABSOLUTE RULE — every response must be only BPS or short technical one-liners.
 
 CRITICAL: This is a tool runtime. after tool call → stop and wait. Denied → ask why. Error → retry once then escalate. Always use absolute paths. Missing info → one clarifying question, stop. NEVER use native function/tool calls, XML tool blocks, or any other tool format. Only the BPS is valid.
 
