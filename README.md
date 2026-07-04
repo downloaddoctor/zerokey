@@ -98,13 +98,30 @@ The `Authorization: Bearer <ide>` header maps the request to the correct IDE's t
 server.js               → Express app, startup wizard, provider dispatch, port selection
 config/
   constants.js          → PORT, MODELS
-routes/                 → deepseek.js, claude.js, chatgpt.js, models.js, health.js
+  models.json           → IDE model definitions for VS Code built-in
+routes/
+  deepseek.js           → DeepSeek chat completion route
+  claude.js             → Claude chat completion route
+  chatgpt.js            → ChatGPT chat completion route
+  models.js             → /v1/models and /v1/models/:model endpoints
+  health.js             → /health endpoint
 core/
-  deepseek/             → api.js (POW + HTTPS), pow.js (WASM SHA3-512), stream-handler.js
-  chatgpt/              → api.js (sentinel + conduit), pow.js (pure JS SHA3-512), stream-handler.js, set-instructions.js
-  claude/               → api.js (HAR auth + Cloudflare headers), stream-handler.js, set-instructions.js
   chat-router.js        → per-request provider dispatch, Claude auto-switch middleware, hot-swap on rate-limit
   session-selector.js   → inquirer wizard, fetch() parser, users.json persistence, switchToNextAvailable
+  deepseek/
+    api.js              → POW + HTTPS request builder
+    pow.js              → WASM SHA3-512 solver
+    stream-handler.js   → SSE stream → OpenAI delta chunks
+    wasm/               → compiled WASM binary
+  chatgpt/
+    api.js              → sentinel token + conduit request builder
+    pow.js              → pure JS SHA3-512 solver
+    stream-handler.js   → SSE stream → OpenAI delta chunks
+    set-instructions.js → system prompt injection for ChatGPT
+  claude/
+    api.js              → HAR auth + Cloudflare header ordering
+    stream-handler.js   → SSE stream → OpenAI delta chunks
+    set-instructions.js → system prompt injection for Claude
 lib/engine/
   index.js              → ToolCompiler singleton: formatPrompt, buildPrompt, parse, emit, compile, inferType
   tool-defs.js          → TOOLS registry, getIDEMapper, IDES_PROMPT_OPTIMIZER, RAW_EDIT, reverseMap
