@@ -124,13 +124,20 @@ core/
     set-instructions.js → system prompt injection for Claude
 lib/engine/
   index.js              → ToolCompiler singleton: formatPrompt, buildPrompt, parse, emit, compile, inferType
+  dynamic-tools.js      → runtime tool resolution, grammarFromSchema, syncDynamicTools
   tool-defs.js          → TOOLS registry, getIDEMapper, IDES_PROMPT_OPTIMIZER, RAW_EDIT, reverseMap
   stream.js             → 3-state SSE parser (outside/toolStartFound/inTool), ⟦tool¦param⟧ detection, flush→OpenAI deltas
-  instructions.md       → system prompt injected on new sessions
-  templates/            → opencode.json, terax.json, vscode.json
+  instructions.js       → system prompt loader (reads instructions.md + skills-extra.md)
+  instructions.md       → BPS tool grammar + system prompt injected on new sessions
+  skills-extra.md       → memory and save workflow for agent sessions
+  templates/
+    opencode.json       → Opencode IDE tool definitions
+    terax.json          → Terax IDE tool definitions
+    vscode.json         → VS Code IDE tool definitions
 utils/
   cookie-jar.js         → shared cookie management for all providers
   errors.js             → OpenAI-format error factory
+  har-to-capture.js     → HAR file → fetch() converter
   rate-limiter.js       → 9 req/30s sliding window per provider
   sse-reader.js         → unified SSE reader for Web ReadableStream + Node.js streams
   stream-helpers.js     → sendFinalChunk (flush+emit+[DONE]), createOnError
