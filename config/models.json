@@ -6,46 +6,40 @@
     "apiType": "chat-completions",
     "models": [
       {
-        "id": "deepseek-v4",
-        "name": "DeepSeek V4",
-        "family": "deepseek",
-        "version": "4.0",
+        "id": "ZK8-0",
+        "name": "ZK - 8000",
         "url": "http://localhost:8000/v1",
         "maxInputTokens": 1000000,
-        "maxOutputTokens": 384000,
+        "maxOutputTokens": 128000,
         "toolCalling": true,
-        "vision": false,
-        "detail": "DeepSeek V4 with 1M context window and 384K output capacity",
-        "tooltip": "Best for long document processing and large context tasks",
-        "description": "DeepSeek's flagship model featuring 1 million token context window and support for up to 384K output tokens through the API"
+        "vision": false
       },
       {
-        "id": "gpt-4o",
-        "name": "GPT-4o",
-        "family": "openai",
-        "version": "4o",
-        "url": "http://localhost:8000/v1",
-        "maxInputTokens": 128000,
-        "maxOutputTokens": 16384,
-        "toolCalling": true,
-        "vision": false,
-        "detail": "GPT-4o legacy model with 128K context and 16K output",
-        "tooltip": "Reliable general purpose model for most tasks",
-        "description": "OpenAI's GPT-4o model featuring 128K token context window with 16,384 max output tokens. Legacy version maintained for API compatibility"
-      },
-      {
-        "id": "claude-sonnet-4-6",
-        "name": "Claude Sonnet 4.6",
-        "family": "anthropic",
-        "version": "4.6",
-        "url": "http://localhost:8000/v1",
+        "id": "ZK8-1",
+        "name": "ZK - 8001",
+        "url": "http://localhost:8001/v1",
         "maxInputTokens": 1000000,
-        "maxOutputTokens": 64000,
+        "maxOutputTokens": 128000,
         "toolCalling": true,
-        "vision": false,
-        "detail": "Claude Sonnet 4.6 with 1M context (GA) and 64K output",
-        "tooltip": "High quality model with massive context window",
-        "description": "Anthropic's Claude Sonnet 4.6 featuring 1 million token context window (generally available as of March 13, 2026) with 64,000 max output tokens"
+        "vision": false
+      },
+      {
+        "id": "ZK8-2",
+        "name": "ZK - 8002",
+        "url": "http://localhost:8002/v1",
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 128000,
+        "toolCalling": true,
+        "vision": false
+      },
+      {
+        "id": "ZK8-3",
+        "name": "ZK - 8003",
+        "url": "http://localhost:8003/v1",
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 128000,
+        "toolCalling": true,
+        "vision": false
       }
     ]
   }

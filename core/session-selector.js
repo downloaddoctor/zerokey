@@ -229,7 +229,7 @@ class SessionSelector {
     const sessions = this.user.sessions || []
 
     const choices = sessions.map((s, i) => ({
-      name: `${s.name}  │  last: ${this._formatTime(s.lastUsed)}${s.disableTools ? '  [no tools]' : ''}`,
+      name: `${s.name}${s.model ? `  │  ${s.model}` : ''}  │  last: ${this._formatTime(s.lastUsed)}${s.disableTools ? '  [no tools]' : ''}`,
       value: i,
     }))
 
@@ -251,14 +251,59 @@ class SessionSelector {
     const name = await this._promptSessionName()
     if (!name) return null
 
-    const { disableTools } = await inquirer.prompt([
+    const questions = [
       {
         type: 'confirm',
         name: 'disableTools',
         message: 'Disable tools (raw chat mode)?',
         default: false,
       },
-    ])
+    ]
+
+    if (this.provider === 'claude') {
+      questions.push({
+        type: 'list',
+        name: 'model',
+        message: 'Claude model:',
+        default: 'claude-sonnet-4-6',
+        choices: [
+          {
+            name: 'claude-sonnet-4-6 (recommended for tools)',
+            value: 'claude-sonnet-4-6',
+          },
+          {
+            name: 'claude-sonnet-5',
+            value: 'claude-sonnet-5',
+          },
+        ],
+      })
+    }
+
+    if (this.provider === 'chatgpt') {
+      questions.push({
+        type: 'list',
+        name: 'model',
+        message: 'ChatGPT model:',
+        default: 'auto',
+        choices: [{ name: 'auto (recommended)', value: 'auto' }],
+      })
+    }
+
+    if (this.provider === 'deepseek') {
+      questions.push({
+        type: 'list',
+        name: 'model',
+        message: 'DeepSeek model:',
+        default: 'expert',
+        choices: [
+          { name: 'expert (recommended)', value: 'expert' },
+          { name: 'default', value: 'default' },
+          { name: 'vision', value: 'vision' },
+        ],
+      })
+    }
+
+    const { disableTools, model } = await inquirer.prompt(questions)
 
     const newSession = {
       name,
@@ -267,6 +312,15 @@ class SessionSelector {
       createdAt: new Date().toISOString(),
       lastUsed: new Date().toISOString(),
       disableTools: disableTools || false,
+      model:
+        model ||
+        (this.provider === 'claude'
+          ? 'claude-sonnet-4-6'
+          : this.provider === 'chatgpt'
+            ? 'auto'
+            : this.provider === 'deepseek'
+              ? 'expert'
+              : undefined),
     }
 
     this.user.sessions.push(newSession)

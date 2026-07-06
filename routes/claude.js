@@ -5,7 +5,7 @@ const { toOpenAIError } = require('../utils/errors')
 const ToolCompiler = require('../lib/engine')
 const { setClaudeInstructions } = require('../core/claude/set-instructions')
 
-const CLAUDE_DEFAULT_MODEL = 'claude-sonnet-5'
+const CLAUDE_DEFAULT_MODEL = 'claude-sonnet-4-6'
 
 const claudeApi = new ClaudeAPI()
 const { acquireSlot } = require('../utils/rate-limiter')
@@ -27,6 +27,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null, onSwitch
   router.post('/', async (req, res) => {
     const { messages = [] } = req.body
     const disableTools = session.disableTools || false
+    const model = session.model || CLAUDE_DEFAULT_MODEL
 
     if (!messages || messages.length === 0) {
       return res
@@ -67,7 +68,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null, onSwitch
         prompt,
         session.chatSessionId,
         session.parentMessageId,
-        CLAUDE_DEFAULT_MODEL,
+        model,
         [],
       )
 
@@ -108,7 +109,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null, onSwitch
             SUMMARY_PROMPT,
             session.chatSessionId,
             session.parentMessageId,
-            CLAUDE_DEFAULT_MODEL,
+            model,
             [],
           )
 

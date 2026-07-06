@@ -51,7 +51,12 @@ class ChatGPTAPI {
     this._ready = true
   }
 
-  async chatCompletion(prompt, chatSessionId, parentMessageId = 'client-created-root') {
+  async chatCompletion(
+    prompt,
+    chatSessionId,
+    parentMessageId = 'client-created-root',
+    model = 'auto',
+  ) {
     if (!this._ready) throw new Error('Not initialized')
 
     const messageId = crypto.randomUUID()
@@ -65,7 +70,7 @@ class ChatGPTAPI {
 
     // Always prepare conversation before sending — matches browser HAR flow.
     // First turn: gets initial conduit_token. Follow-up turns: gets refreshed conduit_token.
-    await this._prepareConversation(chatSessionId, parentMessageId, partialQuery)
+    await this._prepareConversation(chatSessionId, parentMessageId, partialQuery, model)
 
     const now = Date.now() / 1000
 
@@ -133,13 +138,13 @@ class ChatGPTAPI {
   // First call sends "x-conduit-token: no-token". Subsequent calls
   // send the previously returned conduit_token.
 
-  async _prepareConversation(conversationId, parentMessageId, partialQuery) {
+  async _prepareConversation(conversationId, parentMessageId, partialQuery, model = 'auto') {
     const url = `${this.BASE_URL}/backend-api/f/conversation/prepare`
     const body = {
       action: 'next',
       fork_from_shared_post: false,
       parent_message_id: parentMessageId || 'client-created-root',
-      model: 'auto',
+      model: model || 'auto',
       client_prepare_state: partialQuery ? 'success' : 'none',
       partial_query: partialQuery,
       timezone_offset_min: 420,

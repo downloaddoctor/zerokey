@@ -15,6 +15,7 @@ async function buildChatRouter(headers, session) {
   router.post('/', async (req, res) => {
     const { messages = [] } = req.body
     const disableTools = session.disableTools || false
+    const modelType = session.model || 'expert'
 
     if (!messages || messages.length === 0) {
       return res
@@ -39,7 +40,7 @@ async function buildChatRouter(headers, session) {
 
     if (isNewSession) {
       prompt = disableTools ? prompt : compiler.buildPrompt(prompt, dynamicGrammar)
-      model_type = 'expert'
+      model_type = modelType
     }
 
     await acquireSlot('DeepSeek')

@@ -22,6 +22,7 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
   router.post('/', async (req, res) => {
     const { messages = [] } = req.body
     const disableTools = session.disableTools || false
+    const model = session.model || 'auto'
     if (!messages || messages.length === 0) {
       return res
         .status(400)
@@ -54,6 +55,7 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
         prompt,
         session.chatSessionId,
         session.parentMessageId,
+        model,
       )
 
       res.setHeader('Content-Type', 'text/event-stream')
