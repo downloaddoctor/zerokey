@@ -21,6 +21,7 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
 
   router.post('/', async (req, res) => {
     const { messages = [] } = req.body
+    const disableTools = session.disableTools || false
     if (!messages || messages.length === 0) {
       return res
         .status(400)
@@ -41,7 +42,7 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
 
     let prompt = compiler.formatPrompt(messages, isNewSession)
 
-    if (isNewSession) {
+    if (isNewSession && !disableTools) {
       // await setChatGPTInstructions(chatgptApi, userData)
       prompt = instructions.getFull() + '\n\n' + dynamicGrammar + '\n\n' + prompt
     }

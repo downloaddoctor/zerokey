@@ -14,6 +14,7 @@ async function buildChatRouter(headers, session) {
 
   router.post('/', async (req, res) => {
     const { messages = [] } = req.body
+    const disableTools = session.disableTools || false
 
     if (!messages || messages.length === 0) {
       return res
@@ -37,7 +38,7 @@ async function buildChatRouter(headers, session) {
     let model_type = null
 
     if (isNewSession) {
-      prompt = compiler.buildPrompt(prompt, dynamicGrammar)
+      prompt = disableTools ? prompt : compiler.buildPrompt(prompt, dynamicGrammar)
       model_type = 'expert'
     }
 

@@ -26,6 +26,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null, onSwitch
 
   router.post('/', async (req, res) => {
     const { messages = [] } = req.body
+    const disableTools = session.disableTools || false
 
     if (!messages || messages.length === 0) {
       return res
@@ -56,7 +57,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null, onSwitch
     }
 
     if (isNewSession) {
-      await setClaudeInstructions(claudeApi, userData, dynamicGrammar)
+      await setClaudeInstructions(claudeApi, userData, dynamicGrammar, disableTools)
     }
 
     await acquireSlot('Claude')

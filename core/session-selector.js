@@ -130,6 +130,7 @@ class SessionSelector {
       createdAt: new Date().toISOString(),
       lastUsed: new Date().toISOString(),
       pendingSummary: pendingSummary || undefined,
+      disableTools: this.session?.disableTools || false,
     }
 
     if (!nextUser.sessions) nextUser.sessions = []
@@ -228,7 +229,7 @@ class SessionSelector {
     const sessions = this.user.sessions || []
 
     const choices = sessions.map((s, i) => ({
-      name: `${s.name}  │  last: ${this._formatTime(s.lastUsed)}`,
+      name: `${s.name}  │  last: ${this._formatTime(s.lastUsed)}${s.disableTools ? '  [no tools]' : ''}`,
       value: i,
     }))
 
@@ -250,12 +251,22 @@ class SessionSelector {
     const name = await this._promptSessionName()
     if (!name) return null
 
+    const { disableTools } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'disableTools',
+        message: 'Disable tools (raw chat mode)?',
+        default: false,
+      },
+    ])
+
     const newSession = {
       name,
       chatSessionId: null,
       parentMessageId: null,
       createdAt: new Date().toISOString(),
       lastUsed: new Date().toISOString(),
+      disableTools: disableTools || false,
     }
 
     this.user.sessions.push(newSession)
