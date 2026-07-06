@@ -163,6 +163,43 @@ class ClaudeAPI {
   }
 
   // ─── Response header capture ─────────────────────────────────
+  /**
+   * Delete an array of chat sessions server-side.
+   * @param {Array} sessions - array of session objects with chatSessionId
+   */
+  async deleteSessions(sessions) {
+    if (!this._orgId) throw new Error('Organization ID not set')
+
+    const toDelete = sessions.filter((s) => s.chatSessionId)
+    if (toDelete.length === 0) {
+      console.log('[ClaudeAPI] No sessions with server IDs to delete')
+      return
+    }
+
+    console.log(`[ClaudeAPI] Deleting ${toDelete.length} session(s)...`)
+    let deleted = 0
+    for (const session of toDelete) {
+      const url = `${ClaudeAPI.BASE_URL}/organizations/${this._orgId}/chat_conversations/${session.chatSessionId}`
+      try {
+        const res = await this._fetch(url, {
+          method: 'DELETE',
+          headers: this._buildHeaders({ 'content-type': 'application/json' }),
+          body: JSON.stringify({ uuid: session.chatSessionId }),
+        })
+        if (res.ok || res.status === 404) {
+          deleted++
+        } else {
+          const text = await res.text().catch(() => '')
+          console.warn(
+            `[ClaudeAPI] Failed to delete ${session.chatSessionId}: HTTP ${res.status} ${text.slice(0, 100)}`,
+          )
+        }
+      } catch (e) {
+        console.warn(`[ClaudeAPI] Error deleting ${session.chatSessionId}: ${e.message}`)
+      }
+    }
+    console.log(`[ClaudeAPI] Sessions deleted: ${deleted}/${toDelete.length}`)
+  }
 
   _captureResponseHeaders(res) {
     // Capture cookies from response

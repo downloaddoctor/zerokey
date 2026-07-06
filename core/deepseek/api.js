@@ -122,6 +122,29 @@ class DeepSeekAPI {
     }
   }
 
+  /**
+   * Delete all chat sessions server-side (single bulk endpoint).
+   */
+  async deleteAllSessions() {
+    console.log('[DeepSeekAPI] Deleting all sessions...')
+    const res = await this._fetch(
+      `${DeepSeekAPI.BASE_URL}/chat_session/delete_all`,
+      {
+        method: 'POST',
+        headers: this._buildHeaders(),
+        body: null,
+      },
+      false,
+    )
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
+    }
+
+    console.log('[DeepSeekAPI] All sessions deleted successfully')
+  }
+
   // ─── Response header capture ─────────────────────────────────
 
   _captureResponseHeaders(res) {

@@ -1,6 +1,8 @@
 const fs = require('fs')
 const path = require('path')
 const inquirer = require('inquirer')
+const { ClaudeAPI } = require('./claude/api')
+const { DeepSeekAPI } = require('./deepseek/api')
 
 class SessionSelector {
   constructor() {
@@ -268,36 +270,27 @@ class SessionSelector {
     // Delete server-side sessions for DeepSeek
     if (this.provider === 'deepseek') {
       try {
-        await this._deleteDeepSeekSessions(this.user.parsedFetch?.headers || {})
+        const api = new DeepSeekAPI()
+        await api.initialize(this.user.parsedFetch?.headers || {})
+        await api.deleteAllSessions()
       } catch (e) {
         console.warn('[SessionSelector] DeepSeek delete_all failed (non-fatal):', e.message)
       }
     }
 
+    // Delete server-side sessions for Claude
+    if (this.provider === 'claude') {
+      try {
+        const api = new ClaudeAPI()
+        await api.initializeFromJSON(this.user.parsedFetch || {})
+        await api.deleteSessions(this.user.sessions)
+      } catch (e) {
+        console.warn('[SessionSelector] Claude delete_all failed (non-fatal):', e.message)
+      }
+    }
+
     this.user.sessions = []
     return this._createNewSession()
-  }
-
-  async _deleteDeepSeekSessions(headers) {
-    const h = {
-      'accept': '*/*',
-      'accept-language': 'en-US,en;q=0.9',
-      ...headers,
-    }
-
-    console.log('[SessionSelector] Deleting all DeepSeek sessions...')
-    const res = await fetch('https://chat.deepseek.com/api/v0/chat_session/delete_all', {
-      method: 'POST',
-      headers: h,
-      body: null,
-    })
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
-    }
-
-    console.log('[SessionSelector] DeepSeek sessions deleted successfully')
   }
 
   _parseFetchDirect(fetchStr) {

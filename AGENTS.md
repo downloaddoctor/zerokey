@@ -12,7 +12,7 @@ config/: server configuration
 core/: provider API clients + session management
  chat-router.js: ChatRouter → per-request provider route dispatch; autoSwitchMiddleware for Claude rate-limit; hot-swap on signal
  session-selector.js: SessionSelector → inquirer wizard; _stepProviderSelection, _stepUserSelection, _stepSessionSelection; switchToNextAvailable; flush
- # _deleteDeepSeekSessions: POST delete_all via fetch; called on "Delete all sessions"; non-fatal
+ # deleteAllSessions: POST delete_all via _fetch; called on "Delete all sessions"; non-fatal
  deepseek/: DeepSeek provider
   api.js: DeepSeekAPI → https.request, POW, cookie-jar
   pow.js: DeepSeekPOW WASM solver
@@ -100,7 +100,7 @@ session-selector.js → SessionSelector
  # _loadAll(), _saveUser(): atomic read/write with .tmp rename
  # _stepSessionSelection: creates new named session or reuses existing; sets waitUntil/waitReason cleared if expired
  # _deleteAllSessions: deletes server-side DeepSeek sessions (if provider=deepseek) via POST delete_all; clears local sessions; returns to _createNewSession
- # _deleteDeepSeekSessions(headers): fetch POST https://chat.deepseek.com/api/v0/chat_session/delete_all; non-fatal on error
+ # deleteAllSessions: POST chat_session/delete_all via _fetch; non-fatal on error
  # _deleteAllSessions: deletes server-side DeepSeek sessions if provider=deepseek; then clears local; returns to _createNewSession
 
 claude.js
