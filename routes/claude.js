@@ -5,7 +5,7 @@ const { toOpenAIError } = require('../utils/errors')
 const ToolCompiler = require('../lib/engine')
 const { setClaudeInstructions } = require('../core/claude/set-instructions')
 
-const CLAUDE_DEFAULT_MODEL = 'claude-sonnet-4-6'
+const CLAUDE_DEFAULT_MODEL = 'claude-sonnet-5'
 
 const claudeApi = new ClaudeAPI()
 const { acquireSlot } = require('../utils/rate-limiter')
