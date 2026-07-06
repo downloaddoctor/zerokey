@@ -39,6 +39,8 @@ The server auto-finds an available port starting from `8000` and prints the endp
 | `GET`  | `/v1/models/:model`    | Get specific model details       |
 | `POST` | `/v1/chat/completions` | Chat completion (streaming)      |
 
+Full API reference: **[API.md](API.md)**
+
 ## Getting Credentials
 
 ### DeepSeek
@@ -96,6 +98,7 @@ The `Authorization: Bearer <ide>` header maps the request to the correct IDE's t
 
 ```
 server.js               → Express app, startup wizard, provider dispatch, port selection
+API.md                  → full API reference with provider internals, SSE formats, schemas
 config/
   constants.js          → PORT, MODELS
   models.json           → IDE model definitions for VS Code built-in
@@ -135,17 +138,19 @@ lib/engine/
     terax.json          → Terax IDE tool definitions
     vscode.json         → VS Code IDE tool definitions
 utils/
-  cookie-jar.js         → shared cookie management for all providers
-  errors.js             → OpenAI-format error factory
+  cookie-jar.js         → shared cookie management for all providers (seed, capture, toString)
+  errors.js             → 9-category error classifier + OpenAI-format error factory
   har-to-capture.js     → HAR file → fetch() converter
-  rate-limiter.js       → 9 req/30s sliding window per provider
-  sse-reader.js         → unified SSE reader for Web ReadableStream + Node.js streams
-  stream-helpers.js     → sendFinalChunk (flush+emit+[DONE]), createOnError
+  rate-limiter.js       → 5 req/15s sliding window per provider label
+  sse-reader.js         → unified SSE reader for Web ReadableStream (1MB buffer cap, [DONE] detection)
+  stream-helpers.js     → sendFinalChunk (once-guard flush+emit+[DONE]), createOnError
 ```
 
 ## Session Storage
 
 Sessions and credentials are stored in `temp/users.json` (gitignored). Each user entry contains the captured browser headers and a list of named sessions with conversation IDs. Sessions are tracked in-memory during runtime and flushed to disk on graceful shutdown (`SIGINT`/`SIGTERM`) or when Claude auto-switches to another user. No per-request disk writes.
+
+Full schema details: **[API.md](API.md)**
 
 ## License
 
