@@ -1,26 +1,31 @@
-MIT License
-
+ZeroKey Non-Commercial License
 Copyright (c) 2026 ZeroKey
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, and distribute copies of the Software,
-and to permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
+of this software and associated documentation files (the "Software"), to use,
+copy, modify, merge, and distribute the Software for personal, non-commercial
+purposes only, subject to the following conditions:
 
-1. PRIVATE USE ONLY. The Software is licensed for personal, non-commercial
-   use only. Commercial use, including but not limited to selling access,
-   charging fees, incorporating into paid products or services, or any
-   revenue-generating activity involving the Software, is strictly
-   prohibited without a separate commercial license agreement.
+This license is intended for individuals using ZeroKey with their own accounts,
+their own browser sessions, and their own credentials. ZeroKey is designed as a
+self-hosted personal utility and does not grant access to third-party services
+or provide shared access to any user's accounts.
 
-2. The above copyright notice and this permission notice shall be included in
-   all copies or substantial portions of the Software.
+1. NON-COMMERCIAL PERSONAL USE ONLY. The Software may be used by individuals
+   for their own personal workflows and development purposes. Commercial use
+   includes, but is not limited to: selling access to the Software, providing
+   paid access to a hosted instance, operating it as a service for customers,
+   incorporating it into a paid product, or any other revenue-generating
+   activity. A separate written license is required for commercial use.
 
-3. This Software interacts with third-party services (DeepSeek, ChatGPT,
-   Claude). You are solely responsible for complying with each provider's
-   Terms of Service. The authors assume no liability for account suspension,
+2. This license notice and copyright notice shall be included in all copies or
+   substantial portions of the Software.
+3. THIRD-PARTY SERVICES AND USER RESPONSIBILITY. This Software interacts with
+   third-party AI services (DeepSeek, OpenAI/ChatGPT, Anthropic/Claude). Users
+   are responsible for using their own accounts, credentials, and browser
+   sessions and for complying with each provider's Terms of Service. The
+   Software does not provide, sell, share, or distribute access to third-party
+   accounts. The authors assume no liability for account suspension,
    termination, or any other consequences arising from use of this Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR

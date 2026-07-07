@@ -1,6 +1,6 @@
 # ZeroKey
 
-OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** — pipe any of them into VS Code or Terax using your real browser session. No API key. No subscription. Just paste a fetch().
+OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** — use your own browser sessions and your own credentials to connect your own accounts with VS Code, Terax, or OpenCode. Personal use only. Just paste a fetch() call from DevTools. ZeroKey does not provide shared accounts, API access, or commercial access to third-party services.
 
 ## Features
 
@@ -8,7 +8,7 @@ OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** �
 - **Three providers** — DeepSeek, Claude, and ChatGPT — switch at startup
 - **Real browser fingerprint** — POW solving, sentinel tokens, conversation prepare, Cloudflare-safe header ordering, cookie management
 - **Streaming** — SSE response streaming for all providers
-- **Multi-IDE** — per-request IDE selection via `Authorization: Bearer <vscode|terax>`
+- **Multi-IDE** — per-request IDE selection via `Authorization: Bearer <vscode|terax|opencode>`
 - **Session persistence** — in-memory session tracking; flushed to disk on graceful shutdown or Claude auto-switch
 - **Tool call support** — integrated ToolCompiler translates OpenAI-style function calling into provider-compatible prompt grammar
 - **Claude auto-switch** — automatic fallback to next available user when rate-limited, with inline summary context preservation
@@ -41,7 +41,16 @@ The server auto-finds an available port starting from `8000` and prints the endp
 
 Full API reference: **[API.md](API.md)**
 
-## Getting Credentials
+## Account and Credential Responsibility
+
+ZeroKey requires users to provide their own browser session data captured from
+their own accounts. This project does not include, distribute, or request
+credentials from other users.
+
+Only use sessions and credentials belonging to you, and ensure your usage
+complies with the Terms of Service of each connected provider.
+
+### Getting Credentials
 
 ### DeepSeek
 1. Open DevTools → Network tab
@@ -152,6 +161,18 @@ Sessions and credentials are stored in `temp/users.json` (gitignored). Each user
 
 Full schema details: **[API.md](API.md)**
 
+## Legal Use
+
+ZeroKey is a self-hosted personal-use tool. It is intended for individuals using
+their own browser sessions, their own credentials, and their own third-party
+accounts.
+
+Users are responsible for following the Terms of Service of any third-party
+service they connect to, including DeepSeek, OpenAI/ChatGPT, and Anthropic/Claude.
+
+ZeroKey does not provide access to third-party accounts, does not include shared
+credentials, and is not intended to operate as a hosted commercial service.
+
 ## License
 
-MIT
+ZeroKey Non-Commercial License — personal use only. See [LICENSE](LICENSE) for full terms.

@@ -19,8 +19,7 @@ community a harassment-free experience for everyone.
 
 - Trolling, insulting/derogatory comments, and personal attacks
 - Publishing others' private information without explicit permission
-- Any commercial resale, white-labeling, or paid redistribution of this software
-- Abusing provider platforms (credential sharing, scraping, bypassing rate limits)
+- Abusing provider platforms (credential sharing, unauthorized access, scraping, bypassing rate limits, or actions that violate provider Terms of Service)
 - Other conduct which could reasonably be considered inappropriate
 
 ## Scope

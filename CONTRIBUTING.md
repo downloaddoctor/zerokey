@@ -1,6 +1,6 @@
 # Contributing to ZeroKey
 
-Thanks for your interest in contributing! ZeroKey is a personal-use tool — contributions that improve the experience for individual developers are welcome.
+Thanks for your interest in contributing! ZeroKey is a personal-use self-hosted tool — contributions that improve the experience for individual developers using their own accounts and credentials are welcome.
 
 ## Getting Started
 
@@ -12,15 +12,15 @@ Thanks for your interest in contributing! ZeroKey is a personal-use tool — con
 ## What We Welcome
 
 - Bug fixes and error handling improvements
-- New provider support (must be free-tier, browser-session based)
+- New provider support (browser-session based, personal use only)
 - IDE template additions
 - Documentation and README improvements
 - Performance optimizations (streaming, POW, cookie management)
 
 ## What We Don't Accept
 
-- Features that enable commercial use, multi-tenancy, or paid access
-- Credential sharing, scraping tools, or anything that abuses provider ToS
+- Features that enable commercial use, multi-tenancy, hosted access, or paid access
+- Credential sharing, unauthorized account access, scraping tools, or anything that abuses provider Terms of Service
 - Removing or weakening the browser fingerprint / session auth mechanisms
 - Telemetry, analytics, or any user tracking
 
