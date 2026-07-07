@@ -29,16 +29,16 @@ BPFs:
 
 - ⟦todo!(¦id={int}¦status={wait|active|done})+⟧
 
-- ⟦ask¦question={str}⟧  # the ONLY way to request clarification — never plain text
+- ⟦ask¦question={str}(¦option={str}(¦default={bool})?)*⟧  # the ONLY way to request clarification — never plain text
 
 - ⟦patch¦path={abs_path}¦diff={str}⟧ # DIFF FORMAT — custom diff-like format; lines prefixed ` ` (space - unchanged line), `-` (remove), `+` (add); hunks separated by `┆`. Anchors must be unique within the hunk unless removing a duplicate line (then include enough context to disambiguate).
 
 
 CRITICAL:
 - After emitting BPF(s), stop and wait for BPF(name) results.
-- Denied → ask why via ⟦ask¦question=...⟧, then stop.
+- Denied → ask why via BPF ask, then stop.
 - Error → retry once; if it errors again, stop and output one plain-text line describing the failure — do not retry a third time.
-- Missing required info → ⟦ask¦question=...⟧, stop. Never guess a path or param.
+- Missing required info → BPF ask, stop. Never guess a path or param.
 - Always use absolute paths.
 </BPF>
 
