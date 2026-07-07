@@ -332,25 +332,45 @@ class SessionSelector {
     const confirmed = await this._confirmDeleteAll(count)
     if (!confirmed) return this._stepSessionSelection()
 
-    // Delete server-side sessions for DeepSeek
+    // Delete server-side sessions for DeepSeek (one per session)
     if (this.provider === 'deepseek') {
-      try {
-        const api = new DeepSeekAPI()
-        await api.initialize(this.user.parsedFetch?.headers || {})
-        await api.deleteAllSessions()
-      } catch (e) {
-        console.warn('[SessionSelector] DeepSeek delete_all failed (non-fatal):', e.message)
+      const api = new DeepSeekAPI()
+      await api.initialize(this.user.parsedFetch?.headers || {})
+      const toDelete = this.user.sessions.filter((s) => s.chatSessionId)
+      if (toDelete.length > 0) {
+        console.log(`\n[DeepSeek] Deleting ${toDelete.length} session(s)...`)
+        let deleted = 0
+        for (const session of toDelete) {
+          try {
+            await api.deleteSession(session.chatSessionId)
+            deleted++
+            console.log(`  [${deleted}/${toDelete.length}] Deleted ${session.chatSessionId}`)
+          } catch (e) {
+            console.warn(`  [${deleted + 1}/${toDelete.length}] Failed ${session.chatSessionId}: ${e.message}`)
+          }
+        }
+        console.log(`[DeepSeek] Sessions deleted: ${deleted}/${toDelete.length}\n`)
       }
     }
 
-    // Delete server-side sessions for Claude
+    // Delete server-side sessions for Claude (one per session)
     if (this.provider === 'claude') {
-      try {
-        const api = new ClaudeAPI()
-        await api.initializeFromJSON(this.user.parsedFetch || {})
-        await api.deleteSessions(this.user.sessions)
-      } catch (e) {
-        console.warn('[SessionSelector] Claude delete_all failed (non-fatal):', e.message)
+      const api = new ClaudeAPI()
+      await api.initializeFromJSON(this.user.parsedFetch || {})
+      const toDelete = this.user.sessions.filter((s) => s.chatSessionId)
+      if (toDelete.length > 0) {
+        console.log(`\n[Claude] Deleting ${toDelete.length} session(s)...`)
+        let deleted = 0
+        for (const session of toDelete) {
+          try {
+            await api.deleteSession(session.chatSessionId)
+            deleted++
+            console.log(`  [${deleted}/${toDelete.length}] Deleted ${session.chatSessionId}`)
+          } catch (e) {
+            console.warn(`  [${deleted + 1}/${toDelete.length}] Failed ${session.chatSessionId}: ${e.message}`)
+          }
+        }
+        console.log(`[Claude] Sessions deleted: ${deleted}/${toDelete.length}\n`)
       }
     }
 

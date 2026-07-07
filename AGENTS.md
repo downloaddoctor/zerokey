@@ -12,7 +12,8 @@ config/: server configuration
 core/: provider API clients + session management
  chat-router.js: ChatRouter → per-request provider route dispatch; autoSwitchMiddleware for Claude rate-limit; hot-swap on signal
  session-selector.js: SessionSelector → inquirer wizard; _stepProviderSelection, _stepUserSelection, _stepSessionSelection; switchToNextAvailable; flush
- # deleteAllSessions: POST delete_all via _fetch; called on "Delete all sessions"; non-fatal
+ # deleteSession(chatSessionId): POST chat_session/delete for DeepSeek; DELETE /chat_conversations/{uuid} for Claude
+ # _deleteAllSessions: deletes server-side sessions one-by-one; per-session progress logging; non-fatal per session; then clears local; returns to _createNewSession
  deepseek/: DeepSeek provider
   api.js: DeepSeekAPI → https.request, POW, cookie-jar
   pow.js: DeepSeekPOW WASM solver
@@ -100,9 +101,7 @@ session-selector.js → SessionSelector
  # _loadAll(), _saveUser(): atomic read/write with .tmp rename
  # _stepSessionSelection: creates new named session (prompts model per provider) or reuses existing; shows model in list; sets waitUntil/waitReason cleared if expired
  # model selection: Claude → claude-sonnet-4-6/claude-sonnet-5; ChatGPT → auto; DeepSeek → expert/default/vision
- # _deleteAllSessions: deletes server-side DeepSeek sessions (if provider=deepseek) via POST delete_all; clears local sessions; returns to _createNewSession
- # deleteAllSessions: POST chat_session/delete_all via _fetch; non-fatal on error
- # _deleteAllSessions: deletes server-side DeepSeek sessions if provider=deepseek; then clears local; returns to _createNewSession
+ # _deleteAllSessions: deletes server-side sessions one-by-one per provider (DeepSeek via deleteSession, Claude via deleteSession); per-session progress logging; non-fatal per session; then clears local; returns to _createNewSession
 
 claude.js
  → core/claude/api → ClaudeAPI singleton

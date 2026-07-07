@@ -145,6 +145,27 @@ class DeepSeekAPI {
     console.log('[DeepSeekAPI] All sessions deleted successfully')
   }
 
+  /**
+   * Delete a single chat session server-side.
+   * @param {string} chatSessionId - the session UUID to delete
+   */
+  async deleteSession(chatSessionId) {
+    const res = await this._fetch(
+      `${DeepSeekAPI.BASE_URL}/chat_session/delete`,
+      {
+        method: 'POST',
+        headers: this._buildHeaders(),
+        body: JSON.stringify({ chat_session_id: chatSessionId }),
+      },
+      false,
+    )
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
+    }
+  }
+
   // ─── Response header capture ─────────────────────────────────
 
   _captureResponseHeaders(res) {

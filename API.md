@@ -17,17 +17,17 @@ IDE Client (Bearer <ide-name>)
        ▼
 ┌─────────────────────────────────────┐
 │  Express Server (server.js)         │
-│  ├─ IDE detection middleware         │
-│  ├─ Request logger                   │
-│  └─ ChatRouter (hot-swap capable)    │
-│       ├─ POST /v1/chat/completions   │
-│       │    ├─ DeepSeek route          │
-│       │    ├─ Claude route            │
-│       │    └─ ChatGPT route           │
-│       ├─ GET /v1/models              │
-│       ├─ GET /v1/models/:model       │
-│       ├─ GET /                       │
-│       └─ GET /health                 │
+│  ├─ IDE detection middleware        │
+│  ├─ Request logger                  │
+│  └─ ChatRouter (hot-swap capable)   │
+│       ├─ POST /v1/chat/completions  │
+│       │    ├─ DeepSeek route        │
+│       │    ├─ Claude route          │
+│       │    └─ ChatGPT route         │
+│       ├─ GET /v1/models             │
+│       ├─ GET /v1/models/:model      │
+│       ├─ GET /                      │
+│       └─ GET /health                │
 └─────────────────────────────────────┘
 ```
 
@@ -224,12 +224,12 @@ Manages HTTP requests to `chat.deepseek.com` using browser-identical headers and
 
 ### Internal API Endpoints Used
 
-| Endpoint                            | Method | Purpose                           |
-| ----------------------------------- | ------ | --------------------------------- |
-| `/api/v0/chat_session/create`       | POST   | Create a new chat session         |
-| `/api/v0/chat/create_pow_challenge` | POST   | Get POW challenge for anti-bot    |
-| `/api/v0/chat/completion`           | POST   | Send chat completion (SSE stream) |
-| `/api/v0/chat_session/delete_all`   | POST   | Delete all sessions server-side   |
+| Endpoint                            | Method | Purpose                             |
+| ----------------------------------- | ------ | ----------------------------------- |
+| `/api/v0/chat_session/create`       | POST   | Create a new chat session           |
+| `/api/v0/chat/create_pow_challenge` | POST   | Get POW challenge for anti-bot      |
+| `/api/v0/chat/completion`           | POST   | Send chat completion (SSE stream)   |
+| `/api/v0/chat_session/delete`       | POST   | Delete a single session server-side |
 
 ### Dependencies
 - **`DeepSeekPOW`** (`core/deepseek/pow.js`): WASM-based proof-of-work solver
@@ -288,7 +288,7 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
 | Endpoint                                                          | Method | Purpose                           |
 | ----------------------------------------------------------------- | ------ | --------------------------------- |
 | `/api/organizations/{orgId}/chat_conversations/{uuid}/completion` | POST   | Send chat completion (SSE stream) |
-| `/api/organizations/{orgId}/chat_conversations/{uuid}`            | DELETE | Delete a specific conversation    |
+| `/api/organizations/{orgId}/chat_conversations/{uuid}`            | DELETE | Delete a single conversation      |
 
 ### Dependencies
 - **`CookieJar`** (`utils/cookie-jar.js`): Cookie persistence
