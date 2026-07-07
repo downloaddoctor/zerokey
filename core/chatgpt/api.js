@@ -254,6 +254,26 @@ class ChatGPTAPI {
     this._headers['cookie'] = this._cookies.toString()
   }
 
+  // ─── Delete conversation ─────────────────────────────────────
+
+  /**
+   * Delete a single conversation server-side.
+   * @param {string} conversationId - the conversation UUID to delete
+   */
+  async deleteSession(conversationId) {
+    const url = `${this.BASE_URL}/backend-api/conversation/${conversationId}`
+    const res = await this._fetch(url, {
+      method: 'PATCH',
+      headers: this._buildHeaders({ 'content-type': 'application/json' }),
+      body: JSON.stringify({ is_visible: false }),
+    })
+
+    if (!res.ok && res.status !== 404) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
+    }
+  }
+
   // ─── Headers ──────────────────────────────────────────────────
   // Header order matches browser HAR exactly per endpoint.
   // Cloudflare fingerprinting checks header order — must match real browser.

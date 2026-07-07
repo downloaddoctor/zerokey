@@ -20,7 +20,7 @@ core/ # session management, chat router, provider API clients
   core/claude/stream-handler.js → claudeStreamHandler — SSE parser, message_limit detection, auto-summary trigger
   core/claude/set-instructions.js → setClaudeInstructions — PUT account_profile with system prompt
  core/chatgpt/ # ChatGPT API client, POW solver, SSE stream handler, instructions setter
-  core/chatgpt/api.js → ChatGPTAPI — conversation prepare, sentinel refresh, POW, conduit token flow
+  core/chatgpt/api.js → ChatGPTAPI — conversation prepare, sentinel refresh, POW, conduit token flow, session deletion
   core/chatgpt/pow.js → ChatGPTProofOfWork — SHA3-512 sentinel proof-of-work solver
   core/chatgpt/stream-handler.js → chatgptStreamHandler — SSE parser for ChatGPT response format
   core/chatgpt/set-instructions.js → setChatGPTInstructions — PATCH user_system_messages

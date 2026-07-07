@@ -3,6 +3,7 @@ const path = require('path')
 const inquirer = require('inquirer')
 const { ClaudeAPI } = require('./claude/api')
 const { DeepSeekAPI } = require('./deepseek/api')
+const { ChatGPTAPI } = require('./chatgpt/api')
 
 class SessionSelector {
   constructor() {
@@ -268,12 +269,16 @@ class SessionSelector {
         default: 'claude-sonnet-4-6',
         choices: [
           {
-            name: 'claude-sonnet-4-6 (recommended for tools)',
+            name: 'SONNET 4.6 (recommended for tools)',
             value: 'claude-sonnet-4-6',
           },
           {
-            name: 'claude-sonnet-5',
+            name: 'SONNET 5',
             value: 'claude-sonnet-5',
+          },
+          {
+            name: 'HAIKU 4.5',
+            value: 'claude-haiku-4-5-20251001',
           },
         ],
       })
@@ -296,9 +301,9 @@ class SessionSelector {
         message: 'DeepSeek model:',
         default: 'expert',
         choices: [
-          { name: 'expert (recommended)', value: 'expert' },
-          { name: 'default', value: 'default' },
-          { name: 'vision', value: 'vision' },
+          { name: 'V4 - Expert (recommended)', value: 'expert' },
+          { name: 'V4 - Default', value: 'default' },
+          { name: 'V4 - Vision', value: 'vision' },
         ],
       })
     }
@@ -332,50 +337,55 @@ class SessionSelector {
     const confirmed = await this._confirmDeleteAll(count)
     if (!confirmed) return this._stepSessionSelection()
 
-    // Delete server-side sessions for DeepSeek (one per session)
-    if (this.provider === 'deepseek') {
-      const api = new DeepSeekAPI()
-      await api.initialize(this.user.parsedFetch?.headers || {})
-      const toDelete = this.user.sessions.filter((s) => s.chatSessionId)
-      if (toDelete.length > 0) {
-        console.log(`\n[DeepSeek] Deleting ${toDelete.length} session(s)...`)
-        let deleted = 0
-        for (const session of toDelete) {
-          try {
-            await api.deleteSession(session.chatSessionId)
-            deleted++
-            console.log(`  [${deleted}/${toDelete.length}] Deleted ${session.chatSessionId}`)
-          } catch (e) {
-            console.warn(`  [${deleted + 1}/${toDelete.length}] Failed ${session.chatSessionId}: ${e.message}`)
-          }
-        }
-        console.log(`[DeepSeek] Sessions deleted: ${deleted}/${toDelete.length}\n`)
-      }
-    }
-
-    // Delete server-side sessions for Claude (one per session)
-    if (this.provider === 'claude') {
-      const api = new ClaudeAPI()
-      await api.initializeFromJSON(this.user.parsedFetch || {})
-      const toDelete = this.user.sessions.filter((s) => s.chatSessionId)
-      if (toDelete.length > 0) {
-        console.log(`\n[Claude] Deleting ${toDelete.length} session(s)...`)
-        let deleted = 0
-        for (const session of toDelete) {
-          try {
-            await api.deleteSession(session.chatSessionId)
-            deleted++
-            console.log(`  [${deleted}/${toDelete.length}] Deleted ${session.chatSessionId}`)
-          } catch (e) {
-            console.warn(`  [${deleted + 1}/${toDelete.length}] Failed ${session.chatSessionId}: ${e.message}`)
-          }
-        }
-        console.log(`[Claude] Sessions deleted: ${deleted}/${toDelete.length}\n`)
-      }
-    }
+    // Delete server-side sessions (one per session) — unified for all providers
+    await this._deleteProviderSessions()
 
     this.user.sessions = []
     return this._createNewSession()
+  }
+
+  async _deleteProviderSessions() {
+    const PROVIDERS = {
+      deepseek: {
+        label: 'DeepSeek',
+        factory: () => new DeepSeekAPI(),
+        init: (api) => api.initialize(this.user.parsedFetch?.headers || {}),
+      },
+      claude: {
+        label: 'Claude',
+        factory: () => new ClaudeAPI(),
+        init: (api) => api.initializeFromJSON(this.user.parsedFetch || {}),
+      },
+      chatgpt: {
+        label: 'ChatGPT',
+        factory: () => new ChatGPTAPI(),
+        init: (api) => api.initializeFromJSON(this.user.parsedFetch || {}),
+      },
+    }
+
+    const cfg = PROVIDERS[this.provider]
+    if (!cfg) return
+
+    const toDelete = this.user.sessions.filter((s) => s.chatSessionId)
+    if (toDelete.length === 0) return
+
+    const api = cfg.factory()
+    await cfg.init(api)
+
+    console.log(`\n[${cfg.label}] Deleting ${toDelete.length} session(s)...`)
+    let deleted = 0
+    for (const session of toDelete) {
+      try {
+        await api.deleteSession(session.chatSessionId)
+        deleted++
+        console.log(`  [${deleted}/${toDelete.length}] Deleted ${session.chatSessionId}`)
+      } catch (e) {
+        console.warn(
+          `  [${deleted + 1}/${toDelete.length}] Failed ${session.chatSessionId}: ${e.message}`,
+        )
+      }
+    }
+    console.log(`[${cfg.label}] Sessions deleted: ${deleted}/${toDelete.length}\n`)
   }
 
   _parseFetchDirect(fetchStr) {
