@@ -1,258 +1,262 @@
 #PROJECT
-zerokey v1.0.0
-language: javascript
-runtime: node.js
-package-manager: npm
-description: OpenAI-compatible AI proxy for DeepSeek, Claude & ChatGPT — no API keys, real browser sessions
+ZeroKey — OpenAI-compatible AI proxy for DeepSeek, Claude & ChatGPT
+ no API keys required; uses real browser sessions via captured fetch() calls
+ single Express server on configurable port, exposes /v1/models, /v1/chat/completions, /health
 
 #DIRECTORY
-config/: server configuration
- constants.js: CONFIG PORT, MODELS definitions
- models.json: VS Code custom endpoint model registry (ZK8000..ZK8003, ports 8000..8003, editTools=apply-patch|code-rewrite|find-replace|multi-find-replace, no apiKey)
-core/: provider API clients + session management
- chat-router.js: ChatRouter → per-request provider route dispatch; autoSwitchMiddleware for Claude rate-limit; hot-swap on signal
- session-selector.js: SessionSelector → inquirer wizard; _stepProviderSelection, _stepUserSelection, _stepSessionSelection; switchToNextAvailable; flush
- # deleteSession(chatSessionId): POST chat_session/delete for DeepSeek; DELETE /chat_conversations/{uuid} for Claude
- # _deleteAllSessions: deletes server-side sessions one-by-one; per-session progress logging; non-fatal per session; then clears local; returns to _createNewSession
- deepseek/: DeepSeek provider
-  api.js: DeepSeekAPI → https.request, POW, cookie-jar
-  pow.js: DeepSeekPOW WASM solver
-  stream-handler.js: SSE stream parser; SET/BATCH/text delta dispatch; token usage capture; error retry (no saveSession)
- claude/: Claude provider
-  api.js: ClaudeAPI → fetch, org-based, conversation UUID; _buildHeaders preserves exact HAR order
-  stream-handler.js: SSE stream parser; message_limit → inline summary + onNearLimit callback; no saveSession
-  set-instructions.js: setClaudeInstructions → PUT account_profile; hash-cached (no saveSession)
- chatgpt/: ChatGPT provider
-  api.js: ChatGPTAPI → fetch, sentinel POW, conversation prepare; chatCompletion/_prepareConversation accept model param (default 'auto')
-  pow.js: ChatGPTProofOfWork solver
-  stream-handler.js: SSE stream parser for ChatGPT (no saveSession)
-  set-instructions.js: setChatGPTInstructions → PATCH user_system_messages; hash-cached (no saveSession)
-lib/: tool compilation engine
- engine/: ToolCompiler + Stream parser
-  index.js: ToolCompiler(ide, provider) singleton per ide:provider pair; formatPrompt, buildPrompt(userPrompt,dynamicGrammar), syncDynamicTools(reqTools,session), parse, emit(_passthrough→raw args), compile, inferType
-  dynamic-tools.js: syncDynamicTools→hash reqTools[],filter inbuilts via reverseMap,register passthrough entries in compiler.tools,store hash on session,cache grammar as session._dynamicGrammarCache; grammarFromSchema builds grammar from OpenAI input_schema
-  stream.js: Stream 3-state FSM (outside / toolStartFound / inTool); emits text deltas + batched tool_calls on close
-  tool-defs.js: TOOLS registry (read, patch, charPatch, replace, write, ls, mkdir, glob, grep, cmd, todo+, todo!); getIDEMapper(ide) → {tools, reverseMap, user, tool}; IDES_PROMPT_OPTIMIZER; TOOL_OUTPUT_LIMITS; user mes format: SYSTEM: OS / SHELL / CWD; USER: prefix on messages
-  instructions.md: base system prompt — tool runtime format (SYNTAX/RULES/EXTRA); includes <tool_format> + <code_style> + CRITICAL + SYSTEM prefix
-  skills-extra.md: extra prompt blocks (memory, save_workflow)
-  instructions.js: Instructions singleton → getBase(), getExtra(), getFull(), getHash(), invalidate(); lazy-loaded, SHA-256 hash
-  templates/: IDE config templates
-   opencode.json: opencode IDE config
-   terax.json: terax IDE config
-   vscode.json: vscode IDE config
-routes/: Express route handlers (factory functions, not mounted directly)
- deepseek.js: buildChatRouter(parsedFetch.headers, session) → POST /v1/chat/completions
- claude.js: buildClaudeRouter(parsedFetch, session, userData, onSwitch) → POST /v1/chat/completions; SUMMARY_PROMPT; inline summary on near-limit; auto-switch signal
- chatgpt.js: buildChatGPTRouter(parsedFetch, session, userData) → POST /v1/chat/completions
- health.js: GET /, GET /health
- models.js: GET /v1/models, GET /v1/models/:model
-temp/: runtime session data
- users.json: persisted sessions per provider per user (atomic write via .tmp rename)
-utils/: shared utilities
- cookie-jar.js: CookieJar → seedFromHeader, captureFromFetchHeaders, captureFromRawHeaders, toString
- errors.js: classifyError (9 categories), toOpenAIError → OpenAI-compatible error response
- har-to-capture.js: HAR file parser → parsedFetch format
- rate-limiter.js: acquireSlot → 5 calls/15s sliding window; per-label, promise-based queue
- sse-reader.js: readSSE → Web ReadableStream (fetch body); 1MB buffer cap; [DONE] detection
- stream-helpers.js: createSendFinalChunk (once-guard, flush+emit+[DONE]+lastUsed, no saveSession); createOnError
-docs/: static documentation
- logos/: provider logos
-server.js: Express entry; IDE middleware (Bearer header); request logger; SessionSelector wizard; ChatRouter mount; port check; graceful shutdown (flush on exit)
-start.bat: Windows batch launcher
-nodemon.json: nodemon config (watches core/, routes/, lib/, utils/, config/)
-package.json: dependencies, scripts
+server.js # entrypoint, Express app setup, session selection, shutdown handling
+config/ # constants, model definitions, IDE model configs
+ config/constants.js # CONFIG (PORT), MODELS registry
+ config/models.json # ZeroKey endpoint configs for IDEs (ZK8000–ZK8003)
+core/ # session management, chat router, provider API clients
+ core/session-selector.js # interactive CLI wizard: provider→user→session selection; users.json persistence; auto-switch
+ core/chat-router.js # hot-swappable Express router; delegates to provider router; triggers auto-switch on rate limit
+ core/deepseek/ # DeepSeek API client, POW solver, SSE stream handler
+  core/deepseek/api.js → DeepSeekAPI — chat session CRUD, POW challenge, cookie management
+  core/deepseek/pow.js → DeepSeekPOW — WASM SHA3 proof-of-work solver
+  core/deepseek/stream-handler.js → streamHandler — SSE parser for DeepSeek response format
+ core/claude/ # Claude API client, SSE stream handler, instructions setter
+  core/claude/api.js → ClaudeAPI — conversation completion, org ID extraction, HAR-ordered headers
+  core/claude/stream-handler.js → claudeStreamHandler — SSE parser, message_limit detection, auto-summary trigger
+  core/claude/set-instructions.js → setClaudeInstructions — PUT account_profile with system prompt
+ core/chatgpt/ # ChatGPT API client, POW solver, SSE stream handler, instructions setter
+  core/chatgpt/api.js → ChatGPTAPI — conversation prepare, sentinel refresh, POW, conduit token flow
+  core/chatgpt/pow.js → ChatGPTProofOfWork — SHA3-512 sentinel proof-of-work solver
+  core/chatgpt/stream-handler.js → chatgptStreamHandler — SSE parser for ChatGPT response format
+  core/chatgpt/set-instructions.js → setChatGPTInstructions — PATCH user_system_messages
+routes/ # Express route builders (one per provider + models + health)
+ routes/deepseek.js → buildChatRouter(headers, session)
+ routes/claude.js → buildClaudeRouter(parsedFetch, session, userData, onSwitch)
+ routes/chatgpt.js → buildChatGPTRouter(parsedFetch, session, userData)
+ routes/models.js → GET /v1/models, GET /v1/models/:model
+ routes/health.js → GET /health, GET /
+lib/engine/ # tool compilation, prompt formatting, IDE mappings
+ lib/engine/index.js → ToolCompiler (singleton per ide+provider); parse/compile/emit tool calls; _mergeTodo
+ lib/engine/dynamic-tools.js → syncDynamicTools — hash req.body.tools[], register MCP passthrough tools
+ lib/engine/instructions.js → Instructions singleton; lazy-loads instructions.md + skills-extra.md
+ lib/engine/instructions.md # system prompt for LLM (BPF syntax, tool grammar, coding rules)
+ lib/engine/skills-extra.md # extra skills appended to instructions (editing instructions themselves)
+ lib/engine/stream.js → Stream class; scans LLM output for ⟦tool⟧ markers, emits SSE chunks + tool_calls
+ lib/engine/tool-defs.js → TOOLS registry (read/write/replace/patch/charPatch/ls/mkdir/glob/grep/cmd/todo+/todo!), getIDEMapper(ide), IDE-specific prompt optimizers (vscode/terax/opencode user/tool formatters)
+ lib/engine/templates/ # IDE tool schemas
+  lib/engine/templates/vscode.json # VS Code tool definitions (read_file, write_file, multi_replace_string_in_file, grep_search, file_search, list_dir, create_directory, create_file, run_in_terminal, manage_todo_list, etc.)
+  lib/engine/templates/terax.json # Terax tool definitions (read_file, write_file, edit, multi_edit, grep, glob, bash_run, bash_background, bash_logs, bash_kill, bash_list, todo_write, create_directory, etc.)
+  lib/engine/templates/opencode.json # OpenCode tool definitions (read, write, edit, glob, grep, bash, question, task, todowrite, skill, webfetch)
+utils/ # shared utilities
+ utils/cookie-jar.js → CookieJar — parse Set-Cookie, seed from header, capture from fetch/raw headers, serialize to Cookie string
+ utils/errors.js → toOpenAIError, classifyError — error categories: overloaded, session_expired, rate_limited, cloudflare_block, network, invalid_request, provider_error, internal
+ utils/rate-limiter.js → acquireSlot — sliding-window rate limiter (5 req / 15s per label)
+ utils/sse-reader.js → readSSE — generic SSE stream parser with 1MB buffer cap
+ utils/stream-helpers.js → createSendFinalChunk, createOnError — shared SSE finalizers (flush tools, emit [DONE], update session.lastUsed)
+ utils/har-to-capture.js → harToCapture — convert HAR files to network-capture JSON format
+temp/ # runtime data: users.json, scratch files (not committed)
+docs/ # static docs site
+ docs/index.html
+ docs/logos/
+nodemon.json # nodemon config
+start.bat # Windows batch launcher
 
 #ENTRYPOINTS
-start: node server.js → interactive wizard → Express on PORT
-dev: npx nodemon server.js → auto-reload
-win: start.bat → node server.js
+server.js # node server.js (npm start)
+ interactive wizard → select provider (DeepSeek/Claude/ChatGPT) → select/create user → select/create session
+ builds provider-specific router via ChatRouter.mount() → mounts at /v1/chat/completions
+ auto-finds available port starting from CONFIG.PORT (default 8000)
+ SIGINT/SIGTERM → selector.flush() → server.close()
 
 #MODULES
-server.js
- → express
- → config/constants → CONFIG, MODELS
- → routes/models, routes/health
- → core/session-selector → SessionSelector
- → core/chat-router → ChatRouter
- → utils/errors → toOpenAIError
- # IDE_WHITELIST: vscode, terax, opencode (unknown → vscode)
- # request logger: method/url/status/duration/IDE/body-size
- # error middleware: unhandled → OpenAI-compatible JSON; res.headersSent guard
- # graceful shutdown: SIGINT/SIGTERM → selector.flush() → server.close() → 5s force-kill
-
-chat-router.js → ChatRouter
- → express.Router
- → routes/deepseek → buildChatRouter
- → routes/claude → buildClaudeRouter
- → routes/chatgpt → buildChatGPTRouter
- # selected: current {user, userData, provider, parsedFetch, session, sessionName}
- # mount(preSelected): builds initial router, stores selected
- # middleware(): returns express.Router with per-request dispatch + autoSwitchMiddleware
- # autoSwitchMiddleware: catches 429 Claude rate-limit → calls selector.switchToNextAvailable(lastSummary) → flushes old user → rebuilds router → retries
- # rebuildRouter(): rebuilds route handler closure with current selected
-
-session-selector.js → SessionSelector
- → inquirer
- → users.json (atomic write)
- → models.json → model list
- # select(): full wizard → _stepProviderSelection → _stepUserSelection → _stepSessionSelection
- # switchToNextAvailable(pendingSummary): finds next Claude user without active waitUntil; creates fresh session with pendingSummary
- # flush(): _saveUser current in-memory state to disk
- # _loadAll(), _saveUser(): atomic read/write with .tmp rename
- # _stepSessionSelection: creates new named session (prompts model per provider) or reuses existing; shows model in list; sets waitUntil/waitReason cleared if expired
- # model selection: Claude → claude-sonnet-4-6/claude-sonnet-5; ChatGPT → auto; DeepSeek → expert/default/vision
- # _deleteAllSessions: deletes server-side sessions one-by-one per provider (DeepSeek via deleteSession, Claude via deleteSession); per-session progress logging; non-fatal per session; then clears local; returns to _createNewSession
-
-claude.js
- → core/claude/api → ClaudeAPI singleton
- → core/claude/stream-handler → claudeStreamHandler
- → core/claude/set-instructions → setClaudeInstructions
- → lib/engine → ToolCompiler (per-request, ide:claude keyed singleton)
- → utils/rate-limiter → acquireSlot
- → utils/errors → toOpenAIError
- # CLAUDE_DEFAULT_MODEL = 'claude-sonnet-4-6'
- # reads session.model (falls back to CLAUDE_DEFAULT_MODEL) → passes to main + summary calls
- # onNearLimit callback: inline summary via SUMMARY_PROMPT, captures text via monkey-patched parser.scan, stores in userData.lastSummary, calls onSwitch
- # rate_limit_error catch: sets userData.waitUntil, userData.waitReason
-
-chatgpt.js
- → lib/engine/instructions → Instructions singleton
- → core/chatgpt/api → ChatGPTAPI
- → core/chatgpt/stream-handler → chatgptStreamHandler
- → core/chatgpt/set-instructions → setChatGPTInstructions
- → lib/engine → ToolCompiler
- → utils/rate-limiter → acquireSlot
- # reads session.model (default 'auto') → passes to chatgptApi.chatCompletion
- # new session: instructions.getFull() + dynamicGrammar prepended to prompt (setChatGPTInstructions disabled)
-
-deepseek.js
- → core/deepseek/api → DeepSeekAPI
- → core/deepseek/stream-handler → streamHandler
- → lib/engine → ToolCompiler
- → utils/rate-limiter → acquireSlot
- → utils/errors → toOpenAIError
- # reads session.model (default 'expert') → passes as model_type on new session
- # retry logic: on error, calls retry() which re-acquires slot and re-invokes chatCompletion
-
-index.js → ToolCompiler
- → lib/engine/instructions → Instructions singleton
- → lib/engine/tool-defs → getIDEMapper, TOOL_OUTPUT_LIMITS
- → lib/engine/stream → Stream
- # singleton cache: ToolCompiler.objects[ide:provider]
- # _handlers: system, assistant, user (IDES_PROMPT_OPTIMIZER), tool (truncated per TOOL_OUTPUT_LIMITS)
- # formatPrompt: dispatches last message to handler
- # buildPrompt: getFull() + userPrompt (new session only)
- # compile: parse → emit → IDE-specific tool call
- # parse: split ¦, infer types, handle repeatable groups ($array)
- # emit: map generic→IDE fields, handle array/split, run transformer+transform
- # _mergeTodo: merges delta items into session.todos by id
-
-stream.js → Stream
- # 3-state FSM: outside → toolStartFound → inTool
- # scan(text): appends to buffer; detects ⟦ (enter toolStartFound) → ¦ (validate name) →  (complete, push toolBuffers)
- # flush(): forces  if mid-tool; calls emitToolCalls; emits dangling plain text
- # emitToolCalls: compiler.compile → buildCall → buildToolDelta → emit
- # callCounter: global monotonic ID for call_XXXX_toolname IDs
-
-sse-reader.js → readSSE
- # getReader() + TextDecoder loop → processChunk → processLine
- # processChunk: split on \n, keep trailing partial in buffer
- # processLine: skips event:, parses data: JSON, handles [DONE] → onDone
- # 1MB buffer cap; onDone on stream end or error
-
-stream-helpers.js
- # createSendFinalChunk: once-guard; parser.flush() → emit stop → [DONE] → res.end() → session.lastUsed (no disk flush)
- # createOnError: once-guard; classifyError → emit error chunk → res.end
-
-rate-limiter.js
- # 5 req / 15s sliding window per label
- # expired or future windowStart → reset
- # wait queue: single setTimeout resolves promise after window remainder
-
-errors.js
- # classifyError: 9 categories (overloaded, session_expired, rate_limited, cloudflare_block, auth_failed, network, invalid_request, provider_error, internal)
- # toOpenAIError: wraps classified into {error:{message,type,code,action,category,status}}
+Express 5.2.1 # HTTP framework (pre-release)
+inquirer 8.2.7 # interactive CLI prompts for session selection
+WASM (core/deepseek/wasm/) # SHA3 proof-of-work solver compiled from Rust
+Node.js built-ins: fs, path, crypto, net, http
 
 #RUNTIME-GRAPH
-server start
- → SessionSelector.select() → provider/user/session wizard → returns {user, userData, provider, parsedFetch, session, sessionName}
- → new ChatRouter(selector)
- → chatRouter.mount(preSelected) → builds initial router, stores selected
- → mount /v1/chat/completions via chatRouter.middleware()
- → checkPort → find free port starting at CONFIG.PORT
+server.js
+ → express() app setup
+ → auth middleware: Authorization: Bearer <ide> → req.ide (default 'vscode')
+ → GET /v1/models → modelsRouter
+ → GET /, /health → healthRouter
+ → SessionSelector.select() # interactive wizard
+   → inquirer prompts (provider → user → session)
+   → users.json read/write via _loadAll/_saveUser
+   → _parseFetchDirect — parses pasted fetch() string into { headers, body, url }
+   → Claude: check waitUntil on all users, offer switch or re-prompt
+   → DeepSeekAPI.createChatSession() / reuse existing chatSessionId
+   → returns { user, userData, provider, parsedFetch, session, sessionName }
+ → ChatRouter.mount(selected)
+   → buildChatRouter(headers, session) # DeepSeek
+   → buildClaudeRouter(parsedFetch, session, userData, onSwitch) # Claude
+   → buildChatGPTRouter(parsedFetch, session, userData) # ChatGPT
+   → each returns Express router with POST / handler
+ → app.use('/v1/chat/completions', chatRouter.middleware())
  → app.listen(port)
+ → SIGINT/SIGTERM → selector.flush() → server.close()
 
-POST /v1/chat/completions
- → ChatRouter.middleware() per-request dispatch:
-   → parse Authorization header → extract IDE
-   → validate messages[]
-   → route to provider handler via closure (built with current selected)
- → ToolCompiler(req.ide, provider) → singleton
- → formatPrompt(messages, isNewSession)
- → if new session: buildPrompt (prepend instructions); setProviderInstructions (hash-cached)
- → acquireSlot(provider)
- → provider.chatCompletion(prompt, session, model, tools)
- → SSE headers
- → Stream(res, model, compiler, session) → FSM parser
- → streamHandler(res, stream, session, parser, ...)
-   → readSSE → onData → parser.scan(text)
-   → message_limit (Claude) → onNearLimit → inline summary → captures text → stores userData.lastSummary → calls onSwitch signal
-   → message_stop / [DONE] → sendFinalChunk → flush + [DONE] + session.lastUsed (in-memory only)
+POST /v1/chat/completions handler (all providers):
+ → extract messages, model, tools from req.body
+ → ToolCompiler(req.ide, provider) # singleton per ide+provider
+ → syncDynamicTools(req.tools, session) # MCP tool registration, hash-based caching
+ → compiler.formatPrompt(messages, isNewSession) # converts OpenAI messages to provider-specific format
+ → isNewSession: prepend instructions + dynamic grammar + optionally pending summary
+ → acquireSlot(provider) # rate limit
+ → provider API chatCompletion() → returns ReadableStream
+ → StreamHandler → readSSE → parser.scan() → Stream.flush() → emitToolCalls()
 
-Claude rate-limit auto-switch (autoSwitchMiddleware)
- → catch 429 → extract X-RateLimit-Reset header
- → if not resetWithin5min → 429 to client
- → set current user waitUntil/waitReason
- → selector.flush() → persist current user state
- → selector.switchToNextAvailable(lastSummary) → find next available user
- → if no user available → 429 to client
- → chatRouter.rebuildRouter() → rebuild route closure with new user
- → retry original request
+ChatGPT deep flow:
+ → ChatGPTAPI.initializeFromJSON(parsedFetch)
+   → seed CookieJar from initial headers
+   → decode proof token → extract config + user-agent
+   → _refreshSentinel()
+     → generateSentinelProof(config) → POST /backend-api/sentinel/chat-requirements/prepare
+     → solve POW (SHA3-512, iterate counter up to 100k)
+     → store prepare_token, proof_token, turnstile_token in headers
+ → per-request:
+   → _refreshSentinel()
+   → _prepareConversation(conversationId, parentMessageId, partialQuery, model)
+     → POST /backend-api/f/conversation/prepare → capture conduit_token
+   → POST /backend-api/f/conversation → SSE stream
+   → capture response cookies, x-oai-is, conduit_token
+ → streamHandler → readSSE → onData dispatches by type/path:
+   → input_message → session.parentMessageId
+   → message_stream_complete → sendFinalChunk
+   → /message/content/parts/0 append → parser.scan(text)
+   → patch finished_successfully → sendFinalChunk
+
+Claude deep flow:
+ → ClaudeAPI.initializeFromJSON(parsedFetch)
+   → extract orgId from URL
+   → seed CookieJar from initial headers
+ → per-request (new session):
+   → setClaudeInstructions(claudeApi, userData, dynamicGrammar, disableTools)
+     → PUT /api/account_profile with instructions.getFull() + dynamicGrammar
+ → POST /organizations/{orgId}/chat_conversations/{uuid}/completion
+   → header order: accept, accept-encoding, accept-language, anthropic-*, content-type, cookie, origin, priority, referer, sec-ch-ua*, sec-fetch-*, user-agent, x-activity-session-id
+ → claudeStreamHandler → readSSE:
+   → message_start → session.parentMessageId = message.uuid
+   → content_block_delta text_delta → parser.scan(text)
+   → message_limit → check utilization (5h + 7d windows)
+     → if ≥ 95%: after stream ends, send summary prompt, stream summary inline, call onSwitch()
+   → error → onError
+ → onSwitch → ChatRouter.triggerSwitch()
+   → selector.flush()
+   → selector.switchToNextAvailable(pendingSummary) → finds next Claude user without waitUntil
+   → ChatRouter.mount(nextSelected)
+
+DeepSeek deep flow:
+ → DeepSeekAPI.initialize(headers)
+   → init WASM POW solver
+   → seed CookieJar from initial headers
+ → per-request:
+   → _getPowChallenge() → POST /api/v0/chat/create_pow_challenge
+   → powSolver.solveChallenge(challenge) → WASM calculateHash → base64 encode
+   → POST /api/v0/chat/completion → SSE stream
+   → capture response cookies
+ → streamHandler → readSSE:
+   → error type → retry once (re-acquire slot, re-call chatCompletion)
+   → SET FINISHED → sendFinalChunk
+   → BATCH → capture token usage
+   → response fragments → parser.scan(content)
+   → bare string v → parser.scan(text)
 
 #SCHEMA
-User (temp/users.json keyed by provider.username)
- username: string
- parsedFetch: {headers, body, url}
- sessions: Session[]
- instructionsHash: string|null
- instructionsAppliedAt: ISO8601|null
- model: string|null
- waitUntil: timestamp|null  # ms epoch; set by rate-limit/usage-limit errors
- waitReason: string|null
- lastSummary: string|null  # captured inline summary for next session context
+users.json (temp/users.json):
+ {
+   [provider: 'deepseek'|'claude'|'chatgpt']: {
+     [username: string]: {
+       username: string,
+       parsedFetch: {
+         headers: { [key: string]: string },
+         body: object,
+         url: string
+       },
+       sessions: [
+         {
+           name: string,
+           chatSessionId: string | null,
+           parentMessageId: string | null,
+           createdAt: ISO8601,
+           lastUsed: ISO8601,
+           disableTools: boolean,
+           model: string,
+           pendingSummary?: string,
+           dynamicToolsHash?: string,
+           _dynamicGrammarCache?: string,
+           todos?: { [id: string]: { id, title, status, desc } }
+         }
+       ],
+       waitUntil?: number (epoch ms),
+       waitReason?: string,
+       instructionsHash?: string,
+       instructionsAppliedAt?: ISO8601,
+       lastSummary?: string
+     }
+   }
+ }
 
-Session
- name: string
- chatSessionId: string|null
- parentMessageId: string|null
- createdAt: ISO8601
- lastUsed: ISO8601
- todos: {[id]: TodoItem}|undefined
- pendingSummary: string|null  # injected into first prompt of switched session
- model: string|null  # provider-specific: Claude=claude-sonnet-4-6|claude-sonnet-5, ChatGPT=auto, DeepSeek=expert|default|vision
- disableTools: boolean  # raw chat mode, no tool compilation
+req.body (POST /v1/chat/completions):
+ {
+   messages: [{ role: 'system'|'user'|'assistant'|'tool', content: string | [{ type: 'text', text: string }] }],
+   tools?: [{ type: 'function', function: { name: string, description: string, parameters: object } }]
+ }
 
-ToolDefinition (TOOLS in tool-defs.js)
- name: string  # read, patch, charPatch, replace, write, ls, mkdir, glob, grep, cmd, todo+, todo!
- desc: string
- grammar: string
- keys: object
- eg: array
- transformer: (params) => void  # merged at getIDEMapper time
- repeatable: object|null  # {id:true, ...} for todo+/todo!; {path:true, old:true, new:true} for replace
- vscode/terax/opencode: IDEMapping  # shared via EDIT()/TODO() spread
+res (POST /v1/chat/completions) — SSE stream:
+ data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":...,"model":"...","choices":[{"index":0,"delta":{"role":"assistant","content":"text"},"finish_reason":null}]}
+ data: {"id":"...","object":"chat.completion.chunk","created":...,"model":"...","choices":[{"index":0,"delta":{"tool_calls":[...]},"finish_reason":null}]}
+ data: {"id":"...","object":"chat.completion.chunk","created":...,"model":"...","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{...}}
+ data: [DONE]
 
-IDEMapping
- tool: string
- params: object  # generic→IDE field map
- default: object  # default {} if absent
- keys: object  # merged at getIDEMapper time (params + repeatable)
- transformer: (params) => void  # merged at getIDEMapper time
- transform: (args, internal) => void
- array: {key, fields}|null  # bundle into single call (vscode multi_replace, todos)
- split: boolean  # true → one call per array entry
- repeatable: object  # merged for repeatable tools
+IDE detection:
+ Authorization: Bearer <vscode|terax|opencode> → req.ide (default: 'vscode')
 
 #ENV
-engines.node: >=18.0.0
-PORT: server port (default 8000)
+PORT # server port, default 8000
+
+#DEPENDENCIES
+express ^5.2.1 # HTTP framework (pre-release)
+inquirer ^8.2.7 # interactive CLI
+prettier ^3.8.3 # dev only
+
+#PUBLIC-API
+GET / # API info (name, version, endpoints, models)
+GET /health # { status: 'healthy', uptime, timestamp }
+GET /v1/models # { object: 'list', data: [DeepSeek V4, GPT-4o, Claude Sonnet 4.6] }
+GET /v1/models/:model # single model object or 404 with OpenAI error
+POST /v1/chat/completions # OpenAI-compatible chat completions (SSE stream)
+ Authorization: Bearer <vscode|terax|opencode> (default: vscode)
+ Body: { messages: [{ role, content }], tools?: [...] }
+ Response: SSE stream with text deltas + tool_calls + finish_reason
+
+#CONFIG
+CONFIG.PORT # default 8000, auto-increment if occupied (up to +100)
+config/models.json # IDE endpoint definitions: ZK8000–ZK8003 (ports 8000–8003), all maxInputTokens=1M, maxOutputTokens=128K, toolCalling=true
+Rate limit: 5 requests per 15-second window (per provider label: 'DeepSeek', 'Claude', 'ChatGPT')
+Session timeout: 300s (5 min) for all provider HTTP requests
+Stream buffer cap: 1MB (SSE reader)
+
+#KNOWN-INVARIANTS
+- No API keys — all auth via browser session cookies captured from DevTools fetch()
+- ToolCompiler is singleton per (ideName, provider) pair — second instantiation returns cached instance
+- Session state (parentMessageId, chatSessionId, lastUsed, todos) mutated in-memory; persisted to users.json only on shutdown via selector.flush() or before auto-switch
+- Claude auto-switch: when usage ≥ 95% across 5h/7d windows, inline summary generated after stream, session switched to next available user via ChatRouter.triggerSwitch()
+- DeepSeek retries on SSE error events exactly once (re-acquires rate slot before retry)
+- Header order matters for Cloudflare fingerprinting — Claude and ChatGPT build headers in exact HAR order per endpoint
+- POW required: DeepSeek uses WASM SHA3, ChatGPT uses SHA3-512 with real config from user's proof token
+- ChatGPT sentinel must be refreshed before every /f/conversation and /f/conversation/prepare call
+- Claude requires org ID extraction from URL on init; conversation UUID pre-generated client-side
+- Tools disabled per-session via disableTools flag; when disabled, instructions + dynamic grammar not prepended
+- MCP tools synced per-request via SHA256 hash comparison; hash stored on session.dynamicToolsHash, grammar cached on session._dynamicGrammarCache
+- todo+/todo! tools merge delta items into session.todos; cleared when all done
+- Claude instructions set via PUT /api/account_profile only on new session and only if hash changed
+- ChatGPT instructions set via PATCH /backend-api/user_system_messages only on new session (currently commented out in route)
+- write tool (vscode) deletes existing file before creating new one to avoid conflict
+- temp/users.json written atomically via .tmp rename to prevent corruption
+- Cookie jar shared per API client instance; cookies captured from all response headers, serialized into Cookie header for subsequent requests
+ headers captured: Set-Cookie, x-oai-is, x-conduit-token (ChatGPT)
+ session lastUsed updated on every successful response via sendFinalChunk
+ rate limiter window resets if clock skew detected (windowStart > now)
+
+#EXTENSION-POINTS
+- Add new provider: create core/<provider>/ with api.js + stream-handler.js, add route builder in routes/, update session-selector _stepProviderSelection, add case in chat-router mount()
+- Add new IDE: add template in lib/engine/templates/, add IDE config in tool-defs.js IDES_PROMPT_OPTIMIZER + getIDEMapper
+- Add new tool: add entry in lib/engine/tool-defs.js TOOLS with IDE mappings, add to instructions.md grammar section
+- Add MCP tool support: passthrough handled by dynamic-tools.js syncDynamicTools
+- Custom instructions: modify lib/engine/instructions.md and lib/engine/skills-extra.md; hash-based cache invalidation in provider set-instructions modules

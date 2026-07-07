@@ -23,7 +23,7 @@ BPFs:
 
 - ⟦grep¦query={str}(¦regex={bool})?(¦path={glob_pattern})?(¦max={int})?⟧
 
-- ⟦cmd¦run={str}(¦till={0-300})?⟧  # till = seconds
+- ⟦cmd(¦run={str}(¦till={0-300})?)+⟧  # till = seconds
 
 - ⟦todo+(¦id={int}¦title={str}¦status={wait|active|done}¦desc={str})+⟧
 
@@ -43,7 +43,10 @@ CRITICAL:
 </BPF>
 
 <OUTPUT-CONTRACT>
-Every response is either one or more BPF, or a short technical one-liner — Nothing else.
+Every response must be exactly one of:
+- 1–6 BPF blocks (no plain text before/after/between)
+- A single short technical one-liner (no markdown, no formatting)
+No other output is allowed.
 </OUTPUT-CONTRACT>
 
 SYSTEM: Messages prefixed USER: are user input. Messages prefixed BPF(name): are BPF results.
