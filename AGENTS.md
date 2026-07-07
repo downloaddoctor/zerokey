@@ -9,15 +9,15 @@ config/ # constants, model definitions, IDE model configs
  config/constants.js # CONFIG (PORT), MODELS registry
  config/models.json # ZeroKey endpoint configs for IDEs (ZK8000–ZK8003)
 core/ # session management, chat router, provider API clients
- core/session-selector.js # interactive CLI wizard: provider→user→session selection; users.json persistence; auto-switch
- core/chat-router.js # hot-swappable Express router; delegates to provider router; triggers auto-switch on rate limit
+ core/session-selector.js # interactive CLI wizard: provider→user→session selection; users.json persistence
+ core/chat-router.js # hot-swappable Express router; delegates to provider router
  core/deepseek/ # DeepSeek API client, POW solver, SSE stream handler
   core/deepseek/api.js → DeepSeekAPI — chat session CRUD, POW challenge, cookie management
   core/deepseek/pow.js → DeepSeekPOW — WASM SHA3 proof-of-work solver
   core/deepseek/stream-handler.js → streamHandler — SSE parser for DeepSeek response format
  core/claude/ # Claude API client, SSE stream handler, instructions setter
   core/claude/api.js → ClaudeAPI — conversation completion, org ID extraction, HAR-ordered headers
-  core/claude/stream-handler.js → claudeStreamHandler — SSE parser, message_limit detection, auto-summary trigger
+  core/claude/stream-handler.js → claudeStreamHandler — SSE parser, message_limit detection, emits ask BPF at >=90% usage
   core/claude/set-instructions.js → setClaudeInstructions — PUT account_profile with system prompt
  core/chatgpt/ # ChatGPT API client, POW solver, SSE stream handler, instructions setter
   core/chatgpt/api.js → ChatGPTAPI — conversation prepare, sentinel refresh, POW, conduit token flow, session deletion
@@ -26,7 +26,7 @@ core/ # session management, chat router, provider API clients
   core/chatgpt/set-instructions.js → setChatGPTInstructions — PATCH user_system_messages
 routes/ # Express route builders (one per provider + models + health)
  routes/deepseek.js → buildChatRouter(headers, session)
- routes/claude.js → buildClaudeRouter(parsedFetch, session, userData, onSwitch)
+ routes/claude.js → buildClaudeRouter(parsedFetch, session, userData)
  routes/chatgpt.js → buildChatGPTRouter(parsedFetch, session, userData)
  routes/models.js → GET /v1/models, GET /v1/models/:model
  routes/health.js → GET /health, GET /
@@ -84,7 +84,7 @@ server.js
    → returns { user, userData, provider, parsedFetch, session, sessionName }
  → ChatRouter.mount(selected)
    → buildChatRouter(headers, session) # DeepSeek
-   → buildClaudeRouter(parsedFetch, session, userData, onSwitch) # Claude
+   → buildClaudeRouter(parsedFetch, session, userData) # Claude
    → buildChatGPTRouter(parsedFetch, session, userData) # ChatGPT
    → each returns Express router with POST / handler
  → app.use('/v1/chat/completions', chatRouter.middleware())
@@ -96,7 +96,7 @@ POST /v1/chat/completions handler (all providers):
  → ToolCompiler(req.ide, provider) # singleton per ide+provider
  → syncDynamicTools(req.tools, session) # MCP tool registration, hash-based caching
  → compiler.formatPrompt(messages, isNewSession) # converts OpenAI messages to provider-specific format
- → isNewSession: prepend instructions + dynamic grammar + optionally pending summary
+ → isNewSession: prepend instructions + dynamic grammar
  → acquireSlot(provider) # rate limit
  → provider API chatCompletion() → returns ReadableStream
  → StreamHandler → readSSE → parser.scan() → Stream.flush() → emitToolCalls()
@@ -134,12 +134,8 @@ Claude deep flow:
    → message_start → session.parentMessageId = message.uuid
    → content_block_delta text_delta → parser.scan(text)
    → message_limit → check utilization (5h + 7d windows)
-     → if ≥ 95%: after stream ends, send summary prompt, stream summary inline, call onSwitch()
+     → if >= 90%: emits ask BPF tool inline via parser.scan() for user to decide next action
    → error → onError
- → onSwitch → ChatRouter.triggerSwitch()
-   → selector.flush()
-   → selector.switchToNextAvailable(pendingSummary) → finds next Claude user without waitUntil
-   → ChatRouter.mount(nextSelected)
 
 DeepSeek deep flow:
  → DeepSeekAPI.initialize(headers)
@@ -177,7 +173,6 @@ users.json (temp/users.json):
            lastUsed: ISO8601,
            disableTools: boolean,
            model: string,
-           pendingSummary?: string,
            dynamicToolsHash?: string,
            _dynamicGrammarCache?: string,
            todos?: { [id: string]: { id, title, status, desc } }
@@ -187,11 +182,9 @@ users.json (temp/users.json):
        waitReason?: string,
        instructionsHash?: string,
        instructionsAppliedAt?: ISO8601,
-       lastSummary?: string
      }
    }
  }
-
 req.body (POST /v1/chat/completions):
  {
    messages: [{ role: 'system'|'user'|'assistant'|'tool', content: string | [{ type: 'text', text: string }] }],
@@ -235,8 +228,8 @@ Stream buffer cap: 1MB (SSE reader)
 #KNOWN-INVARIANTS
 - No API keys — all auth via browser session cookies captured from DevTools fetch()
 - ToolCompiler is singleton per (ideName, provider) pair — second instantiation returns cached instance
-- Session state (parentMessageId, chatSessionId, lastUsed, todos) mutated in-memory; persisted to users.json only on shutdown via selector.flush() or before auto-switch
-- Claude auto-switch: when usage ≥ 95% across 5h/7d windows, inline summary generated after stream, session switched to next available user via ChatRouter.triggerSwitch()
+- Session state (parentMessageId, chatSessionId, lastUsed, todos) mutated in-memory; persisted to users.json only on shutdown via selector.flush()
+- Claude rate-limit: when usage >= 90% across 5h/7d windows, an interactive ask BPF tool is emitted inline to let the user decide next action (no automatic switching)
 - DeepSeek retries on SSE error events exactly once (re-acquires rate slot before retry)
 - Header order matters for Cloudflare fingerprinting — Claude and ChatGPT build headers in exact HAR order per endpoint
 - POW required: DeepSeek uses WASM SHA3, ChatGPT uses SHA3-512 with real config from user's proof token

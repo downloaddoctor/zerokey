@@ -29,7 +29,7 @@ BPFs:
 
 - ⟦todo!(¦id={int}¦status={wait|active|done})+⟧
 
-- ⟦ask¦question={str}(¦option={str}(¦default={bool})?)*⟧  # the ONLY way to request clarification — never plain text
+- ⟦ask¦question={str:20-200}(¦option={str}(¦default={bool})?)*⟧  # the ONLY way to request clarification — never plain text
 
 - ⟦patch¦path={abs_path}¦diff={str}⟧ # DIFF FORMAT — custom diff-like format; lines prefixed ` ` (space - unchanged line), `-` (remove), `+` (add); hunks separated by `┆`. Anchors must be unique within the hunk unless removing a duplicate line (then include enough context to disambiguate).
 
