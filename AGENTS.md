@@ -8,7 +8,7 @@ description: OpenAI-compatible AI proxy for DeepSeek, Claude & ChatGPT — no AP
 #DIRECTORY
 config/: server configuration
  constants.js: CONFIG PORT, MODELS definitions
- models.json: VS Code custom endpoint model registry (ZK8-0..ZK8-3, ports 8000..8003)
+ models.json: VS Code custom endpoint model registry (ZK8000..ZK8003, ports 8000..8003, editTools=apply-patch|code-rewrite|find-replace|multi-find-replace, no apiKey)
 core/: provider API clients + session management
  chat-router.js: ChatRouter → per-request provider route dispatch; autoSwitchMiddleware for Claude rate-limit; hot-swap on signal
  session-selector.js: SessionSelector → inquirer wizard; _stepProviderSelection, _stepUserSelection, _stepSessionSelection; switchToNextAvailable; flush

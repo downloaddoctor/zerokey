@@ -2,42 +2,45 @@
   {
     "name": "ZeroKey",
     "vendor": "customendpoint",
-    "apiKey": "${input:chat.lm.secret.-4c337c00}",
     "apiType": "chat-completions",
     "models": [
       {
-        "id": "ZK8-0",
+        "id": "ZK8000",
         "name": "ZK - 8000",
         "url": "http://localhost:8000/v1",
         "maxInputTokens": 1000000,
         "maxOutputTokens": 128000,
+        "editTools": ["apply-patch", "code-rewrite", "find-replace", "multi-find-replace"],
         "toolCalling": true,
         "vision": false
       },
       {
-        "id": "ZK8-1",
+        "id": "ZK8001",
         "name": "ZK - 8001",
         "url": "http://localhost:8001/v1",
         "maxInputTokens": 1000000,
         "maxOutputTokens": 128000,
+        "editTools": ["apply-patch", "code-rewrite", "find-replace", "multi-find-replace"],
         "toolCalling": true,
         "vision": false
       },
       {
-        "id": "ZK8-2",
+        "id": "ZK8002",
         "name": "ZK - 8002",
         "url": "http://localhost:8002/v1",
         "maxInputTokens": 1000000,
         "maxOutputTokens": 128000,
+        "editTools": ["apply-patch", "code-rewrite", "find-replace", "multi-find-replace"],
         "toolCalling": true,
         "vision": false
       },
       {
-        "id": "ZK8-3",
+        "id": "ZK8003",
         "name": "ZK - 8003",
         "url": "http://localhost:8003/v1",
         "maxInputTokens": 1000000,
         "maxOutputTokens": 128000,
+        "editTools": ["apply-patch", "code-rewrite", "find-replace", "multi-find-replace"],
         "toolCalling": true,
         "vision": false
       }
