@@ -1,10 +1,12 @@
 const express = require('express')
-const { CONFIG } = require('./config/constants')
 const modelsRouter = require('./routes/models')
 const healthRouter = require('./routes/health')
+const buildRouter = require('./core/chat-router')
+
+const { CONFIG } = require('./config/constants')
 const { SessionSelector } = require('./core/session-selector')
-const { ChatRouter } = require('./core/chat-router')
 const { toOpenAIError } = require('./utils/errors')
+const { findPort } = require('./utils/find-port')
 
 const app = express()
 
@@ -48,55 +50,23 @@ app.use('/', healthRouter)
     `\n[Server] ${preSelected.user} - ${preSelected.provider} - ${preSelected.sessionName}\n`,
   )
 
-  const chatRouter = new ChatRouter(selector)
-
-  app.use('/v1/chat/completions', chatRouter.middleware())
-
-  app.use((err, req, res, _next) => {
-    console.error('[Server] Unhandled error:', err.message || err)
-    const openaiErr = toOpenAIError(err, chatRouter.selected?.provider || 'server')
-    const status = openaiErr.error?.status || err.statusCode || err.status || 500
-    if (!res.headersSent) res.status(status).json(openaiErr)
-    else res.end()
-  })
-
-  const checkPort = (p) =>
-    new Promise((resolve) => {
-      const net = require('net')
-      const sock = new net.Socket()
-      sock.setTimeout(400)
-      sock
-        .once('connect', () => {
-          resolve((sock.destroy(), false))
-        })
-        .once('error', () => {
-          resolve((sock.destroy(), true))
-        })
-        .once('timeout', () => {
-          resolve((sock.destroy(), true))
-        })
-        .connect(p, '127.0.0.1')
-    })
-
-  let port = CONFIG.PORT
-  const desiredPort = CONFIG.PORT
-  while (!(await checkPort(port))) {
-    port++
-    if (port > desiredPort + 100) {
-      console.error('No available ports found in range.')
-      process.exit(1)
-    }
-  }
-  if (port !== desiredPort) {
-    console.warn(`\n⚠ Port ${desiredPort} is already in use. Using port ${port} instead.`)
-  }
+  const port = await findPort(CONFIG.PORT)
 
   try {
-    await chatRouter.mount(preSelected)
+    const router = await buildRouter(preSelected)
+    app.use('/v1/chat/completions', router)
   } catch (error) {
     console.error('Failed to build initial router:', error)
     process.exit(1)
   }
+
+  app.use((err, req, res, _next) => {
+    console.error('[Server] Unhandled error:', err.message || err)
+    const openaiErr = toOpenAIError(err, preSelected.provider)
+    const status = openaiErr.error?.status || err.statusCode || err.status || 500
+    if (!res.headersSent) res.status(status).json(openaiErr)
+    else res.end()
+  })
 
   const server = app.listen(port, () => {
     console.log(`\n✅ ZeroKey running on http://localhost:${port}`)

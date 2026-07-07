@@ -7,8 +7,8 @@ const { acquireSlot } = require('../utils/rate-limiter')
 
 const deepseekApi = new DeepSeekAPI()
 
-async function buildChatRouter(headers, session) {
-  await initDeepSeekAPI(session, headers)
+async function buildChatRouter(parsedFetch, session) {
+  await initDeepSeekAPI(session, parsedFetch.headers)
 
   const router = express.Router()
 
