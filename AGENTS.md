@@ -37,7 +37,7 @@ lib/engine/ # tool compilation, prompt formatting, IDE mappings
  lib/engine/instructions.md # system prompt for LLM (BPF syntax, tool grammar, coding rules)
  lib/engine/skills-extra.md # extra skills appended to instructions (editing instructions themselves)
  lib/engine/stream.js → Stream class; iterative state machine scans LLM output for ⟦tool⟧ markers, emits SSE chunks + tool_calls; _maxToolLen from tool registry
- lib/engine/tool-defs.js → TOOLS registry (read/write/replace/patch/charPatch/ask/ls/mkdir/glob/grep/cmd/todo+/todo!), getIDEMapper(ide), IDE-specific prompt optimizers (vscode/terax/opencode user/tool formatters)
+ lib/engine/tool-defs.js → TOOLS registry (read/write/replace/patch/charPatch/ask/ls/mkdir/glob/grep/cmd/todos_add/todos_set), getIDEMapper(ide), IDE-specific prompt optimizers (vscode/terax/opencode user/tool formatters)
  lib/engine/templates/ # IDE tool schemas
   lib/engine/templates/vscode.json # VS Code tool definitions (read_file, write_file, multi_replace_string_in_file, grep_search, file_search, list_dir, create_directory, create_file, run_in_terminal, manage_todo_list, etc.)
   lib/engine/templates/terax.json # Terax tool definitions (read_file, write_file, edit, multi_edit, grep, glob, bash_run, bash_background, bash_logs, bash_kill, bash_list, todo_write, create_directory, etc.)
@@ -237,7 +237,7 @@ Stream buffer cap: 1MB (SSE reader)
 - Claude requires org ID extraction from URL on init; conversation UUID pre-generated client-side
 - Tools disabled per-session via disableTools flag; when disabled, instructions + dynamic grammar not prepended
 - MCP tools synced per-request via SHA256 hash comparison; hash stored on session.dynamicToolsHash, grammar cached on session._dynamicGrammarCache
-- todo+/todo! tools merge delta items into session.todos; cleared when all done
+- todos_add/todos_set tools merge delta items into session.todos; cleared when all done
 - Claude instructions set via PUT /api/account_profile only on new session and only if hash changed
 - ChatGPT instructions set via PATCH /backend-api/user_system_messages only on new session (currently commented out in route)
 - write tool (vscode) deletes existing file before creating new one to avoid conflict

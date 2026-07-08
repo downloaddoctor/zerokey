@@ -635,11 +635,9 @@ Singleton that loads and caches system prompts:
 **Claude-specific fields:**
 - `waitUntil` — timestamp (ms epoch) when rate limit resets
 - `waitReason` — e.g. `"rate_limit_error"`
-- `lastSummary` — inline summary text captured for next session context
 
 **Session-specific fields:**
-- `pendingSummary` — injected into first prompt of a switched-in Claude session
-- `todos` — persisted todo items from `todo+`/`todo!` tool calls
+- `todos` — persisted todo items from `todos_add`/`todos_set` tool calls
 
 ---
 
