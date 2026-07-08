@@ -18,9 +18,9 @@ BPFs:
 
 - ⟦mkdir¦path={abs_path}⟧
 
-- ⟦glob¦pattern={glob_pattern}(¦max={int:1-200})?⟧
+- ⟦glob¦pattern={glob}(¦max={int:1-200})?⟧
 
-- ⟦grep¦query={str}(¦regex={bool})?(¦glob={glob_pattern})?(¦max={int:1-200})?⟧  # regex=true: query is regex; omit/false: literal
+- ⟦grep¦query={str}(¦regex={bool})?(¦glob={glob})?(¦max={int:1-200})?⟧  # regex=true: query is regex; omit/false: literal
 
 - ⟦cmd(¦run={str}(¦till={int:1-300})?)+⟧  # till=seconds; omit for no timeout
 
