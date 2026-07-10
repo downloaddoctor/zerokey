@@ -53,10 +53,11 @@ function streamHandler(res, stream, session, parser, retry) {
       const usageEntry = data.v?.find((e) => e.p === 'accumulated_token_usage')
       const statusEntry = data.v?.find((e) => e.p === 'quasi_status')
       if (usageEntry) {
-        tokenUsage.completion_tokens = usageEntry.v
-        tokenUsage.total_tokens = usageEntry.v + (tokenUsage.prompt_tokens || 0)
+        tokenUsage.prompt_tokens = 0
+        tokenUsage.completion_tokens = usageEntry.v * 10
+        tokenUsage.total_tokens = tokenUsage.completion_tokens + tokenUsage.prompt_tokens
         console.log('[DeepSeek] Token usage:', {
-          accumulated: usageEntry.v,
+          accumulated: usageEntry.v * 10,
           status: statusEntry?.v ?? null,
         })
       }
@@ -65,7 +66,6 @@ function streamHandler(res, stream, session, parser, retry) {
       if (response) {
         session.parentMessageId = response.message_id
         session.lastUsed = new Date().toISOString()
-        tokenUsage.prompt_tokens = response.accumulated_token_usage
         parser.scan(response.fragments[0]?.content || '')
       } else if (typeof data.v === 'string') {
         parser.scan(data.v)

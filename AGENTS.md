@@ -5,6 +5,8 @@ ZeroKey — OpenAI-compatible AI proxy for DeepSeek, Claude & ChatGPT
 
 #DIRECTORY
 server.js # entrypoint, Express app setup, session selection, shutdown handling
+pnpm-lock.yaml # pnpm lockfile
+start.bat # Windows batch launcher (node server.js)
 config/ # constants, model definitions, IDE model configs
  config/constants.js # CONFIG (PORT), MODELS registry
  config/models.json # ZeroKey endpoint configs for IDEs (ZK8000–ZK8003)
@@ -57,8 +59,8 @@ nodemon.json # nodemon config
 start.bat # Windows batch launcher
 
 #ENTRYPOINTS
-server.js # node server.js (npm start)
- interactive wizard → select provider (DeepSeek/Claude/ChatGPT) → select/create user → select/create session
+server.js # node server.js (npm start) interactive wizard → select provider (DeepSeek/Claude/ChatGPT) → select/create user → select/create session
+server.js # pnpm start (node server.js) interactive wizard → select provider (DeepSeek/Claude/ChatGPT) → select/create user → select/create session
  builds provider-specific router via ChatRouter.mount() → mounts at /v1/chat/completions
  auto-finds available port starting from CONFIG.PORT (default 8000)
  SIGINT/SIGTERM → selector.flush() → server.close()
@@ -68,6 +70,10 @@ Express 5.2.1 # HTTP framework (pre-release)
 inquirer 8.2.7 # interactive CLI prompts for session selection
 WASM (core/deepseek/wasm/) # SHA3 proof-of-work solver compiled from Rust
 Node.js built-ins: fs, path, crypto, net, http
+
+#BUILD
+pnpm 10.13.1
+ start: node server.js
 
 #RUNTIME-GRAPH
 server.js

@@ -2,6 +2,14 @@ node_modules
 data
 temp
 
+# Yarn PnP
+.pnp.*
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+
 # Environment
 .env
 .env.*
