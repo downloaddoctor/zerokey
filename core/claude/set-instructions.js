@@ -4,7 +4,7 @@ async function setClaudeInstructions(claudeApi, userData, dynamicGrammar, disabl
   if (!userData) return false
 
   const currentHash = instructions.getHash()
-  if (userData.instructionsHash === currentHash && !dynamicGrammar) return false
+  if (userData.instructionsHash === currentHash) return false
 
   const content = disableTools ? '' : instructions.getFull() + (dynamicGrammar || '')
   const payload = JSON.stringify({ conversation_preferences: content })

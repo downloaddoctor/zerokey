@@ -243,6 +243,7 @@ Stream buffer cap: 1MB (SSE reader)
 - Claude requires org ID extraction from URL on init; conversation UUID pre-generated client-side
 - Tools disabled per-session via disableTools flag; when disabled, instructions + dynamic grammar not prepended
 - MCP tools synced per-request via SHA256 hash comparison; hash stored on session.dynamicToolsHash, grammar cached on session._dynamicGrammarCache
+- KNOWN LIMITATION: dynamicGrammar is only injected into the prompt when isNewSession is true (routes/*.js gate compiler.buildPrompt behind isNewSession). If req.body.tools[] changes mid-session (after the first turn), syncDynamicTools correctly detects the hash change and rebuilds dynamicGrammar, but that grammar is never sent to the model — the new/changed tools silently never reach the model until the session is recreated. Not fixed because MCP tools are currently unused; revisit if MCP is enabled.
 - todos_add/todos_set tools merge delta items into session.todos; cleared when all done
 - Claude instructions set via PUT /api/account_profile only on new session and only if hash changed
 - ChatGPT instructions set via PATCH /backend-api/user_system_messages only on new session (currently commented out in route)
