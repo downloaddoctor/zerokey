@@ -75,7 +75,7 @@ async function claudeStreamHandler(res, stream, session, parser) {
 
             tokenUsage.total_tokens = usedTokens
 
-            if (worstWindow.util >= 90) {
+            if (worstWindow.util >= 0.9) {
               console.log(`[Claude] ⚠ Usage at ${worstWindow.pct}`)
               const ask = [
                 `⟦ask¦question=Claude usage is ${worstWindow.pct} (5h ${h5.pct}, 7d ${d7.pct}). What would you like to do?`,

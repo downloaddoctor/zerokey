@@ -12,7 +12,7 @@ config/ # constants, model definitions, IDE model configs
  config/models.json # ZeroKey endpoint configs for IDEs (ZK8000–ZK8003)
 core/ # session management, chat router, provider API clients
  core/session-selector.js # interactive CLI wizard: provider→user→session selection; users.json persistence
- core/chat-router.js # hot-swappable Express router; delegates to provider router
+ core/chat-router.js # builds Express router for selected provider (no runtime hot-swap)
  core/deepseek/ # DeepSeek API client, POW solver, SSE stream handler
   core/deepseek/api.js → DeepSeekAPI — chat session CRUD, POW challenge, cookie management
   core/deepseek/pow.js → DeepSeekPOW — WASM SHA3 proof-of-work solver
@@ -235,7 +235,7 @@ Stream buffer cap: 1MB (SSE reader)
 - No API keys — all auth via browser session cookies captured from DevTools fetch()
 - ToolCompiler is singleton per (ideName, provider) pair — second instantiation returns cached instance
 - Session state (parentMessageId, chatSessionId, lastUsed, todos) mutated in-memory; persisted to users.json only on shutdown via selector.flush()
-- Claude rate-limit: when usage >= 90% across 5h/7d windows, an interactive ask BPF tool is emitted inline to let the user decide next action (no automatic switching)
+- Claude rate-limit: when usage >= 90% across 5h/7d windows (compared as a 0-1 fraction, not a percentage), an interactive ask BPF tool is emitted inline to let the user decide next action (no automatic switching); waitUntil/waitReason are only consulted at startup in SessionSelector.select(), not mid-request
 - DeepSeek retries on SSE error events exactly once (re-acquires rate slot before retry)
 - Header order matters for Cloudflare fingerprinting — Claude and ChatGPT build headers in exact HAR order per endpoint
 - POW required: DeepSeek uses WASM SHA3, ChatGPT uses SHA3-512 with real config from user's proof token

@@ -115,7 +115,8 @@ class ChatGPTAPI {
 
     console.log(res.status, res.statusText)
 
-    // On 403, refresh sentinel and retry once
+    // Non-200 status is logged here; the error branch below throws for the caller to handle.
+    // No automatic sentinel-refresh-and-retry is implemented.
     if (res.status !== 200) {
       console.log(`[ChatGPT] Got ${res.status}`)
     }

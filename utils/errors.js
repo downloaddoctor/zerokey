@@ -160,6 +160,21 @@ function getProviderURL(provider) {
  * @param {string} code - OpenAI error code
  */
 function toOpenAIError(error, provider, type, code) {
+  // Direct-message overload: toOpenAIError(status, message, type, code)
+  // Used by route handlers for simple validation errors, bypassing classifyError.
+  if (typeof error === 'number' && typeof provider === 'string') {
+    return {
+      error: {
+        message: provider,
+        type: type || 'invalid_request_error',
+        code: code || 'invalid_request',
+        action: null,
+        category: type || 'invalid_request_error',
+        status: error,
+      },
+    }
+  }
+
   const classified = classifyError(error, provider)
 
   return {

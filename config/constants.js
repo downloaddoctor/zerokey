@@ -31,6 +31,22 @@ const MODELS = {
     context_length: 1_000_000,
     max_output_length: 64_000,
   },
+  'Claude Sonnet 5': {
+    id: 'Claude Sonnet 5',
+    object: 'model',
+    created: 1_772_736_000,
+    owned_by: 'anthropic',
+    context_length: 1_000_000,
+    max_output_length: 64_000,
+  },
+  'Claude Haiku 4.5': {
+    id: 'Claude Haiku 4.5',
+    object: 'model',
+    created: 1_772_736_000,
+    owned_by: 'anthropic',
+    context_length: 1_000_000,
+    max_output_length: 64_000,
+  },
 }
 
 module.exports = { CONFIG, MODELS }

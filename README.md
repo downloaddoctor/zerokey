@@ -9,9 +9,9 @@ OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** �
 - **Real browser fingerprint** — POW solving, sentinel tokens, conversation prepare, Cloudflare-safe header ordering, cookie management
 - **Streaming** — SSE response streaming for all providers
 - **Multi-IDE** — per-request IDE selection via `Authorization: Bearer <vscode|terax|opencode>`
-- **Session persistence** — in-memory session tracking; flushed to disk on graceful shutdown or Claude auto-switch
+- **Session persistence** — in-memory session tracking; flushed to disk on graceful shutdown
 - **Tool call support** — integrated ToolCompiler translates OpenAI-style function calling into provider-compatible prompt grammar
-- **Claude auto-switch** — automatic fallback to next available user when rate-limited, with inline summary context preservation
+- **Claude usage warnings** — inline `ask` prompt when 5h/7d usage hits >= 90%, so you can decide next steps (no automatic switching)
 
 ## Quick Start
 
@@ -118,8 +118,8 @@ routes/
   models.js             → /v1/models and /v1/models/:model endpoints
   health.js             → /health endpoint
 core/
-  chat-router.js        → per-request provider dispatch, Claude auto-switch middleware, hot-swap on rate-limit
-  session-selector.js   → inquirer wizard, fetch() parser, users.json persistence, switchToNextAvailable
+  chat-router.js        → provider dispatch, builds the Express router for the selected provider
+  session-selector.js   → inquirer wizard, fetch() parser, users.json persistence, startup waitUntil checks
   deepseek/
     api.js              → POW + HTTPS request builder
     pow.js              → WASM SHA3-512 solver

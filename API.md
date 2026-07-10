@@ -19,7 +19,7 @@ IDE Client (Bearer <ide-name>)
 │  Express Server (server.js)         │
 │  ├─ IDE detection middleware        │
 │  ├─ Request logger                  │
-│  └─ ChatRouter (hot-swap capable)   │
+│  └─ ChatRouter                      │
 │       ├─ POST /v1/chat/completions  │
 │       │    ├─ DeepSeek route        │
 │       │    ├─ Claude route          │
@@ -308,18 +308,11 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
 3. Stream parsed via readSSE → claudeStreamHandler:
    a. "message_start" → capture parentMessageId (message.uuid)
    b. "content_block_delta" with text_delta → scan text
-   c. "message_limit" → check utilization (5h + 7d windows), trigger onNearLimit if >= 95%
+   c. "message_limit" → check utilization (5h + 7d windows), emit inline `ask` BPF if >= 90%
    d. "message_stop" / "error" → sendFinalChunk or onError
-4. Rate-limit auto-switch (autoSwitchMiddleware):
-   a. Catch 429 from route handler
-   b. Extract X-RateLimit-Reset header
-   c. If reset within 5 min → flush current user, switchToNextAvailable, rebuild router, retry
-5. Near-limit summary (inline, before stream end):
-   a. onNearLimit fires when utilization >= 95%
-   b. Sends SUMMARY_PROMPT as separate completion
-   c. Monkey-patches parser.scan to capture summary text
-   d. Stores in userData.lastSummary for next session
-   e. Calls onSwitch signal → ChatRouter.triggerSwitch()
+4. No automatic switching or retry — the route's try/catch returns an OpenAI-format
+   error to the client on failure. Switching Claude users requires restarting the
+   server and reselecting a user in the startup wizard.
 ```
 
 ### Claude SSE Event Format
@@ -328,7 +321,8 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
 | ------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------- |
 | message_start       | `{"type":"message_start","message":{"uuid":"..."}}`                                         | Capture parent msg UUID                      |
 | content_block_delta | `{"type":"content_block_delta","delta":{"type":"text_delta","text":"..."}}`                 | Scan text delta                              |
-| message_limit       | `{"type":"message_limit","message_limit":{"type":"...","windows":{"5h":{...},"7d":{...}}}}` | Check utilization, trigger summary if >= 95% |
+| message_limit       | `{"type":"message_limit","message_limit":{"type":"...","windows":{"5h":{...},"7d":{...}}}}` | Check utilization, emit `ask` BPF if >= 90%  |
+
 | message_stop        | `{"type":"message_stop"}`                                                                   | Stream complete, sendFinalChunk              |
 | error               | `{"type":"error","error":{"type":"overloaded_error","message":"..."}}`                      | Classify + send error                        |
 
@@ -375,23 +369,18 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
   "parentMessageId": "550e8400-e29b-41d4-a716-446655440001",
   "createdAt": "2026-07-06T10:30:00.000Z",
   "lastUsed": "2026-07-06T10:35:00.000Z",
-  "pendingSummary": "## Session Summary\n\nPrevious context...",
-  "todos": {}
+ "todos": {}
 }
 ```
 
-### Auto-Switch Mechanism
-Claude supports automatic user switching when rate limits are hit:
-1. Error handler in route catches 429 with `rate_limit_error` type
-2. Sets `userData.waitUntil` and `userData.waitReason` from the `5h` window reset timestamp
-3. `autoSwitchMiddleware` (in ChatRouter) catches the 429 response
-4. Checks `X-RateLimit-Reset` header — only switches if reset is within 5 minutes
-5. Flushes current user state to disk
-6. Calls `selector.switchToNextAvailable(lastSummary)` → finds next Claude user without active `waitUntil`
-7. If no available user → returns 429 to client
-8. Rebuilds router with new user's parsedFetch, creates fresh session with `pendingSummary` injected
-
----
+### Usage Warning Mechanism
+Claude does not auto-switch users on rate limits. Instead, when either the 5h or 7d
+usage window reaches >= 90% utilization, the stream handler emits an inline `ask` BPF
+tool call so the calling agent/user can decide how to proceed (generate a summary,
+switch to a different saved user at the next server restart, or switch providers).
+`userData.waitUntil` / `waitReason` are still tracked and consulted only at startup,
+in `SessionSelector.select()`, to warn about or skip users who are still rate-limited
+when the wizard runs.
 
 ## ChatGPT Provider
 
@@ -525,6 +514,7 @@ Manages HTTP requests to `chatgpt.com/backend-api` using browser-identical heade
 9 categories mapped from error message patterns and HTTP status codes (see error table in Endpoint 5 above).
 
 **Function:** `toOpenAIError(error, provider, type, code)` → returns OpenAI-compatible `{error: {message, type, code, action, category, status}}`
+Two calling conventions: `toOpenAIError(errorObject, providerName)` classifies via `classifyError`; `toOpenAIError(statusCode, message, type, code)` builds the response directly (used by route handlers for validation errors).
 
 ### SSE Reader (`utils/sse-reader.js`)
 
@@ -589,8 +579,7 @@ Singleton that loads and caches system prompts:
           "parentMessageId": "xyz789",
           "createdAt": "2026-07-06T10:30:00.000Z",
           "lastUsed": "2026-07-06T10:35:00.000Z",
-          "todos": {},
-          "pendingSummary": null
+          "todos": {}
         }
       ],
       "instructionsHash": null,
@@ -611,8 +600,7 @@ Singleton that loads and caches system prompts:
       "instructionsAppliedAt": "2026-07-06T10:30:00.000Z",
       "model": "claude-sonnet-4-6",
       "waitUntil": null,
-      "waitReason": null,
-      "lastSummary": null
+      "waitReason": null
     }
   },
   "chatgpt": {
