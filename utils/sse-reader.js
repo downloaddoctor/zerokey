@@ -54,19 +54,31 @@ async function readSSE(stream, { onData, onDone, onError }) {
     }
   }
 
-  const reader = stream.getReader()
   const decoder = new TextDecoder()
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      processChunk(decoder.decode(value, { stream: true }))
+  // node-fetch returns a Node.js Readable; native fetch returns a WHATWG ReadableStream
+  if (typeof stream.getReader === 'function') {
+    const reader = stream.getReader()
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        processChunk(decoder.decode(value, { stream: true }))
+      }
+      onDone()
+    } catch (err) {
+      onError(err)
     }
-    onDone()
-  } catch (err) {
-    onError(err)
+  } else {
+    await new Promise((resolve) => {
+      stream.on('data', (chunk) => {
+        processChunk(Buffer.isBuffer(chunk) ? decoder.decode(chunk, { stream: true }) : chunk)
+      })
+      stream.on('end', () => { onDone(); resolve() })
+      stream.on('error', (err) => { onError(err); resolve() })
+    })
   }
 }
+
 
 module.exports = { readSSE }

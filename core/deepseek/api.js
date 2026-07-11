@@ -1,3 +1,5 @@
+const https = require('https')
+const nodeFetch = require('node-fetch')
 const { CookieJar } = require('../../utils/cookie-jar')
 const { DeepSeekPOW } = require('./pow')
 
@@ -8,6 +10,12 @@ class DeepSeekAPI {
     this.powSolver = null
     this._cookies = new CookieJar()
     this._headers = {}
+    this._httpAgent = new https.Agent({
+      keepAlive: true,
+      maxSockets: 50,
+      maxFreeSockets: 10,
+      timeout: 300000,
+    })
   }
 
   async initialize(headers = {}) {
@@ -195,7 +203,7 @@ class DeepSeekAPI {
 
     let res
     try {
-      res = await fetch(url, { ...options, redirect: 'follow', signal: controller.signal })
+      res = await nodeFetch(url, { ...options, redirect: 'follow', signal: controller.signal, agent: this._httpAgent })
     } catch (err) {
       clearTimeout(timer)
       if (err.name === 'AbortError') {

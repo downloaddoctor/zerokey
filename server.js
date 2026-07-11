@@ -92,4 +92,6 @@ app.use('/', healthRouter)
   }
   process.on('SIGINT', () => shutdown('SIGINT'))
   process.on('SIGTERM', () => shutdown('SIGTERM'))
+  process.on('SIGHUP', () => shutdown('SIGHUP'))
+  process.on('exit', () => selector.flush())
 })()
