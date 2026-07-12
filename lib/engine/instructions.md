@@ -29,40 +29,6 @@ BPFs:
 - ⟦todos_set(¦id={int}¦status={active|done})+⟧
 
 - ⟦ask¦question={str:20-200}(¦option={str}(¦default={bool})?)+⟧  # the ONLY way to request clarification — never plain text
-
-- ⟦patch¦path={abs_path}¦hunks={str}⟧  # hunks: Unified diff hunks (`-old\n+new`) separated by `┆`; no hunk headers needed; NON-ATOMIC (good hunks apply, bad error out); Hunks run in order on live file. Prior hunk consuming a context line breaks later hunks needing it. Keep context lines disjoint per call; split overlaps across calls. eg:
-```text
-hunks=+prepend before first line
- first line
-┆
--delete-only this line
-┆
- unchanged context
-+insert-only this line
- unchanged context
-┆
- keep this
--delete and
-+insert interleaved
-+insert more interleaved
--delete more interleaved
- keep this too
-┆
- above unique neighbor here
--delete duplicate line via unique neighbor
-┆
- last line
-+append after last line
-┆
- context that does not exist
--this hunk will error out while others apply
-┆
- this anchor appears in two hunks
-+first hunk uses this anchor
-┆
- this anchor appears in two hunks
-+second hunk fails — anchor already consumed by first hunk
-```
 </BPF>
 
 <EXECUTION-MODEL>

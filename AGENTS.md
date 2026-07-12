@@ -39,7 +39,7 @@ lib/engine/ # tool compilation, prompt formatting, IDE mappings
  lib/engine/instructions.md # system prompt for LLM (BPF syntax, tool grammar, coding rules)
  lib/engine/skills-extra.md # extra skills appended to instructions (editing instructions themselves)
  lib/engine/stream.js → Stream class; iterative state machine scans LLM output for ⟦tool⟧ markers, emits SSE chunks + tool_calls; _maxToolLen from tool registry
- lib/engine/tool-defs.js → TOOLS registry (read/write/replace/patch/charPatch/ask/ls/mkdir/glob/grep/cmd/todos_add/todos_set), getIDEMapper(ide), IDE-specific prompt optimizers (vscode/terax/opencode user/tool formatters)
+ lib/engine/tool-defs.js → TOOLS registry (read/write/replace/ask/ls/mkdir/glob/grep/cmd/todos_add/todos_set), getIDEMapper(ide), IDE-specific prompt optimizers (vscode/terax/opencode user/tool formatters)
  lib/engine/templates/ # IDE tool schemas
   lib/engine/templates/vscode.json # VS Code tool definitions (read_file, write_file, multi_replace_string_in_file, grep_search, file_search, list_dir, create_directory, create_file, run_in_terminal, manage_todo_list, etc.)
   lib/engine/templates/terax.json # Terax tool definitions (read_file, write_file, edit, multi_edit, grep, glob, bash_run, bash_background, bash_logs, bash_kill, bash_list, todo_write, create_directory, etc.)
