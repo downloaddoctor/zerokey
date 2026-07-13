@@ -20,7 +20,7 @@ function formatWindow(w, resetFormat = 'time') {
           ? d.toLocaleDateString()
           : d.toLocaleTimeString()
   }
-  return { pct, reset, used, util }
+  return { pct, reset, resets_at: w?.resets_at, used, util }
 }
 
 /**
@@ -36,8 +36,9 @@ function formatWindow(w, resetFormat = 'time') {
  * @param {object} session
  * @param {object} parser
  */
-async function claudeStreamHandler(res, stream, session, parser) {
+async function claudeStreamHandler(res, stream, session, parser, cb) {
   const tokenUsage = {}
+  let limitReached = null
   const sendFinalChunk = createSendFinalChunk(res, session, parser, tokenUsage)
   const onError = createOnError(res, parser, 'Claude')
 
@@ -73,18 +74,8 @@ async function claudeStreamHandler(res, stream, session, parser) {
             tokenUsage.completion_tokens = 0
             tokenUsage.total_tokens = usedTokens
 
-            tokenUsage.total_tokens = usedTokens
-
             if (worstWindow.util >= 0.9) {
-              console.log(`[Claude] ⚠ Usage at ${worstWindow.pct}`)
-              const ask = [
-                `⟦ask¦question=Claude usage is ${worstWindow.pct} (5h ${h5.pct}, 7d ${d7.pct}). What would you like to do?`,
-                '¦option=Generate summary for next session¦default=true',
-                '¦option=Will switch to another Claude user',
-                '¦option=Will switch to another provider⟧',
-              ]
-
-              parser.scan(ask.join(''))
+              limitReached = worstWindow
             }
           }
           break
@@ -96,9 +87,14 @@ async function claudeStreamHandler(res, stream, session, parser) {
         }
       }
     },
-    onDone: () => {},
+    onDone: () => { },
     onError,
   })
+
+  if (limitReached && cb) {
+    await cb(limitReached, sendFinalChunk)
+    return
+  }
 
   sendFinalChunk()
 }

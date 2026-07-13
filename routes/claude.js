@@ -5,8 +5,6 @@ const { toOpenAIError } = require('../utils/errors')
 const ToolCompiler = require('../lib/engine')
 const { setClaudeInstructions } = require('../core/claude/set-instructions')
 
-const CLAUDE_DEFAULT_MODEL = 'claude-sonnet-4-6'
-
 const claudeApi = new ClaudeAPI()
 const { acquireSlot } = require('../utils/rate-limiter')
 
@@ -22,8 +20,8 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
 
   router.post('/', async (req, res) => {
     const { messages = [] } = req.body
-    const disableTools = session.disableTools || false
-    const model = session.model || CLAUDE_DEFAULT_MODEL
+    const disableTools = session.disableTools
+    const model = session.model
 
     if (!messages || messages.length === 0) {
       return res
@@ -71,10 +69,81 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
 
       const parser = new ToolCompiler.Stream(res, 'claude', compiler, session)
 
-      await claudeStreamHandler(res, stream, session, parser)
+      await claudeStreamHandler(res, stream, session, parser, async (limitReached) => {
+        if (limitReached?.resets_at) {
+          console.log(`[Claude] ⚠ Usage at ${limitReached.pct} — requesting summary`)
+
+          userData.waitUntil = limitReached.resets_at * 1000
+          userData.waitReason = 'Claude rate limit'
+
+          const resetTime = new Date(userData.waitUntil).toLocaleTimeString()
+          const mins = Math.max(1, Math.ceil((userData.waitUntil - Date.now()) / 60000))
+
+          try {
+            const summaryPrompt = `Please write a concise but complete summary of this entire conversation — topics discussed, decisions made, code written, and any open tasks — so it can be pasted into a fresh session to resume work seamlessly.`
+            const { stream: summaryStream } = await claudeApi.chatCompletion(
+              summaryPrompt,
+              session.chatSessionId,
+              session.parentMessageId,
+              model,
+              [],
+            )
+
+            parser.scan("```text\n")
+            await claudeStreamHandler(res, summaryStream, session, parser, (limitReached, sendFinalChunk) => {
+              parser.scan("```")
+              sendLimitMessage(parser, resetTime, mins)
+              sendFinalChunk()
+            })
+
+          } catch (summaryErr) {
+            console.error('[Claude] Summary call failed:', summaryErr.message)
+          }
+
+          setImmediate(() => process.exit(0))
+          return
+        }
+      })
+
     } catch (error) {
       if (res.headersSent) return
       console.error('[Claude Route] Error:', error.message)
+
+      try {
+        const raw = JSON.parse(error.message)
+        const payload = raw?.error?.message ? JSON.parse(raw.error.message) : null
+        const limit = payload?.resolved?.limit
+        const reset =
+          limit?.resets_at ||
+          payload?.windows?.['5h']?.resets_at ||
+          payload?.resetsAt
+
+        if (reset) {
+          userData.waitUntil = typeof reset === 'number' ? reset * 1000 : new Date(reset).getTime()
+          userData.waitReason = limit?.title || payload?.notice?.title || 'Claude rate limit'
+        }
+
+        if (payload?.resolved?.status === 'exceeded') {
+          const resetMs = userData.waitUntil || (payload?.resolved?.limit?.resets_at * 1000)
+          const mins = Math.max(1, Math.ceil((resetMs - Date.now()) / 60000))
+          const resetTime = new Date(resetMs).toLocaleTimeString()
+
+          res.setHeader('Content-Type', 'text/event-stream')
+          res.setHeader('Cache-Control', 'no-cache')
+          res.setHeader('Connection', 'keep-alive')
+          res.setHeader('Access-Control-Allow-Origin', '*')
+          const parser = new ToolCompiler.Stream(res, 'claude', compiler, session)
+          sendLimitMessage(res, parser, resetTime, mins)
+          parser.flush()
+          parser.emit({}, 'stop', {})
+
+          res.write('data: [DONE]\n\n')
+          res.end()
+
+          setImmediate(() => process.exit(0))
+          return
+        }
+      } catch { }
 
       const err = toOpenAIError(error, 'Claude')
       return res.status(err.error.status || 500).json(err)
@@ -82,6 +151,10 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
   })
 
   return router
+}
+
+function sendLimitMessage(parser, resetTime, mins) {
+  parser.scan(`⟦ask¦question=This Claude session has reached its usage limit. It resets at ${resetTime} (~${mins} min). What would you like to do?¦option=Switch to another Claude user¦default=true¦option=Switch to another provider⟧`)
 }
 
 module.exports = { buildClaudeRouter }

@@ -124,7 +124,12 @@ class SessionSelector {
 
     if (savedUsers.length > 0) {
       const choices = [
-        ...savedUsers.map((username) => ({ name: `  ${username}`, value: username })),
+        ...savedUsers.map((username) => {
+          const user = providerUsers[username]
+          const limited = this.provider === 'claude' && user.waitUntil && user.waitUntil > Date.now()
+          const suffix = limited ? ' (limit reached)' : ''
+          return { name: `  ${username}${suffix}`, value: username }
+        }),
         { name: '＋ Create new user...', value: '__new__' },
       ]
 

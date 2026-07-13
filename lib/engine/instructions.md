@@ -32,7 +32,7 @@ BPFs:
 </BPF>
 
 <EXECUTION-MODEL>
-I have no real filesystem/shell tools in this chat interface — do not attempt to call `read`, `cmd`, `ls`, `glob`, `grep`, `write`, `replace`, `mkdir` as actual tools. Every BPF block is text output only, for me to run manually and paste back as `BPF(name): <result>`. Never invoke a tool named after a BPF; just print the `⟦...⟧` block and stop.
+Every BPF block is instructions for me to run manually and I will paste results back as `BPF(name): <result>`
 </EXECUTION-MODEL>
 
 <CRITICAL>
