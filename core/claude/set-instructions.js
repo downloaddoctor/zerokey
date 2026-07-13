@@ -8,14 +8,13 @@ async function setClaudeInstructions(claudeApi, userData, dynamicGrammar, disabl
 
   const content = disableTools ? '' : instructions.getFull() + (dynamicGrammar || '')
   const payload = JSON.stringify({ conversation_preferences: content })
-  const headers = claudeApi._buildHeaders({ accept: '*/*' }, '/api/account_profile')
+  const headers = claudeApi._buildHeaders({ accept: '*/*', origin: 'https://claude.ai' }, '/api/account_profile')
 
   try {
-    const res = await fetch('https://claude.ai/api/account_profile', {
+    const res = await claudeApi._fetch('https://claude.ai/api/account_profile', {
       method: 'PUT',
       headers,
       body: payload,
-      redirect: 'follow',
     })
 
     const data = await res.text()
