@@ -63,8 +63,8 @@ class SessionSelector {
           const resetsAtSoonest = new Date(soonest.ts).toLocaleTimeString()
           console.error(
             `\n🚫 All Claude users are at their usage limit.\n` +
-              `   Soonest reset: "${soonest.username}" at ${resetsAtSoonest} (~${minsLeft} min).\n` +
-              `   Please select a different provider.\n`,
+            `   Soonest reset: "${soonest.username}" at ${resetsAtSoonest} (~${minsLeft} min).\n` +
+            `   Please select a different provider.\n`,
           )
 
           return this.select()
@@ -165,8 +165,8 @@ class SessionSelector {
 
     console.log(
       '\nPaste the full fetch() call from browser DevTools:\n' +
-        '  DevTools → Network → Find a "conversation" request → Right-click → Copy → Copy as fetch\n' +
-        '  (This captures ALL headers + body with real browser fingerprint)\n',
+      '  DevTools → Network → Find a "conversation" request → Right-click → Copy → Copy as fetch\n' +
+      '  (This captures ALL headers + body with real browser fingerprint)\n',
     )
     const fetchStr = await this._stepFetchInput()
     if (!fetchStr) return null
@@ -254,7 +254,7 @@ class SessionSelector {
         default: 'expert',
         choices: [
           { name: 'V4 - Expert (recommended)', value: 'expert' },
-          { name: 'V4 - Default', value: 'default' },
+          { name: 'V4 - Instant', value: 'default' },
           { name: 'V4 - Vision', value: 'vision' },
         ],
       })
