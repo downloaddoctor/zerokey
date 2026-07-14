@@ -44,13 +44,13 @@ Root endpoint — returns API metadata and available models.
 {
   "name": "ZeroKey API Server",
   "version": "1.0.0",
-  "description": "OpenAI-compatible AI proxy for DeepSeek & ChatGPT",
+  "description": "OpenAI-compatible AI proxy for DeepSeek, Claude & ChatGPT",
   "endpoints": {
     "models": "GET /v1/models",
     "chat_completions": "POST /v1/chat/completions",
     "health": "GET /health"
   },
-  "models": ["DeepSeek V4", "GPT-4o", "Claude Sonnet 4.6"]
+  "models": ["DeepSeek V4", "GPT-4o", "Claude Sonnet 4.6", "Claude Sonnet 5", "Claude Haiku 4.5"]
 }
 ```
 
@@ -128,7 +128,7 @@ Get details for a specific model by ID.
     "message": "Model 'unknown-model' not found",
     "type": "invalid_request_error",
     "code": "model_not_found",
-    "action": "Valid models: DeepSeek V4, GPT-4o, Claude Sonnet 4.6",
+    "action": "Valid models: DeepSeek V4, GPT-4o, Claude Sonnet 4.6, Claude Sonnet 5, Claude Haiku 4.5",
     "category": "invalid_request",
     "status": 404
   }
@@ -182,7 +182,6 @@ Get details for a specific model by ID.
 | session_expired  | 401    | Browser session expired, re-capture fetch()         |
 | rate_limited     | 429    | Rate limit hit, wait or switch session              |
 | cloudflare_block | 403    | Cloudflare challenge — browser fingerprint rejected |
-| auth_failed      | 401    | Credentials invalid / session revoked               |
 | network          | 502    | Connection failed / timeout                         |
 | invalid_request  | 502    | Provider returned unexpected/invalid response       |
 | provider_error   | 502    | Upstream provider returned an HTTP error            |
@@ -230,6 +229,7 @@ Manages HTTP requests to `chat.deepseek.com` using browser-identical headers and
 | `/api/v0/chat/create_pow_challenge` | POST   | Get POW challenge for anti-bot      |
 | `/api/v0/chat/completion`           | POST   | Send chat completion (SSE stream)   |
 | `/api/v0/chat_session/delete`       | POST   | Delete a single session server-side |
+| `/api/v0/chat_session/delete_all`   | POST   | Delete all sessions server-side     |
 
 ### Dependencies
 - **`DeepSeekPOW`** (`core/deepseek/pow.js`): WASM-based proof-of-work solver
@@ -250,7 +250,8 @@ Manages HTTP requests to `chat.deepseek.com` using browser-identical headers and
    b. "BATCH" → capture token usage
    c. data.v.response → capture parentMessageId, scan content
    d. data.v (string) → scan text delta
-   e. Error → retry once, then fail
+   e. Error event → retry once (re-acquire rate slot, re-call chatCompletion)
+   f. Stream closes without FINISHED → retry once
 ```
 
 ### DeepSeek SSE Event Format
@@ -271,6 +272,10 @@ Manages HTTP requests to `chat.deepseek.com` using browser-identical headers and
   "parentMessageId": "xyz789...",
   "createdAt": "2026-07-06T10:30:00.000Z",
   "lastUsed": "2026-07-06T10:35:00.000Z",
+  "disableTools": false,
+  "model": "expert",
+  "dynamicToolsHash": null,
+  "_dynamicGrammarCache": null,
   "todos": {}
 }
 ```
@@ -289,6 +294,7 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
 | ----------------------------------------------------------------- | ------ | --------------------------------- |
 | `/api/organizations/{orgId}/chat_conversations/{uuid}/completion` | POST   | Send chat completion (SSE stream) |
 | `/api/organizations/{orgId}/chat_conversations/{uuid}`            | DELETE | Delete a single conversation      |
+| `/api/account_profile`                                          | PUT    | Set custom instructions (hash-cached) |
 
 ### Dependencies
 - **`CookieJar`** (`utils/cookie-jar.js`): Cookie persistence
@@ -308,11 +314,12 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
 3. Stream parsed via readSSE → claudeStreamHandler:
    a. "message_start" → capture parentMessageId (message.uuid)
    b. "content_block_delta" with text_delta → scan text
-   c. "message_limit" → check utilization (5h + 7d windows), emit inline `ask` BPF if >= 90%
+   c. "message_limit" → check utilization (5h + 7d windows), if >= 90% delegates to route callback
    d. "message_stop" / "error" → sendFinalChunk or onError
-4. No automatic switching or retry — the route's try/catch returns an OpenAI-format
-   error to the client on failure. Switching Claude users requires restarting the
-   server and reselecting a user in the startup wizard.
+4. On rate limit (>= 90%): route callback requests a conversation summary from Claude,
+   emits an ask BPF with provider-switch options, sets waitUntil on userData,
+   then calls process.exit(0). On hard exceeded errors, emits ask BPF in SSE and exits.
+   Switching Claude users requires restarting the server.
 ```
 
 ### Claude SSE Event Format
@@ -320,8 +327,8 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
 | Event Type          | Shape                                                                                       | Action                                       |
 | ------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------- |
 | message_start       | `{"type":"message_start","message":{"uuid":"..."}}`                                         | Capture parent msg UUID                      |
-| content_block_delta | `{"type":"content_block_delta","delta":{"type":"text_delta","text":"..."}}`                 | Scan text delta                              |
-| message_limit       | `{"type":"message_limit","message_limit":{"type":"...","windows":{"5h":{...},"7d":{...}}}}` | Check utilization, emit `ask` BPF if >= 90%  |
+| content_block_delta | `{"type":"content_block_delta","delta":{"type":"text_delta","text":"..."}}`                 | Scan text delta    delegate to route callback if >= 90% |
+| message_limit       | `{"type":"message_limit","message_limit":{"type":"...","windows":{"5h":{...},"7d":{...}}}}` | Check utilization, delegate to route callback if >= 90% |
 
 | message_stop        | `{"type":"message_stop"}`                                                                   | Stream complete, sendFinalChunk              |
 | error               | `{"type":"error","error":{"type":"overloaded_error","message":"..."}}`                      | Classify + send error                        |
@@ -369,18 +376,22 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
   "parentMessageId": "550e8400-e29b-41d4-a716-446655440001",
   "createdAt": "2026-07-06T10:30:00.000Z",
   "lastUsed": "2026-07-06T10:35:00.000Z",
- "todos": {}
+  "disableTools": false,
+  "model": "claude-sonnet-4-6",
+  "dynamicToolsHash": null,
+  "_dynamicGrammarCache": null,
+  "todos": {}
 }
 ```
 
-### Usage Warning Mechanism
-Claude does not auto-switch users on rate limits. Instead, when either the 5h or 7d
-usage window reaches >= 90% utilization, the stream handler emits an inline `ask` BPF
-tool call so the calling agent/user can decide how to proceed (generate a summary,
-switch to a different saved user at the next server restart, or switch providers).
-`userData.waitUntil` / `waitReason` are still tracked and consulted only at startup,
-in `SessionSelector.select()`, to warn about or skip users who are still rate-limited
-when the wizard runs.
+### Usage Limit Handling
+When either the 5h or 7d usage window reaches >= 90% utilization, the stream handler
+delegates to the route callback. The route requests a conversation summary from Claude,
+emits an ask BPF with provider-switch options, sets `waitUntil` on userData, then calls
+`process.exit(0)`. On hard exceeded errors (caught in the catch block), the route emits
+an ask BPF directly in the SSE stream and exits. `userData.waitUntil` / `waitReason` are
+consulted at startup in `SessionSelector.select()` — blocked users show "(limit reached)"
+suffix and auto-switch to available users is offered.
 
 ## ChatGPT Provider
 
@@ -395,6 +406,8 @@ Manages HTTP requests to `chatgpt.com/backend-api` using browser-identical heade
 | `/backend-api/sentinel/chat-requirements/prepare` | POST   | Refresh sentinel proof-of-work token    |
 | `/backend-api/f/conversation/prepare`             | POST   | Prepare conversation, get conduit token |
 | `/backend-api/f/conversation`                     | POST   | Send chat completion (SSE stream)       |
+| `/backend-api/conversation/{id}`                 | PATCH  | Soft-delete conversation (is_visible=false) |
+| `/backend-api/user_system_messages`              | PATCH  | Set custom instructions (currently disabled) |
 
 ### Dependencies
 - **`ChatGPTProofOfWork`** (`core/chatgpt/pow.js`): Sentinel POW solver — decodes proof token config, generates sentinel proof, solves POW challenges
@@ -486,6 +499,10 @@ Manages HTTP requests to `chatgpt.com/backend-api` using browser-identical heade
 ```json
 {
   "name": "2026-07-06 10:30",
+  "disableTools": false,
+  "model": "auto",
+  "dynamicToolsHash": null,
+  "_dynamicGrammarCache": null,
   "chatSessionId": "abc-123-def",
   "parentMessageId": "client-created-root",
   "createdAt": "2026-07-06T10:30:00.000Z",
@@ -583,8 +600,7 @@ Singleton that loads and caches system prompts:
         }
       ],
       "instructionsHash": null,
-      "instructionsAppliedAt": null,
-      "model": null
+      "instructionsAppliedAt": null
     }
   },
   "claude": {
@@ -598,7 +614,6 @@ Singleton that loads and caches system prompts:
       "sessions": [...],
       "instructionsHash": "abc123...",
       "instructionsAppliedAt": "2026-07-06T10:30:00.000Z",
-      "model": "claude-sonnet-4-6",
       "waitUntil": null,
       "waitReason": null
     }
@@ -615,7 +630,6 @@ Singleton that loads and caches system prompts:
       "instructionsHash": null,
       "instructionsAppliedAt": null,
       "model": null
-    }
   }
 }
 ```
@@ -625,6 +639,14 @@ Singleton that loads and caches system prompts:
 - `waitReason` — e.g. `"rate_limit_error"`
 
 **Session-specific fields:**
+- `disableTools` — boolean; when true, tools + instructions not prepended
+- `model` — provider-specific model string (e.g. "expert", "claude-sonnet-4-6", "auto")
+- `dynamicToolsHash` — SHA-256 hash of req.body.tools[] for MCP cache invalidation
+- `_dynamicGrammarCache` — cached BPF grammar string for current tool set
+- `disableTools` — boolean; when true, tools + instructions not prepended
+- `model` — provider-specific model string (e.g. "expert", "claude-sonnet-4-6", "auto")
+- `dynamicToolsHash` — SHA-256 hash of req.body.tools[] for MCP cache invalidation
+- `_dynamicGrammarCache` — cached BPF grammar string for current tool set
 - `todos` — persisted todo items from `todos_add`/`todos_set` tool calls
 
 ---
@@ -641,6 +663,8 @@ Singleton that loads and caches system prompts:
 | DeepSeek V4       | deepseek  | 1,000,000      | 384,000    |
 | GPT-4o            | openai    | 128,000        | 16,384     |
 | Claude Sonnet 4.6 | anthropic | 1,000,000      | 64,000     |
+| Claude Sonnet 5   | anthropic | 1,000,000      | 64,000     |
+| Claude Haiku 4.5  | anthropic | 1,000,000      | 64,000     |
 
 ---
 
@@ -668,7 +692,7 @@ On `SIGINT` / `SIGTERM`:
 
 All user data persists in users.json (atomic writes via `.tmp` rename). Sessions are updated in-memory during operation; `lastUsed` timestamp is set in-memory after each stream completes. Full disk flush happens only on:
 - Graceful shutdown (`selector.flush()`)
-- Claude auto-switch (flushes old user before switching)
+- Claude rate-limit exit (flushes before process.exit(0))
 - Initial session creation (eager write)
 - Manual session deletion
 - New user creation

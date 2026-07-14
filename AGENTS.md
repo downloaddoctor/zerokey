@@ -11,18 +11,18 @@ config/ # constants, model definitions, IDE model configs
  config/constants.js # CONFIG (PORT), MODELS registry
  config/models.json # ZeroKey endpoint configs for IDEs (ZK8000–ZK8003)
 core/ # session management, chat router, provider API clients
- core/session-selector.js # interactive CLI wizard: provider→user→session selection; users.json persistence
- core/chat-router.js # builds Express router for selected provider (no runtime hot-swap)
+ core/session-selector.js # interactive CLI wizard: provider→user→session selection; users.json persistence; Claude "(limit reached)" suffix on user list; auto-switch to available users; deleteAllSessions with provider-side cleanup
+ core/chat-router.js # builds Express router for selected provider, logs active session (no runtime hot-swap)
  core/deepseek/ # DeepSeek API client, POW solver, SSE stream handler
-  core/deepseek/api.js → DeepSeekAPI — chat session CRUD, POW challenge, cookie management
+  core/deepseek/api.js → DeepSeekAPI — chat session CRUD (create/delete/deleteAll), POW challenge, cookie management, HTTP keep-alive
   core/deepseek/pow.js → DeepSeekPOW — WASM SHA3 proof-of-work solver
   core/deepseek/stream-handler.js → streamHandler — SSE parser for DeepSeek response format
  core/claude/ # Claude API client, SSE stream handler, instructions setter
-  core/claude/api.js → ClaudeAPI — conversation completion, org ID extraction, HAR-ordered headers
-  core/claude/stream-handler.js → claudeStreamHandler — SSE parser, message_limit detection, emits ask BPF at >=90% usage
+  core/claude/api.js → ClaudeAPI — conversation completion, client-side UUID gen, org ID extraction, HAR-ordered headers, session delete, cookie management, HTTP keep-alive
+  core/claude/stream-handler.js → claudeStreamHandler(res, stream, session, parser, cb) — SSE parser, message_limit detection, delegates >=90% usage to cb callback
   core/claude/set-instructions.js → setClaudeInstructions — PUT account_profile with system prompt
  core/chatgpt/ # ChatGPT API client, POW solver, SSE stream handler, instructions setter
-  core/chatgpt/api.js → ChatGPTAPI — conversation prepare, sentinel refresh, POW, conduit token flow, session deletion
+  core/chatgpt/api.js → ChatGPTAPI — conversation prepare, sentinel refresh, POW, conduit token flow, session deletion (PATCH), cookie management, UA extraction from proof token, HTTP keep-alive (PATCH), cookie management, UA extraction from proof token, HTTP keep-alive
   core/chatgpt/pow.js → ChatGPTProofOfWork — SHA3-512 sentinel proof-of-work solver
   core/chatgpt/stream-handler.js → chatgptStreamHandler — SSE parser for ChatGPT response format
   core/chatgpt/set-instructions.js → setChatGPTInstructions — PATCH user_system_messages
@@ -33,7 +33,7 @@ routes/ # Express route builders (one per provider + models + health)
  routes/models.js → GET /v1/models, GET /v1/models/:model
  routes/health.js → GET /health, GET /
 lib/engine/ # tool compilation, prompt formatting, IDE mappings
- lib/engine/index.js → ToolCompiler (singleton per ide+provider); parse/compile/emit tool calls; _mergeTodo
+ lib/engine/index.js → ToolCompiler (singleton per ide+provider); formatPrompt dispatches by role; parse/compile/emit tool calls; _mergeTodo; inferType
  lib/engine/dynamic-tools.js → syncDynamicTools — hash req.body.tools[], register MCP passthrough tools
  lib/engine/instructions.js → Instructions singleton; lazy-loads instructions.md + skills-extra.md
  lib/engine/instructions.md # system prompt for LLM (BPF syntax, tool grammar, coding rules)
@@ -45,11 +45,11 @@ lib/engine/ # tool compilation, prompt formatting, IDE mappings
   lib/engine/templates/terax.json # Terax tool definitions (read_file, write_file, edit, multi_edit, grep, glob, bash_run, bash_background, bash_logs, bash_kill, bash_list, todo_write, create_directory, etc.)
   lib/engine/templates/opencode.json # OpenCode tool definitions (read, write, edit, glob, grep, bash, question, task, todowrite, skill, webfetch)
 utils/ # shared utilities
- utils/cookie-jar.js → CookieJar — parse Set-Cookie, seed from header, capture from fetch/raw headers, serialize to Cookie string
+ utils/cookie-jar.js → CookieJar — parse Set-Cookie, seed from header, capture from fetch/raw headers, serialize to Cookie string, size getter
  utils/errors.js → toOpenAIError, classifyError — error categories: overloaded, session_expired, rate_limited, cloudflare_block, network, invalid_request, provider_error, internal
  utils/rate-limiter.js → acquireSlot — sliding-window rate limiter (5 req / 15s per label)
  utils/sse-reader.js → readSSE — generic SSE stream parser with 1MB buffer cap
- utils/stream-helpers.js → createSendFinalChunk, createOnError — shared SSE finalizers (flush tools, emit [DONE], update session.lastUsed)
+ utils/stream-helpers.js → createSendFinalChunk, createOnError — shared SSE finalizers (flush tools, emit [DONE], update session.lastUsed; onError writes error JSON to SSE stream)
  utils/har-to-capture.js → harToCapture — convert HAR files to network-capture JSON format
 temp/ # runtime data: users.json, scratch files (not committed)
 docs/ # static docs site
@@ -140,7 +140,7 @@ Claude deep flow:
    → message_start → session.parentMessageId = message.uuid
    → content_block_delta text_delta → parser.scan(text)
    → message_limit → check utilization (5h + 7d windows)
-     → if >= 90%: emits ask BPF tool inline via parser.scan() for user to decide next action
+     → if >= 90%: sets limitReached, calls route callback → route requests summary, emits ask BPF, sets waitUntil on user, process.exit(0)
    → error → onError
 
 DeepSeek deep flow:
@@ -212,6 +212,7 @@ PORT # server port, default 8000
 #DEPENDENCIES
 express ^5.2.1 # HTTP framework (pre-release)
 inquirer ^8.2.7 # interactive CLI
+node-fetch ^2.7.0 # HTTP client with keep-alive connection pooling
 prettier ^3.8.3 # dev only
 
 #PUBLIC-API
@@ -235,7 +236,7 @@ Stream buffer cap: 1MB (SSE reader)
 - No API keys — all auth via browser session cookies captured from DevTools fetch()
 - ToolCompiler is singleton per (ideName, provider) pair — second instantiation returns cached instance
 - Session state (parentMessageId, chatSessionId, lastUsed, todos) mutated in-memory; persisted to users.json only on shutdown via selector.flush()
-- Claude rate-limit: when usage >= 90% across 5h/7d windows (compared as a 0-1 fraction, not a percentage), an interactive ask BPF tool is emitted inline to let the user decide next action (no automatic switching); waitUntil/waitReason are only consulted at startup in SessionSelector.select(), not mid-request
+- Claude rate-limit: when usage >= 90% across 5h/7d windows (compared as a 0-1 fraction, not a percentage), stream-handler delegates to route callback; route requests a conversation summary, emits an ask BPF with provider-switch options, sets waitUntil on userData, then process.exit(0). On exceeded (hard block), route emits ask BPF in SSE and exits. waitUntil/waitReason consulted at startup in SessionSelector.select() with auto-switch to available users; blocked users show "(limit reached)" suffix
 - DeepSeek retries on SSE error events exactly once (re-acquires rate slot before retry)
 - Header order matters for Cloudflare fingerprinting — Claude and ChatGPT build headers in exact HAR order per endpoint
 - POW required: DeepSeek uses WASM SHA3, ChatGPT uses SHA3-512 with real config from user's proof token
@@ -243,7 +244,7 @@ Stream buffer cap: 1MB (SSE reader)
 - Claude requires org ID extraction from URL on init; conversation UUID pre-generated client-side
 - Tools disabled per-session via disableTools flag; when disabled, instructions + dynamic grammar not prepended
 - MCP tools synced per-request via SHA256 hash comparison; hash stored on session.dynamicToolsHash, grammar cached on session._dynamicGrammarCache
-- KNOWN LIMITATION: dynamicGrammar is only injected into the prompt when isNewSession is true (routes/*.js gate compiler.buildPrompt behind isNewSession). If req.body.tools[] changes mid-session (after the first turn), syncDynamicTools correctly detects the hash change and rebuilds dynamicGrammar, but that grammar is never sent to the model — the new/changed tools silently never reach the model until the session is recreated. Not fixed because MCP tools are currently unused; revisit if MCP is enabled.
+- KNOWN LIMITATION: syncDynamicTools has early return (line 67) that always returns dynamicGrammar='', skipping cache/rebuild. Entire dynamic grammar system (hash caching, _dynamicGrammarCache, grammarFromSchema, MCP tool registration) is dead code. MCP tools non-functional until this early return is removed.
 - todos_add/todos_set tools merge delta items into session.todos; cleared when all done
 - Claude instructions set via PUT /api/account_profile only on new session and only if hash changed
 - ChatGPT instructions set via PATCH /backend-api/user_system_messages only on new session (currently commented out in route)

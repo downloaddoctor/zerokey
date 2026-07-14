@@ -11,7 +11,7 @@ OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** �
 - **Multi-IDE** — per-request IDE selection via `Authorization: Bearer <vscode|terax|opencode>`
 - **Session persistence** — in-memory session tracking; flushed to disk on graceful shutdown
 - **Tool call support** — integrated ToolCompiler translates OpenAI-style function calling into provider-compatible prompt grammar
-- **Claude usage warnings** — inline `ask` prompt when 5h/7d usage hits >= 90%, so you can decide next steps (no automatic switching)
+- **Claude usage limit handling** — auto-summarizes conversation and gracefully exits when 5h/7d usage hits >= 90%, with option to switch providers on restart
 
 ## Quick Start
 
@@ -81,8 +81,9 @@ The `Authorization: Bearer <ide>` header maps the request to the correct IDE's t
 
 | IDE     | Bearer Token    | Purpose             |
 | ------- | --------------- | ------------------- |
-| VS Code | `Bearer vscode` | Loads VS Code tools |
-| Terax   | `Bearer terax`  | Loads Terax tools   |
+| VS Code  | `Bearer vscode`   | Loads VS Code tools  |
+| Terax   | `Bearer terax`   | Loads Terax tools    |
+| OpenCode| `Bearer opencode` | Loads OpenCode tools |
 
 ### VS Code — LLM Gateway
 
@@ -106,7 +107,7 @@ The `Authorization: Bearer <ide>` header maps the request to the correct IDE's t
 ## Architecture
 
 ```
-server.js               → Express app, startup wizard, provider dispatch, port selection
+server.js               → Express app, startup wizard, provider router mounting, port selection
 API.md                  → full API reference with provider internals, SSE formats, schemas
 config/
   constants.js          → PORT, MODELS
@@ -118,21 +119,21 @@ routes/
   models.js             → /v1/models and /v1/models/:model endpoints
   health.js             → /health endpoint
 core/
-  chat-router.js        → provider dispatch, builds the Express router for the selected provider
-  session-selector.js   → inquirer wizard, fetch() parser, users.json persistence, startup waitUntil checks
+  chat-router.js        → builds the Express router for the selected provider
+  session-selector.js   → inquirer wizard, fetch() parser, users.json persistence, Claude "(limit reached)" suffix, auto-switch to available users
   deepseek/
     api.js              → POW + HTTPS request builder
-    pow.js              → WASM SHA3-512 solver
+    pow.js              → WASM SHA3 solver
     stream-handler.js   → SSE stream → OpenAI delta chunks
     wasm/               → compiled WASM binary
   chatgpt/
     api.js              → sentinel token + conduit request builder
     pow.js              → pure JS SHA3-512 solver
-    stream-handler.js   → SSE stream → OpenAI delta chunks
+    stream-handler.js   → SSE stream → OpenAI delta chunks, delegates rate-limit to route callback
     set-instructions.js → system prompt injection for ChatGPT
   claude/
     api.js              → HAR auth + Cloudflare header ordering
-    stream-handler.js   → SSE stream → OpenAI delta chunks
+    stream-handler.js   → SSE stream → OpenAI delta chunks, delegates rate-limit to route callback
     set-instructions.js → system prompt injection for Claude
 lib/engine/
   index.js              → ToolCompiler singleton: formatPrompt, buildPrompt, parse, emit, compile, inferType
@@ -152,12 +153,12 @@ utils/
   har-to-capture.js     → HAR file → fetch() converter
   rate-limiter.js       → 5 req/15s sliding window per provider label
   sse-reader.js         → unified SSE reader for Web ReadableStream (1MB buffer cap, [DONE] detection)
-  stream-helpers.js     → sendFinalChunk (once-guard flush+emit+[DONE]), createOnError
+  stream-helpers.js     → sendFinalChunk (once-guard flush+emit+[DONE]), createOnError (writes error JSON to SSE)
 ```
 
 ## Session Storage
 
-Sessions and credentials are stored in `temp/users.json` (gitignored). Each user entry contains the captured browser headers and a list of named sessions with conversation IDs. Sessions are tracked in-memory during runtime and flushed to disk on graceful shutdown (`SIGINT`/`SIGTERM`) or when Claude auto-switches to another user. No per-request disk writes.
+Sessions and credentials are stored in `temp/users.json` (gitignored). Each user entry contains the captured browser headers and a list of named sessions with conversation IDs. Sessions are tracked in-memory during runtime and flushed to disk on graceful shutdown (`SIGINT`/`SIGTERM`). No per-request disk writes.
 
 Full schema details: **[API.md](API.md)**
 
