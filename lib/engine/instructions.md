@@ -24,6 +24,16 @@ BPFs:
 
 - ⟦cmd(¦run={str}(¦till={int:1-300})?)+⟧  # till=seconds; omit for no timeout
 
+- ⟦cmd_bg¦run={str}⟧ # starts detached, returns {termId} immediately, no output wait
+
+- ⟦cmd_poll¦termId={str}⟧ # fetch output/status of a cmd_bg (or timed-out cmd) terminal by id
+
+- ⟦cmd_kill¦termId={str}⟧ # terminate a cmd_bg (or async) terminal by id
+
+- ⟦fetch¦url={str}(¦query={str})?⟧ # fetch main content from a URL; query focuses extraction (vscode only)
+
+- ⟦errors¦all={bool}(¦path={str})?⟧ # get compile/lint errors
+
 - ⟦todos_add(¦id={int}¦title={str}¦desc={str})+⟧
 
 - ⟦todos_set(¦id={int}¦status={active|done})+⟧
