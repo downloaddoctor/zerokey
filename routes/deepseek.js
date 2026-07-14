@@ -7,6 +7,58 @@ const { acquireSlot } = require('../utils/rate-limiter')
 
 const deepseekApi = new DeepSeekAPI()
 
+/**
+ * Extract files from messages array.
+ * Supports:
+ *   - content array with { type: 'image_url', image_url: { url: 'data:<mime>;base64,...' } }
+ *   - content array with { type: 'file', file: { file_data: 'data:<mime>;base64,...', filename: '...' } }
+ * Returns array of { filename, data: Buffer, size: number }
+ */
+function extractFiles(messages) {
+  if (messages.length < 2) return []
+
+  const files = []
+
+  for (let i = messages.length - 2; i >= 0; i--) {
+    const msg = messages[i]
+    const content = msg.content
+    if (!Array.isArray(content)) break
+
+    let found = false
+    for (const part of content) {
+      if (part.type === 'image_url' && part.image_url?.url?.startsWith('data:')) {
+        const match = part.image_url.url.match(/^data:([^;]*);base64,(.+)$/)
+        if (match) {
+          const mime = match[1]
+          const data = Buffer.from(match[2], 'base64')
+          const ext = mime.split('/')[1] || 'png'
+          files.push({
+            filename: `image_${Date.now()}_${files.length}.${ext}`,
+            data,
+            size: data.length,
+          })
+          found = true
+        }
+      } else if (part.type === 'file' && part.file?.file_data?.startsWith('data:')) {
+        const match = part.file.file_data.match(/^data:([^;]*);base64,(.+)$/)
+        if (match) {
+          const data = Buffer.from(match[2], 'base64')
+          files.push({
+            filename: part.file.filename || `file_${Date.now()}_${files.length}`,
+            data,
+            size: data.length,
+          })
+          found = true
+        }
+      }
+    }
+
+    if (!found) break
+  }
+
+  return files
+}
+
 async function buildChatRouter(parsedFetch, session) {
   await initDeepSeekAPI(session, parsedFetch.headers)
 
@@ -28,6 +80,31 @@ async function buildChatRouter(parsedFetch, session) {
             'missing_messages',
           ),
         )
+    }
+
+    // Extract and upload files from messages
+    let refFileIds = []
+    const files = extractFiles(messages)
+    if (files.length > 0) {
+      console.log(`[DeepSeek Route] Found ${files.length} file(s) to upload`)
+      for (const file of files) {
+        try {
+          const fileId = await deepseekApi.uploadFile(file.filename, file.data, file.size)
+          refFileIds.push(fileId)
+        } catch (err) {
+          console.error('[DeepSeek Route] File upload failed:', err.message)
+          return res
+            .status(400)
+            .json(
+              toOpenAIError(
+                400,
+                `File upload failed: ${err.message}`,
+                'invalid_request_error',
+                'file_upload_failed',
+              ),
+            )
+        }
+      }
     }
 
     const compiler = new ToolCompiler(req.ide, 'deepseek')
@@ -53,6 +130,7 @@ async function buildChatRouter(parsedFetch, session) {
         false,
         true,
         model_type,
+        refFileIds,
       )
 
       res.setHeader('Content-Type', 'text/event-stream')
@@ -71,6 +149,7 @@ async function buildChatRouter(parsedFetch, session) {
           false,
           true,
           model_type,
+          refFileIds,
         )
       }
 

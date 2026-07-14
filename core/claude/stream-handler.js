@@ -68,7 +68,7 @@ async function claudeStreamHandler(res, stream, session, parser, cb) {
             )
 
             const worstWindow = h5.util > d7.util ? h5 : d7
-            const CONTEXT_WINDOW = 1_000_000
+            const CONTEXT_WINDOW = 264_000
             const usedTokens = Math.round(worstWindow.util * CONTEXT_WINDOW)
             tokenUsage.prompt_tokens = usedTokens
             tokenUsage.completion_tokens = 0

@@ -24,7 +24,7 @@ function streamHandler(res, stream, session, parser, retry) {
       console.log('[DeepSeek] Retrying request...')
       try {
         stream.destroy()
-      } catch (_) {}
+      } catch (_) { }
       retry()
         .then((newStream) => {
           streamHandler(res, newStream, session, parser, retry)
@@ -54,10 +54,10 @@ function streamHandler(res, stream, session, parser, retry) {
       const statusEntry = data.v?.find((e) => e.p === 'quasi_status')
       if (usageEntry) {
         tokenUsage.prompt_tokens = 0
-        tokenUsage.completion_tokens = usageEntry.v * 10
+        tokenUsage.completion_tokens = usageEntry.v
         tokenUsage.total_tokens = tokenUsage.completion_tokens + tokenUsage.prompt_tokens
         console.log('[DeepSeek] Token usage:', {
-          accumulated: usageEntry.v * 10,
+          accumulated: usageEntry.v,
           status: statusEntry?.v ?? null,
         })
       }

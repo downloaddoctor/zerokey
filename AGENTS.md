@@ -14,7 +14,7 @@ core/ # session management, chat router, provider API clients
  core/session-selector.js # interactive CLI wizard: provider→user→session selection; users.json persistence; Claude "(limit reached)" suffix on user list; auto-switch to available users; deleteAllSessions with provider-side cleanup; session mode as list pick (Tools Mode / Raw Mode)
  core/chat-router.js # builds Express router for selected provider, logs active session (no runtime hot-swap)
  core/deepseek/ # DeepSeek API client, POW solver, SSE stream handler
-  core/deepseek/api.js → DeepSeekAPI — chat session CRUD (create/delete/deleteAll), POW challenge, cookie management, HTTP keep-alive
+  core/deepseek/api.js → DeepSeekAPI — chat session CRUD (create/delete/deleteAll), POW challenge, file upload (uploadFile + _pollFile), cookie management, HTTP keep-alive
   core/deepseek/pow.js → DeepSeekPOW — WASM SHA3 proof-of-work solver
   core/deepseek/stream-handler.js → streamHandler — SSE parser for DeepSeek response format
  core/claude/ # Claude API client, SSE stream handler, instructions setter
@@ -148,9 +148,12 @@ DeepSeek deep flow:
    → init WASM POW solver
    → seed CookieJar from initial headers
  → per-request:
+   → extractFiles(messages) # scan messages backwards from last-1; stop at first non-file message
+     → decode base64 data URIs from image_url / file content parts
+   → for each extracted file: uploadFile() → _getPowChallenge('/api/v0/file/upload_file') → solve POW → POST multipart/form-data → _pollFile (poll fetch_files until SUCCESS)
    → _getPowChallenge() → POST /api/v0/chat/create_pow_challenge
    → powSolver.solveChallenge(challenge) → WASM calculateHash → base64 encode
-   → POST /api/v0/chat/completion → SSE stream
+   → POST /api/v0/chat/completion (with ref_file_ids from uploads) → SSE stream
    → capture response cookies
  → streamHandler → readSSE:
    → error type → retry once (re-acquire slot, re-call chatCompletion)
@@ -193,9 +196,12 @@ users.json (temp/users.json):
  }
 req.body (POST /v1/chat/completions):
  {
-   messages: [{ role: 'system'|'user'|'assistant'|'tool', content: string | [{ type: 'text', text: string }] }],
+   messages: [{ role: 'system'|'user'|'assistant'|'tool', content: string | [{ type: 'text'|'image_url'|'file', ... }] }],
    tools?: [{ type: 'function', function: { name: string, description: string, parameters: object } }]
  }
+ image_url parts: { type: 'image_url', image_url: { url: 'data:<mime>;base64,...' } }
+ file parts: { type: 'file', file: { file_data: 'data:<mime>;base64,...', filename: '...' } }
+ DeepSeek: leading file/image messages auto-uploaded before completion, passed as ref_file_ids
 
 res (POST /v1/chat/completions) — SSE stream:
  data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":...,"model":"...","choices":[{"index":0,"delta":{"role":"assistant","content":"text"},"finish_reason":null}]}

@@ -65,8 +65,9 @@ class DeepSeekAPI {
     prompt,
     parentMessageId = null,
     thinkingEnabled = false,
-    searchEnabled = false,
+    searchEnabled = true,
     modelType = null,
+    refFileIds = [],
   ) {
     const challenge = await this._getPowChallenge()
     const powResponse = await this.powSolver.solveChallenge(challenge)
@@ -76,7 +77,7 @@ class DeepSeekAPI {
       parent_message_id: parentMessageId,
       model_type: modelType,
       prompt,
-      ref_file_ids: [],
+      ref_file_ids: refFileIds,
       thinking_enabled: thinkingEnabled,
       search_enabled: searchEnabled,
     }
@@ -111,15 +112,113 @@ class DeepSeekAPI {
     return res.body
   }
 
+  /**
+   * Upload a file to DeepSeek. Returns file_id on success.
+   * @param {string} fileName
+   * @param {Buffer|string} fileContent
+   * @param {number} fileSize - bytes
+   * @returns {Promise<string>} file_id
+   */
+  async uploadFile(fileName, fileContent, fileSize) {
+    // 1. Get POW challenge for file upload
+    const challenge = await this._getPowChallenge('/api/v0/file/upload_file')
+    const powResponse = await this.powSolver.solveChallenge(challenge)
+
+    // 2. Build multipart form data
+    const boundary = '----WebKitFormBoundary' + Math.random().toString(36).slice(2)
+    const CRLF = '\r\n'
+    const header =
+      `--${boundary}${CRLF}` +
+      `Content-Disposition: form-data; name="file"; filename="${fileName}"${CRLF}` +
+      `Content-Type: application/octet-stream${CRLF}${CRLF}`
+    const footer = `${CRLF}--${boundary}--${CRLF}`
+
+    const bodyBuffer = Buffer.concat([
+      Buffer.from(header, 'utf-8'),
+      Buffer.isBuffer(fileContent) ? fileContent : Buffer.from(fileContent, 'utf-8'),
+      Buffer.from(footer, 'utf-8'),
+    ])
+
+    // 3. Upload
+    const uploadHeaders = this._buildHeaders({
+      'content-type': `multipart/form-data; boundary=${boundary}`,
+      'x-ds-pow-response': powResponse,
+      'x-file-size': String(fileSize),
+      'x-model-type': 'default',
+      'x-thinking-enabled': '0',
+    })
+
+    const res = await this._fetch(
+      `${DeepSeekAPI.BASE_URL}/file/upload_file`,
+      {
+        method: 'POST',
+        headers: uploadHeaders,
+        body: bodyBuffer,
+      },
+      true,
+    )
+
+    const body = res.data
+    if (body.code !== 0 || body.data.biz_code !== 0) {
+      throw new Error(`File upload failed: ${body.msg || body.data.biz_msg || 'unknown error'}`)
+    }
+
+    const fileId = body.data.biz_data.id
+    console.log('[DeepSeekAPI] File uploaded:', fileId, `(${fileName}, ${fileSize} bytes)`)
+
+    // 4. Poll until processing completes
+    return this._pollFile(fileId, fileName)
+  }
+
+  /**
+   * Poll file status until SUCCESS.
+   * @param {string} fileId
+   * @param {string} fileName
+   * @returns {Promise<string>} file_id
+   */
+  async _pollFile(fileId, fileName) {
+    const maxAttempts = 30
+    const delay = 1000
+
+    for (let i = 0; i < maxAttempts; i++) {
+      const res = await this._fetch(
+        `${DeepSeekAPI.BASE_URL}/file/fetch_files?file_ids=${encodeURIComponent(fileId)}`,
+        {
+          method: 'GET',
+          headers: this._buildHeaders(),
+        },
+        true,
+      )
+
+      const body = res.data
+      const file = body.data?.biz_data?.files?.[0]
+      if (!file) throw new Error(`File ${fileId} not found in fetch_files response`)
+
+      if (file.status === 'SUCCESS') {
+        console.log('[DeepSeekAPI] File ready:', fileId, `(tokens: ${file.token_usage})`)
+        return fileId
+      }
+
+      if (file.status === 'ERROR' || file.error_code) {
+        throw new Error(`File ${fileId} processing error: ${file.error_code || 'unknown'}`)
+      }
+
+      // Still PENDING — wait and retry
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
+
+    throw new Error(`File ${fileId} timed out waiting for processing`)
+  }
+
   // ─── Internal ───
-  async _getPowChallenge() {
+  async _getPowChallenge(targetPath = '/api/v0/chat/completion') {
     try {
       const resp = await this._fetch(
         `${DeepSeekAPI.BASE_URL}/chat/create_pow_challenge`,
         {
           method: 'POST',
           headers: this._buildHeaders(),
-          body: JSON.stringify({ target_path: '/api/v0/chat/completion' }),
+          body: JSON.stringify({ target_path: targetPath }),
         },
         true,
       )

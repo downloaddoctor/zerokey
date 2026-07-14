@@ -223,13 +223,15 @@ Manages HTTP requests to `chat.deepseek.com` using browser-identical headers and
 
 ### Internal API Endpoints Used
 
-| Endpoint                            | Method | Purpose                             |
-| ----------------------------------- | ------ | ----------------------------------- |
-| `/api/v0/chat_session/create`       | POST   | Create a new chat session           |
-| `/api/v0/chat/create_pow_challenge` | POST   | Get POW challenge for anti-bot      |
-| `/api/v0/chat/completion`           | POST   | Send chat completion (SSE stream)   |
-| `/api/v0/chat_session/delete`       | POST   | Delete a single session server-side |
-| `/api/v0/chat_session/delete_all`   | POST   | Delete all sessions server-side     |
+| Endpoint                            | Method | Purpose                                  |
+| ----------------------------------- | ------ | ---------------------------------------- |
+| `/api/v0/chat_session/create`       | POST   | Create a new chat session                |
+| `/api/v0/chat/create_pow_challenge` | POST   | Get POW challenge for anti-bot           |
+| `/api/v0/chat/completion`           | POST   | Send chat completion (SSE stream)        |
+| `/api/v0/file/upload_file`          | POST   | Upload file (multipart, POW-protected)   |
+| `/api/v0/file/fetch_files`          | GET    | Poll file processing status              |
+| `/api/v0/chat_session/delete`       | POST   | Delete a single session server-side      |
+| `/api/v0/chat_session/delete_all`   | POST   | Delete all sessions server-side          |
 
 ### Dependencies
 - **`DeepSeekPOW`** (`core/deepseek/pow.js`): WASM-based proof-of-work solver
@@ -241,11 +243,17 @@ Manages HTTP requests to `chat.deepseek.com` using browser-identical headers and
 ```
 1. initialize(headers) → seed CookieJar, init POW solver
 2. createChatSession() → POST /chat_session/create → returns chatSessionId
-3. chatCompletion(chatSessionId, prompt, parentMessageId):
+3. uploadFile(fileName, fileContent, fileSize):
+   a. _getPowChallenge('/api/v0/file/upload_file') → POW challenge
+   b. powSolver.solveChallenge(challenge) → x-ds-pow-response header
+   c. Build multipart/form-data body with boundary
+   d. POST /file/upload_file with x-ds-pow-response, x-file-size, x-model-type, x-thinking-enabled
+   e. _pollFile(fileId) → GET /file/fetch_files every 1s up to 30 attempts → SUCCESS
+4. chatCompletion(chatSessionId, prompt, parentMessageId, ..., refFileIds):
    a. _getPowChallenge() → POST /chat/create_pow_challenge
    b. powSolver.solveChallenge(challenge) → x-ds-pow-response header
-   c. POST /chat/completion → SSE stream
-4. Stream parsed via readSSE → streamHandler:
+   c. POST /chat/completion with ref_file_ids in body → SSE stream
+5. Stream parsed via readSSE → streamHandler:
    a. "SET" with "FINISHED" → sendFinalChunk
    b. "BATCH" → capture token usage
    c. data.v.response → capture parentMessageId, scan content
@@ -253,6 +261,22 @@ Manages HTTP requests to `chat.deepseek.com` using browser-identical headers and
    e. Error event → retry once (re-acquire rate slot, re-call chatCompletion)
    f. Stream closes without FINISHED → retry once
 ```
+
+DeepSeek chat completions auto-extract files from leading messages before the last one.
+Scans backwards from `messages[length-2]` down to index 0, stopping at the first message
+without extractable file/image parts.
+
+**Supported content part types:**
+- `{ type: 'image_url', image_url: { url: 'data:<mime>;base64,...' } }`
+- `{ type: 'file', file: { file_data: 'data:<mime>;base64,...', filename: '...' } }`
+
+**Upload flow per file:**
+1. POW challenge for `/api/v0/file/upload_file`
+2. Solve challenge → `x-ds-pow-response` header
+3. POST multipart/form-data with `x-file-size`, `x-model-type`, `x-thinking-enabled`
+4. Poll `GET /api/v0/file/fetch_files?file_ids=<id>` until `status: "SUCCESS"` (max 30 attempts, 1s apart)
+5. Collected `file_id`s passed as `ref_file_ids` in chat completion body
+
 
 ### DeepSeek SSE Event Format
 
