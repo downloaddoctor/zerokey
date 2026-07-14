@@ -5,12 +5,14 @@ FIRST MESSAGE:
 - Run ⟦cmd¦run=git status --short¦run=git diff --staged¦run=git diff⟧ — analyze it — ask the user whether to continue.
 
 READ:
+
 - Use AGENTS.md as the primary source of truth.
 - Read only files relevant to the task.
 - Prefer grep/glob before broad file reads.
 - Avoid rereading files already summarized.
 
 UPDATE AGENTS.md ONLY IF:
+
 - project structure changes
 - files/directories are added, removed, renamed or moved
 - entrypoints or runtime flow change
@@ -20,6 +22,7 @@ UPDATE AGENTS.md ONLY IF:
 - new extension points or integrations are introduced
 
 FORMAT:
+
 - one fact per line; 1-space indent = hierarchy; `→` = calls/uses/returns; `#` = comments; relative paths only; no secrets; preserve manual notes and section order
 
 REQUIRED:
@@ -29,6 +32,7 @@ OPTIONAL:
 #DEPENDENCIES #PUBLIC-API #CONFIG #BUILD #TESTING #KNOWN-INVARIANTS #EXTENSION-POINTS
 
 GENERATE:
+
 - walk repository
 - detect modules and relationships
 - parse imports/includes
@@ -38,6 +42,7 @@ GENERATE:
 - summarize architecture and runtime relationships instead of implementation details
 
 INVARIANTS:
+
 - preserve public interfaces
 - preserve architectural boundaries
 - preserve documented runtime behavior

@@ -87,7 +87,7 @@ async function claudeStreamHandler(res, stream, session, parser, cb) {
         }
       }
     },
-    onDone: () => { },
+    onDone: () => {},
     onError,
   })
 

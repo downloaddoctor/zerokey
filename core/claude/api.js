@@ -5,7 +5,7 @@ const { CookieJar } = require('../../utils/cookie-jar')
 
 /**
  * Generate a UUID v4.
-*/
+ */
 function generateUUID() {
   try {
     return crypto.randomUUID()
@@ -24,7 +24,7 @@ function generateUUID() {
  * User pastes a full fetch() call from browser DevTools (or HAR capture).
  * We extract headers + body, reuse all real values in exact HAR order.
  * Header order matters — Cloudflare fingerprints based on it.
-*/
+ */
 class ClaudeAPI {
   static BASE_URL = 'https://claude.ai/api'
 
@@ -265,7 +265,7 @@ class ClaudeAPI {
     h.push([
       'user-agent',
       src['user-agent'] ||
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
     ])
 
     // Activity session ID (present in GET requests in HAR)
@@ -296,7 +296,12 @@ class ClaudeAPI {
 
     let res
     try {
-      res = await nodeFetch(url, { ...options, redirect: 'follow', signal: controller.signal, agent: this._httpAgent })
+      res = await nodeFetch(url, {
+        ...options,
+        redirect: 'follow',
+        signal: controller.signal,
+        agent: this._httpAgent,
+      })
     } catch (err) {
       clearTimeout(timer)
       if (err.name === 'AbortError') {

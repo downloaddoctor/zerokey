@@ -89,13 +89,18 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
               [],
             )
 
-            parser.scan("```text\n")
-            await claudeStreamHandler(res, summaryStream, session, parser, (limitReached, sendFinalChunk) => {
-              parser.scan("```")
-              sendLimitMessage(parser, resetTime, mins)
-              sendFinalChunk()
-            })
-
+            parser.scan('```text\n')
+            await claudeStreamHandler(
+              res,
+              summaryStream,
+              session,
+              parser,
+              (limitReached, sendFinalChunk) => {
+                parser.scan('```')
+                sendLimitMessage(parser, resetTime, mins)
+                sendFinalChunk()
+              },
+            )
           } catch (summaryErr) {
             console.error('[Claude] Summary call failed:', summaryErr.message)
           }
@@ -104,7 +109,6 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
           return
         }
       })
-
     } catch (error) {
       if (res.headersSent) return
       console.error('[Claude Route] Error:', error.message)
@@ -113,10 +117,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
         const raw = JSON.parse(error.message)
         const payload = raw?.error?.message ? JSON.parse(raw.error.message) : null
         const limit = payload?.resolved?.limit
-        const reset =
-          limit?.resets_at ||
-          payload?.windows?.['5h']?.resets_at ||
-          payload?.resetsAt
+        const reset = limit?.resets_at || payload?.windows?.['5h']?.resets_at || payload?.resetsAt
 
         if (reset) {
           userData.waitUntil = typeof reset === 'number' ? reset * 1000 : new Date(reset).getTime()
@@ -124,7 +125,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
         }
 
         if (payload?.resolved?.status === 'exceeded') {
-          const resetMs = userData.waitUntil || (payload?.resolved?.limit?.resets_at * 1000)
+          const resetMs = userData.waitUntil || payload?.resolved?.limit?.resets_at * 1000
           const mins = Math.max(1, Math.ceil((resetMs - Date.now()) / 60000))
           const resetTime = new Date(resetMs).toLocaleTimeString()
 
@@ -143,7 +144,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
           setImmediate(() => process.exit(0))
           return
         }
-      } catch { }
+      } catch {}
 
       const err = toOpenAIError(error, 'Claude')
       return res.status(err.error.status || 500).json(err)
@@ -154,7 +155,9 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
 }
 
 function sendLimitMessage(parser, resetTime, mins) {
-  parser.scan(`⟦ask¦question=This Claude session has reached its usage limit. It resets at ${resetTime} (~${mins} min). What would you like to do?¦option=Switch to another Claude user¦default=true¦option=Switch to another provider⟧`)
+  parser.scan(
+    `⟦ask¦question=This Claude session has reached its usage limit. It resets at ${resetTime} (~${mins} min). What would you like to do?¦option=Switch to another Claude user¦default=true¦option=Switch to another provider⟧`,
+  )
 }
 
 module.exports = { buildClaudeRouter }

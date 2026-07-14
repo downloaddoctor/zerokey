@@ -74,11 +74,16 @@ async function readSSE(stream, { onData, onDone, onError }) {
       stream.on('data', (chunk) => {
         processChunk(Buffer.isBuffer(chunk) ? decoder.decode(chunk, { stream: true }) : chunk)
       })
-      stream.on('end', () => { onDone(); resolve() })
-      stream.on('error', (err) => { onError(err); resolve() })
+      stream.on('end', () => {
+        onDone()
+        resolve()
+      })
+      stream.on('error', (err) => {
+        onError(err)
+        resolve()
+      })
     })
   }
 }
-
 
 module.exports = { readSSE }

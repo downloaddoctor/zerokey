@@ -36,7 +36,7 @@ lib/engine/ # tool compilation, prompt formatting, IDE mappings
  lib/engine/index.js → ToolCompiler (singleton per ide+provider); formatPrompt dispatches by role; parse/compile/emit tool calls; _mergeTodo; inferType
  lib/engine/dynamic-tools.js → syncDynamicTools — hash req.body.tools[], register MCP passthrough tools
  lib/engine/instructions.js → Instructions singleton; lazy-loads instructions.md + skills-extra.md
- lib/engine/instructions.md # system prompt for LLM (BPF syntax, tool grammar, coding rules)
+ lib/engine/instructions.md # system prompt for LLM (BPI syntax, tool grammar, coding rules)
  lib/engine/skills-extra.md # extra skills appended to instructions (editing instructions themselves)
  lib/engine/stream.js → Stream class; iterative state machine scans LLM output for ⟦tool⟧ markers, emits SSE chunks + tool_calls; _maxToolLen from tool registry
  lib/engine/tool-defs.js → TOOLS registry (read/write/replace/ask/ls/mkdir/glob/grep/cmd/todos_add/todos_set), getIDEMapper(ide), IDE-specific prompt optimizers (vscode/terax/opencode user/tool formatters)
@@ -140,7 +140,7 @@ Claude deep flow:
    → message_start → session.parentMessageId = message.uuid
    → content_block_delta text_delta → parser.scan(text)
    → message_limit → check utilization (5h + 7d windows)
-     → if >= 90%: sets limitReached, calls route callback → route requests summary, emits ask BPF, sets waitUntil on user, process.exit(0)
+     → if >= 90%: sets limitReached, calls route callback → route requests summary, emits ask BPI, sets waitUntil on user, process.exit(0)
    → error → onError
 
 DeepSeek deep flow:
@@ -242,7 +242,7 @@ Stream buffer cap: 1MB (SSE reader)
 - No API keys — all auth via browser session cookies captured from DevTools fetch()
 - ToolCompiler is singleton per (ideName, provider) pair — second instantiation returns cached instance
 - Session state (parentMessageId, chatSessionId, lastUsed, todos) mutated in-memory; persisted to users.json only on shutdown via selector.flush()
-- Claude rate-limit: when usage >= 90% across 5h/7d windows (compared as a 0-1 fraction, not a percentage), stream-handler delegates to route callback; route requests a conversation summary, emits an ask BPF with provider-switch options, sets waitUntil on userData, then process.exit(0). On exceeded (hard block), route emits ask BPF in SSE and exits. waitUntil/waitReason consulted at startup in SessionSelector.select() with auto-switch to available users; blocked users show "(limit reached)" suffix
+- Claude rate-limit: when usage >= 90% across 5h/7d windows (compared as a 0-1 fraction, not a percentage), stream-handler delegates to route callback; route requests a conversation summary, emits an ask BPI with provider-switch options, sets waitUntil on userData, then process.exit(0). On exceeded (hard block), route emits ask BPI in SSE and exits. waitUntil/waitReason consulted at startup in SessionSelector.select() with auto-switch to available users; blocked users show "(limit reached)" suffix
 - DeepSeek retries on SSE error events exactly once (re-acquires rate slot before retry)
 - Header order matters for Cloudflare fingerprinting — Claude and ChatGPT build headers in exact HAR order per endpoint
 - POW required: DeepSeek uses WASM SHA3, ChatGPT uses SHA3-512 with real config from user's proof token

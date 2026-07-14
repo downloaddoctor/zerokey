@@ -2,6 +2,27 @@
   {
     "type": "function",
     "function": {
+      "name": "apply_patch",
+      "description": "Edit text files. Do not use this tool to edit Jupyter notebooks. `apply_patch` allows you to execute a diff/patch against a text file, but the format of the diff specification is unique to this task, so pay careful attention to these instructions. To use the `apply_patch` command, you should pass a message of the following structure as \"input\":\n\n*** Begin Patch\n[YOUR_PATCH]\n*** End Patch\n\nWhere [YOUR_PATCH] is the actual content of your patch, specified in the following V4A diff format.\n\n*** [ACTION] File: [/absolute/path/to/file] -> ACTION can be one of Add, Update, or Delete.\nAn example of a message that you might pass as \"input\" to this function, in order to apply a patch, is shown below.\n\n*** Begin Patch\n*** Update File: /Users/someone/pygorithm/searching/binary_search.py\n@@class BaseClass\n@@    def search():\n-        pass\n+        raise NotImplementedError()\n\n@@class Subclass\n@@    def search():\n-        pass\n+        raise NotImplementedError()\n\n*** End Patch\nDo not use line numbers in this diff format.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "The edit patch to apply."
+          },
+          "explanation": {
+            "type": "string",
+            "description": "A short description of what the tool call is aiming to achieve."
+          }
+        },
+        "required": ["input", "explanation"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
       "name": "create_directory",
       "description": "Create a new directory structure in the workspace. Will recursively create all directories in the path, like mkdir -p. You do not need to use this tool before using create_file, that tool will automatically create the needed directories.",
       "parameters": {
@@ -197,6 +218,30 @@
   {
     "type": "function",
     "function": {
+      "name": "get_changed_files",
+      "description": "Get git diffs of current file changes in a git repository. Don't forget that you can use run_in_terminal to run git commands in a terminal as well.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "repositoryPath": {
+            "type": "string",
+            "description": "The absolute path to the git repository to look for changes in. If not provided, the active git repository will be used."
+          },
+          "sourceControlState": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["staged", "unstaged", "merge-conflicts"]
+            },
+            "description": "The kinds of git state to filter by. Allowed values are: 'staged', 'unstaged', and 'merge-conflicts'. If not provided, all states will be included."
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
       "name": "get_errors",
       "description": "Get any compile or lint errors in a specific file or across all files. If the user mentions errors or problems in a file, they may be referring to these. Use the tool to see the same errors that the user is seeing. If the user asks you to analyze all errors, or does not specify a file, use this tool to gather errors for all files. Also use this tool after editing a file to validate the change.",
       "parameters": {
@@ -290,6 +335,31 @@
           }
         },
         "required": ["scope", "query"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "insert_edit_into_file",
+      "description": "Insert new code into an existing file in the workspace. Use this tool once per file that needs to be modified, even if there are multiple changes for a file. Generate the \"explanation\" property first.\nThe system is very smart and can understand how to apply your edits to the files, you just need to provide minimal hints.\nAvoid repeating existing code, instead use comments to represent regions of unchanged code. Be as concise as possible. For example:\n// ...existing code...\n{ changed code }\n// ...existing code...\n{ changed code }\n// ...existing code...\n\nHere is an example of how you should use format an edit to an existing Person class:\nclass Person {\n\t// ...existing code...\n\tage: number;\n\t// ...existing code...\n\tgetAge() {\n\treturn this.age;\n\t}\n}",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "explanation": {
+            "type": "string",
+            "description": "A short explanation of the edit being made."
+          },
+          "filePath": {
+            "type": "string",
+            "description": "An absolute path to the file to edit."
+          },
+          "code": {
+            "type": "string",
+            "description": "The code change to apply to the file.\nThe system is very smart and can understand how to apply your edits to the files, you just need to provide minimal hints.\nAvoid repeating existing code, instead use comments to represent regions of unchanged code. Be as concise as possible. For example:\n// ...existing code...\n{ changed code }\n// ...existing code...\n{ changed code }\n// ...existing code...\n\nHere is an example of how you should use format an edit to an existing Person class:\nclass Person {\n\t// ...existing code...\n\tage: number;\n\t// ...existing code...\n\tgetAge() {\n\t\treturn this.age;\n\t}\n}"
+          }
+        },
+        "required": ["explanation", "filePath", "code"]
       }
     }
   },
@@ -582,32 +652,15 @@
   {
     "type": "function",
     "function": {
-      "name": "semantic_search",
-      "description": "Run a natural language search for relevant code or documentation comments from the user's current workspace. Returns relevant code snippets from the user's current workspace if it is large, or the full contents of the workspace if it is small.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string",
-            "description": "The query to search the codebase for. Should contain all relevant context. Should ideally be text that might appear in the codebase, such as function names, variable names, or comments."
-          }
-        },
-        "required": ["query"]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
       "name": "session_store_sql",
-      "description": "Query the local session store containing history from past coding sessions. Uses SQLite syntax (NOT DuckDB or Postgres). SQL queries are read-only — only SELECT and WITH are allowed. Use `datetime('now', '-1 day')` for date math (NOT `now() - INTERVAL '1 day'`), FTS5 `MATCH` for text search.\n\nTables: `sessions`, `turns`, `session_files`, `session_refs`, `checkpoints`, `search_index`. For column details and query patterns, use the **chronicle** skill.\n\nActions: 'query' (execute SQL — supports JOINs, FTS5 MATCH, aggregations), 'standup' (pre-fetch last 24h data), 'reindex' (rebuild index from debug logs).",
+      "description": "Query the local session store containing history from past coding sessions. Uses SQLite syntax (NOT DuckDB or Postgres). SQL queries are read-only — only SELECT and WITH are allowed. Use `datetime('now', '-1 day')` for date math (NOT `now() - INTERVAL '1 day'`), FTS5 `MATCH` for text search.\n\nTables: `sessions`, `turns`, `session_files`, `session_refs`, `checkpoints`, `search_index`. For column details and query patterns, use the **chronicle** skill.\n\nActions: 'query' (execute SQL — supports JOINs, FTS5 MATCH, aggregations), 'reindex' (rebuild index from debug logs).",
       "parameters": {
         "type": "object",
         "properties": {
           "action": {
             "type": "string",
-            "enum": ["query", "standup", "reindex"],
-            "description": "The action to perform. 'query' (default) executes a SQL query. 'standup' pre-fetches last 24h session data for standup reports. 'reindex' rebuilds the local session index and syncs to cloud if enabled."
+            "enum": ["query", "reindex"],
+            "description": "The action to perform. 'query' (default) executes a SQL query. 'reindex' rebuilds the local session index and syncs to cloud if enabled."
           },
           "query": {
             "type": "string",
@@ -620,6 +673,11 @@
           "description": {
             "type": "string",
             "description": "A 2-5 word summary of what this call does (e.g. 'Recent sessions overview', 'Generate standup', 'Reindex sessions')."
+          },
+          "subcommand": {
+            "type": "string",
+            "enum": ["standup", "tips", "cost-tips", "search", "improve", "reindex"],
+            "description": "The chronicle subcommand that triggered this call (e.g. 'tips' for /chronicle tips). Used for telemetry attribution only — pass this whenever the call originates from a /chronicle slash command."
           }
         },
         "required": ["description"]
@@ -828,6 +886,45 @@
   {
     "type": "function",
     "function": {
+      "name": "click_element",
+      "description": "Click on an element in a browser page.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "description": "The browser page ID, acquired from context or the open tool."
+          },
+          "ref": {
+            "type": "string",
+            "description": "Element reference to click."
+          },
+          "selector": {
+            "type": "string",
+            "description": "Playwright selector of the element to click when \"ref\" is not available."
+          },
+          "element": {
+            "type": "string",
+            "description": "Human-readable description of the element to click (e.g., \"submit button\", \"search icon\")."
+          },
+          "dblClick": {
+            "type": "boolean",
+            "description": "Set to true for double clicks. Default is false."
+          },
+          "button": {
+            "type": "string",
+            "enum": ["left", "right", "middle"],
+            "description": "Mouse button to click with. Default is \"left\"."
+          }
+        },
+        "required": ["pageId", "element"],
+        "$comment": "One of \"ref\" or \"selector\" is required."
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
       "name": "create_and_run_task",
       "description": "Creates and runs a build, run, or custom task for the workspace by generating or adding to a tasks.json file based on the project structure (such as package.json or README.md). If the user asks to build, run, launch and they have no tasks.json file, use this tool. If they ask to create or add a task, use this tool.",
       "parameters": {
@@ -887,6 +984,48 @@
   {
     "type": "function",
     "function": {
+      "name": "drag_element",
+      "description": "Drag an element over another element in a browser page.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "description": "The browser page ID, acquired from context or the open tool."
+          },
+          "fromRef": {
+            "type": "string",
+            "description": "Element reference of the element to drag."
+          },
+          "fromSelector": {
+            "type": "string",
+            "description": "Playwright selector of the element to drag when \"fromRef\" is not available."
+          },
+          "fromElement": {
+            "type": "string",
+            "description": "Human-readable description of the element to drag (e.g., \"file item\", \"draggable card\")."
+          },
+          "toRef": {
+            "type": "string",
+            "description": "Element reference of the element to drop onto."
+          },
+          "toSelector": {
+            "type": "string",
+            "description": "Playwright selector of the element to drop onto when \"toRef\" is not available."
+          },
+          "toElement": {
+            "type": "string",
+            "description": "Human-readable description of the element to drop onto (e.g., \"drop zone\", \"target folder\")."
+          }
+        },
+        "required": ["pageId", "fromElement", "toElement"],
+        "$comment": "One of \"fromRef\" or \"fromSelector\" is required, and one of \"toRef\" or \"toSelector\" is required."
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
       "name": "get_task_output",
       "description": "Get the output of a task",
       "parameters": {
@@ -909,7 +1048,7 @@
     "type": "function",
     "function": {
       "name": "get_terminal_output",
-      "description": "Get output from an active terminal execution (identified by the `id` returned from run_in_terminal).",
+      "description": "Get output from a terminal execution that was moved to background (identified by the `id` returned from run_in_terminal). Use this ONLY when the run_in_terminal result explicitly says the command was moved to background, timed out, or needs input. Do NOT call this after a sync command that completed normally — sync commands return full output inline. If a background command has not yet completed, you will be automatically notified when it finishes — do NOT poll; end your turn and wait.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -920,6 +1059,68 @@
           }
         },
         "required": ["id"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "handle_dialog",
+      "description": "Respond to a pending modal (alert, confirm, prompt) or file chooser dialog on a browser page.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "description": "The browser page ID, acquired from context or the open tool."
+          },
+          "acceptModal": {
+            "type": "boolean",
+            "description": "Whether to accept (true) or dismiss (false) a modal dialog."
+          },
+          "promptText": {
+            "type": "string",
+            "description": "Text to enter into a prompt dialog."
+          },
+          "selectFiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Absolute paths of files to select, or empty to dismiss. Required for file chooser dialogs."
+          }
+        },
+        "required": ["pageId"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "hover_element",
+      "description": "Hover over an element in a browser page. Provide either a Playwright selector or an element reference.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "description": "The browser page ID, acquired from context or the open tool."
+          },
+          "ref": {
+            "type": "string",
+            "description": "Element reference to hover over."
+          },
+          "selector": {
+            "type": "string",
+            "description": "Playwright selector of the element to hover over when \"ref\" is not available."
+          },
+          "element": {
+            "type": "string",
+            "description": "Human-readable description of the element to hover over (e.g., \"navigation menu\", \"tooltip trigger\")."
+          }
+        },
+        "required": ["pageId", "element"],
+        "$comment": "One of \"ref\" or \"selector\" is required."
       }
     }
   },
@@ -980,8 +1181,34 @@
   {
     "type": "function",
     "function": {
+      "name": "navigate_page",
+      "description": "Navigate a browser page by URL, history, or reload.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "description": "The browser page ID to navigate, acquired from context or the open tool."
+          },
+          "type": {
+            "type": "string",
+            "enum": ["url", "back", "forward", "reload"],
+            "description": "Navigation type: \"url\" to navigate to a URL (default, requires \"url\" param), \"back\" or \"forward\" for history, \"reload\" to refresh."
+          },
+          "url": {
+            "type": "string",
+            "description": "The URL to navigate to. Required when type is \"url\"."
+          }
+        },
+        "required": ["pageId"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
       "name": "open_browser_page",
-      "description": "Open a new browser page in the integrated browser at the given URL.",
+      "description": "Open a new browser page in the integrated browser at the given URL.\nMay prompt the user to share a page if there is a similar one already open, unless \"forceNew\" is true.\nReturns a page ID that must be used with other browser tools to interact with the page, as well as an accessibility snapshot of the page.\n\nImportant: Prefer to reuse existing pages whenever possible and only call this tool if you do not already have access to a tab you can reuse.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -994,7 +1221,24 @@
             "description": "Whether to force opening a new page even if a page with the same host already exists. Default is false."
           }
         },
-        "required": ["url"]
+        "$comment": "If you omit \"url\", the user will be prompted to share an existing page instead. Use this if there are unshared pages that the user may be interested in sharing with you."
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "read_page",
+      "description": "Get a snapshot of the current browser page state. This is better than screenshot.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "description": "The browser page ID to read, acquired from context or the open tool."
+          }
+        },
+        "required": ["pageId"]
       }
     }
   },
@@ -1002,7 +1246,7 @@
     "type": "function",
     "function": {
       "name": "run_in_terminal",
-      "description": "This tool allows you to execute Windows PowerShell 5.1 commands in a persistent terminal session, preserving environment variables, working directory, and other context across multiple commands.\n\nCommand Execution:\n- Use semicolons ; to chain commands on one line, NEVER use && even when asked explicitly\n- Prefer pipelines | for object-based data flow\n- Never create a sub-shell (eg. powershell -c \"command\") unless explicitly asked\n\nDirectory Management:\n- Prefer relative paths when navigating directories, only use absolute when the path is far away or the current cwd is not expected\n- By default (mode=sync), shell and cwd are reused by subsequent sync commands\n- Use $PWD or Get-Location for current directory\n- Use Push-Location/Pop-Location for directory stack\n\nProgram Execution:\n- Supports .NET, Python, Node.js, and other executables\n- Install modules via Install-Module, Install-Package\n- Use Get-Command to verify cmdlet/function availability\n\nAsync Mode:\n- Use mode=async ONLY for processes that should keep running while you do other work (servers, watchers, dev daemons)\n- For one-shot long-running commands where you have nothing to do until they finish (package installs, builds, downloads, test suites), use mode=sync with a generous timeout (e.g. 600000 / 10 min for installs, longer for big builds) so the command can complete before your turn ends\n- Returns a terminal ID for checking status and runtime later\n- Use Start-Job for background PowerShell jobs\n\nUse send_to_terminal to send commands or input to a terminal session.\n\nOutput Management:\n- Output is automatically truncated if longer than 60KB to prevent context overflow\n- Use Select-Object, Where-Object, Format-Table to filter output\n- Use -First/-Last parameters to limit results\n- For pager commands, add | Out-String or | Format-List\n\nBest Practices:\n- Use proper cmdlet names instead of aliases in scripts\n- Quote paths with spaces: \"C:\\Path With Spaces\"\n- Prefer PowerShell cmdlets over external commands when available\n- Prefer idiomatic PowerShell like Get-ChildItem instead of dir or ls for file listings\n- Use Test-Path to check file/directory existence\n- Be specific with Select-Object properties to avoid excessive output\n- Avoid printing credentials unless absolutely required\n- NEVER run Start-Sleep or similar wait commands. You will be automatically notified on your next turn when async terminal commands or timed-out sync commands complete or need input. Do NOT poll for completion.\n\nInteractive Input Handling:\n- When a terminal command is waiting for interactive input, do NOT suggest alternatives or ask the user whether to proceed. Instead, use the vscode_askQuestions tool to collect the needed values from the user, then send them.\n- NEVER use vscode_askQuestions to request sensitive input such as passwords, passphrases, API keys, tokens, or other secrets — answers to that tool are sent through the model. If the prompt requires a secret, tell the user to type it directly into the terminal and stop; do not call vscode_askQuestions or send_to_terminal for that prompt.\n- Send exactly one answer per prompt using send_to_terminal. Never send multiple answers in a single send.\n- After each send, call get_terminal_output to read the next prompt before sending the next answer.\n- Continue one prompt at a time until the command finishes.\n\nExecution mode:\n- mode='sync': wait for completion (optionally capped by timeout); if still running when timeout elapses, return with a terminal ID.\n- mode='async': wait for an initial idle/output signal, then return with terminal output snapshot and ID. Timeout caps how long to wait for the initial idle/output signal.\n- Prefer mode='sync' for commands that will prompt for interactive input (e.g., npm init, interactive installers, configuration wizards).\n\nTimeout parameter: For one-shot long-running commands, set a generous timeout as a safety net (e.g. 600000 for installs, longer for big builds). Omit timeout only for processes that should run indefinitely (servers, daemons). If the timeout elapses, you get a terminal ID and can check output later.\n\nTerminal notifications: When an async command finishes or a sync command times out, you will be automatically notified on your next turn with the exit code and terminal output. You will also be notified if the terminal needs input. Do NOT poll or sleep to wait for completion.",
+      "description": "This tool allows you to execute Windows PowerShell 5.1 commands in a persistent terminal session, preserving environment variables, working directory, and other context across multiple commands.\n\nCommand Execution:\n- Use semicolons ; to chain commands on one line, NEVER use && even when asked explicitly\n- Prefer pipelines | for object-based data flow\n- Never create a sub-shell (eg. powershell -c \"command\") unless explicitly asked\n\nDirectory Management:\n- Prefer relative paths when navigating directories, only use absolute when the path is far away or the current cwd is not expected\n- By default (mode=sync), shell and cwd are reused by subsequent sync commands\n- Use $PWD or Get-Location for current directory\n- Use Push-Location/Pop-Location for directory stack\n\nProgram Execution:\n- Supports .NET, Python, Node.js, and other executables\n- Install modules via Install-Module, Install-Package\n- Use Get-Command to verify cmdlet/function availability\n\nExecution Mode:\n- For ALL one-shot commands (builds, tests, installs, compilation, linting, downloads, scripts), use mode=sync and omit timeout. The tool waits for the command to complete and returns full output inline. This is the default and strongly preferred mode.\n- Use mode=async ONLY for processes that must keep running indefinitely while you do other work (servers, watchers, dev daemons). Async waits for an initial idle/output signal, then returns a terminal ID and output snapshot while the process continues running.\n- In sync mode, the full output is returned when the command completes — you do NOT need to call get_terminal_output afterward. Only use get_terminal_output if the tool result explicitly says the command was moved to background, timed out, or needs input.\n- Returns a terminal ID for checking status and runtime later\n- Use Start-Job for background PowerShell jobs\n\nUse send_to_terminal to send commands or input to a terminal session.\n\nOutput Management:\n- Output exceeding 20KB is saved to a temp file; the result includes the file path so you can read the full output with readFile or search it with grep\n- Use Select-Object, Where-Object, Format-Table to filter output\n- Use -First/-Last parameters to limit results\n- For pager commands, add | Out-String or | Format-List\n\nBest Practices:\n- Use proper cmdlet names instead of aliases in scripts\n- Quote paths with spaces: \"C:\\Path With Spaces\"\n- Prefer PowerShell cmdlets over external commands when available\n- Prefer idiomatic PowerShell like Get-ChildItem instead of dir or ls for file listings\n- Use Test-Path to check file/directory existence\n- Be specific with Select-Object properties to avoid excessive output\n- Avoid printing credentials unless absolutely required\n- NEVER run Start-Sleep or similar wait commands. You will be automatically notified on your next turn when async terminal commands or timed-out sync commands complete or need input. Do NOT poll for completion.\n- NEVER pipe interactive commands through Select-Object, Where-Object, or other filters — this hides prompts and prevents the terminal from detecting when input is needed. Run interactive commands without pipes.\n\nInteractive Input Handling:\n- When a terminal command is waiting for interactive input, do NOT suggest alternatives or ask the user whether to proceed. Instead, use the vscode_askQuestions tool to collect the needed values from the user, then send them.\n- NEVER use vscode_askQuestions to request sensitive input such as passwords, passphrases, API keys, tokens, or other secrets — answers to that tool are sent through the model. If the prompt requires a secret, tell the user to type it directly into the terminal and stop; do not call vscode_askQuestions or send_to_terminal for that prompt.\n- Send exactly one answer per prompt using send_to_terminal. Never send multiple answers in a single send.\n- After each send, call get_terminal_output to read the next prompt before sending the next answer.\n- Continue one prompt at a time until the command finishes.\n\nExecution mode:\n- mode='sync' (strongly preferred): waits for the command to complete and returns full output inline. Use for ALL one-shot commands (builds, tests, installs, compilation, scripts). Omit timeout to let the command run to completion — the tool handles idle detection and input prompts automatically.\n- mode='async': waits for an initial idle/output signal from the command, then returns a terminal ID and output snapshot while the process continues running. Use ONLY for processes that must keep running indefinitely (servers, watchers, daemons). Timeout caps how long to wait for the initial idle/output signal.\n\nTimeout parameter: Usually omit timeout entirely for sync commands — the tool returns automatically on completion, input-needed, or cancellation. Only set a timeout as a safety net for commands you suspect might hang. Use 0 to explicitly indicate no timeout.\n\nSync output is final: When a sync command completes, the full output is returned inline — do NOT call get_terminal_output afterward. Only use get_terminal_output if the tool result explicitly indicates the command was moved to background, timed out, or needs input. Do NOT tell the user to check the terminal panel — all command output is already included in the tool result.\n\nTerminal notifications: When an async command finishes or a sync command times out, you will be automatically notified on your next turn with the exit code and terminal output. You will also be notified if the terminal needs input. Do NOT poll or sleep to wait for completion.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -1022,10 +1266,10 @@
             "type": "string",
             "enum": ["sync", "async"],
             "enumDescriptions": [
-              "Wait for completion up to timeout, then return with collected output. If still running at timeout, the terminal session continues in the background.",
-              "Wait for an initial idle/output signal, then return with a terminal ID and output snapshot while the session may continue running."
+              "Wait for command completion and return full output inline. Strongly preferred for all one-shot commands (builds, tests, installs, scripts).",
+              "Wait for an initial idle/output signal, then return a terminal ID and output snapshot while the process continues running. Timeout caps how long to wait for the initial signal. Use ONLY for processes that must keep running indefinitely (servers, watchers, daemons)."
             ],
-            "description": "Execution mode for this command."
+            "description": "Execution mode for this command. Use sync (default) for nearly all commands."
           },
           "isBackground": {
             "type": "boolean",
@@ -1033,10 +1277,40 @@
           },
           "timeout": {
             "type": "number",
-            "description": "Optional hard cap in milliseconds on how long the tool tracks the command before returning. Omit to let the command run to completion (recommended for package installs, builds, and long-running scripts). Use 0 to explicitly indicate no timeout."
+            "description": "Optional. Usually omit entirely for sync commands — the tool waits for completion automatically. Only set a timeout (in milliseconds) as a safety net if you suspect the command might hang. If the timeout elapses, the command continues in the background and you get a terminal ID to check output later. Use 0 to explicitly indicate no timeout."
           }
         },
         "required": ["command", "explanation", "goal", "mode"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "run_playwright_code",
+      "description": "Run a Playwright code snippet to control a browser page. Only use this if other browser tools are insufficient.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "description": "The browser page ID, acquired from context or the open tool."
+          },
+          "code": {
+            "type": "string",
+            "description": "The Playwright code to execute. The code must be concise, serve one clear purpose, and be self-contained. You **must not** directly access `document` or `window` using this tool. You must access it via the provided `page` object, e.g. \"return page.evaluate(() => document.title)\". Omit this when resuming a deferred execution via deferredResultId."
+          },
+          "deferredResultId": {
+            "type": "string",
+            "description": "If a previous call returned a deferredResultId, pass it here to continue waiting for that execution to complete."
+          },
+          "timeoutMs": {
+            "type": "number",
+            "description": "Maximum time in milliseconds to wait for the code to complete. Defaults to 5000 (5 seconds)."
+          }
+        },
+        "required": ["pageId"],
+        "$comment": "Either \"code\" or \"deferredResultId\" must be provided."
       }
     }
   },
@@ -1072,6 +1346,39 @@
   {
     "type": "function",
     "function": {
+      "name": "screenshot_page",
+      "description": "Capture a screenshot of the current browser page. You can't perform actions based on the screenshot; use read_page for actions.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "description": "The browser page ID to capture, acquired from context or the open tool."
+          },
+          "ref": {
+            "type": "string",
+            "description": "Element reference to capture. If omitted, captures the whole viewport."
+          },
+          "selector": {
+            "type": "string",
+            "description": "Playwright selector of an element to capture when \"ref\" is not available. If omitted, captures the whole viewport."
+          },
+          "element": {
+            "type": "string",
+            "description": "Human-readable description of the element to capture (e.g., \"chart diagram\", \"product image\")."
+          },
+          "scrollIntoViewIfNeeded": {
+            "type": "boolean",
+            "description": "Whether to scroll the element into view before capturing. Defaults to false."
+          }
+        },
+        "required": ["pageId"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
       "name": "send_to_terminal",
       "description": "Send input text to an active terminal execution (identified by the `id` returned from run_in_terminal). The 'command' field may be empty or whitespace to press Enter (useful for interactive prompts). By default, returns the last 20 lines of terminal output captured shortly after sending. Set 'waitForOutput' to true for interactive programs (games, REPLs, etc.) to wait until the terminal becomes idle before returning output — this gives you the program's response to your input.",
       "parameters": {
@@ -1092,6 +1399,17 @@
           }
         },
         "required": ["id", "command"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "setup_tools_createNewWorkspace",
+      "description": "Scaffold a new workspace in VS Code",
+      "parameters": {
+        "type": "object",
+        "properties": {}
       }
     }
   },
@@ -1125,6 +1443,47 @@
       "parameters": {
         "type": "object",
         "properties": {}
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "type_in_page",
+      "description": "Type text or press keys in a browser page.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "description": "The browser page ID, acquired from context or the open tool."
+          },
+          "text": {
+            "type": "string",
+            "description": "The text to type. One of \"text\" or \"key\" must be provided."
+          },
+          "submit": {
+            "type": "boolean",
+            "description": "Whether to press Enter after typing text. Ignored when \"key\" is provided. Default is false."
+          },
+          "key": {
+            "type": "string",
+            "description": "A key or key combination to press (e.g., \"Enter\", \"Tab\", \"Control+c\"). One of \"text\" or \"key\" must be provided."
+          },
+          "ref": {
+            "type": "string",
+            "description": "Element reference to focus and type into. If omitted, types into the focused element."
+          },
+          "selector": {
+            "type": "string",
+            "description": "Playwright selector of element to focus and type into. Use if \"ref\" is not available. If omitted, types into the focused element."
+          },
+          "element": {
+            "type": "string",
+            "description": "Human-readable description of the element to type into (e.g., \"search box\", \"comment field\"). Required when \"ref\" or \"selector\" is specified."
+          }
+        },
+        "required": ["pageId"]
       }
     }
   }

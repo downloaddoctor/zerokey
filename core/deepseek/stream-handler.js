@@ -24,7 +24,7 @@ function streamHandler(res, stream, session, parser, retry) {
       console.log('[DeepSeek] Retrying request...')
       try {
         stream.destroy()
-      } catch (_) { }
+      } catch (_) {}
       retry()
         .then((newStream) => {
           streamHandler(res, newStream, session, parser, retry)

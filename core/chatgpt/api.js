@@ -13,7 +13,7 @@ const { CookieJar } = require('../../utils/cookie-jar')
  * CRITICAL: "Copy as fetch" omits User-Agent (browser adds it automatically).
  * We extract the real UA from the proof token config[4] and add it to every request.
  * Without User-Agent, Cloudflare returns 403.
-*/
+ */
 class ChatGPTAPI {
   constructor() {
     this.BASE_URL = 'https://chatgpt.com'
@@ -396,7 +396,12 @@ class ChatGPTAPI {
 
     let res
     try {
-      res = await nodeFetch(url, { ...options, redirect: 'follow', signal: controller.signal, agent: this._httpAgent })
+      res = await nodeFetch(url, {
+        ...options,
+        redirect: 'follow',
+        signal: controller.signal,
+        agent: this._httpAgent,
+      })
     } catch (err) {
       clearTimeout(timer)
       if (err.name === 'AbortError') {

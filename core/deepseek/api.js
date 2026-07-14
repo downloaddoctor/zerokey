@@ -178,7 +178,7 @@ class DeepSeekAPI {
    */
   async _pollFile(fileId, fileName) {
     const maxAttempts = 30
-    const delay = 1000
+    const delay = 5000
 
     for (let i = 0; i < maxAttempts; i++) {
       const res = await this._fetch(
@@ -302,7 +302,12 @@ class DeepSeekAPI {
 
     let res
     try {
-      res = await nodeFetch(url, { ...options, redirect: 'follow', signal: controller.signal, agent: this._httpAgent })
+      res = await nodeFetch(url, {
+        ...options,
+        redirect: 'follow',
+        signal: controller.signal,
+        agent: this._httpAgent,
+      })
     } catch (err) {
       clearTimeout(timer)
       if (err.name === 'AbortError') {

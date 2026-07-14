@@ -63,8 +63,8 @@ class SessionSelector {
           const resetsAtSoonest = new Date(soonest.ts).toLocaleTimeString()
           console.error(
             `\n🚫 All Claude users are at their usage limit.\n` +
-            `   Soonest reset: "${soonest.username}" at ${resetsAtSoonest} (~${minsLeft} min).\n` +
-            `   Please select a different provider.\n`,
+              `   Soonest reset: "${soonest.username}" at ${resetsAtSoonest} (~${minsLeft} min).\n` +
+              `   Please select a different provider.\n`,
           )
 
           return this.select()
@@ -126,7 +126,8 @@ class SessionSelector {
       const choices = [
         ...savedUsers.map((username) => {
           const user = providerUsers[username]
-          const limited = this.provider === 'claude' && user.waitUntil && user.waitUntil > Date.now()
+          const limited =
+            this.provider === 'claude' && user.waitUntil && user.waitUntil > Date.now()
           const suffix = limited ? ' (limit reached)' : ''
           return { name: `${username}${suffix}`, value: username }
         }),
@@ -165,8 +166,8 @@ class SessionSelector {
 
     console.log(
       '\nPaste the full fetch() call from browser DevTools:\n' +
-      '  DevTools → Network → Find a "conversation" request → Right-click → Copy → Copy as fetch\n' +
-      '  (This captures ALL headers + body with real browser fingerprint)\n',
+        '  DevTools → Network → Find a "conversation" request → Right-click → Copy → Copy as fetch\n' +
+        '  (This captures ALL headers + body with real browser fingerprint)\n',
     )
     const fetchStr = await this._stepFetchInput()
     if (!fetchStr) return null
@@ -211,7 +212,7 @@ class SessionSelector {
         message: 'Session mode:',
         default: false,
         choices: [
-          { name: 'Tools Mode  (BPF agent — recommended)', value: false },
+          { name: 'Tools Mode  (BPI agent — recommended)', value: false },
           { name: 'Raw Mode    (plain chat, no tools)', value: true },
         ],
       },

@@ -40,6 +40,7 @@ IDE Client (Bearer <ide-name>)
 Root endpoint — returns API metadata and available models.
 
 **Response `200 OK`:**
+
 ```json
 {
   "name": "ZeroKey API Server",
@@ -61,6 +62,7 @@ Root endpoint — returns API metadata and available models.
 Health check endpoint — returns server uptime and status.
 
 **Response `200 OK`:**
+
 ```json
 {
   "status": "healthy",
@@ -76,6 +78,7 @@ Health check endpoint — returns server uptime and status.
 Lists all available models in OpenAI-compatible format.
 
 **Response `200 OK`:**
+
 ```json
 {
   "object": "list",
@@ -115,6 +118,7 @@ Lists all available models in OpenAI-compatible format.
 Get details for a specific model by ID.
 
 **Path Parameters:**
+
 | Name  | Type   | Required | Description                   |
 | ----- | ------ | -------- | ----------------------------- |
 | model | string | yes      | Model ID (e.g. `DeepSeek V4`) |
@@ -122,6 +126,7 @@ Get details for a specific model by ID.
 **Response `200 OK`:** Single model object (same shape as items in the list).
 
 **Response `404 Not Found`:**
+
 ```json
 {
   "error": {
@@ -142,12 +147,14 @@ Get details for a specific model by ID.
 **This is the primary endpoint.** OpenAI-compatible chat completion endpoint that routes to the currently selected provider.
 
 **Headers:**
+
 | Name          | Required | Description                                                       |
 | ------------- | -------- | ----------------------------------------------------------------- |
 | Authorization | no       | `Bearer <ide-name>` — valid values: `vscode`, `terax`, `opencode` |
 | Content-Type  | yes      | `application/json`                                                |
 
 **Request Body:**
+
 | Field    | Type  | Required | Description                                                                                           |
 | -------- | ----- | -------- | ----------------------------------------------------------------------------------------------------- |
 | messages | array | yes      | Array of message objects `{role, content}`                                                            |
@@ -156,12 +163,14 @@ Get details for a specific model by ID.
 **Response:** `text/event-stream` (SSE) — OpenAI-compatible streaming chunks.
 
 **SSE Chunk Types:**
+
 - `data: {"choices":[{"delta":{"content":"text..."},"index":0}]}` — text delta
 - `data: {"choices":[{"delta":{"tool_calls":[...]},"index":0}]}` — tool call batch (on stream close)
 - `data: {"choices":[{"delta":{},"finish_reason":"stop","index":0}], "usage":{...}}` — stop signal
 - `data: [DONE]` — stream end
 
 **Error Response (JSON, non-streaming):**
+
 ```json
 {
   "error": {
@@ -176,6 +185,7 @@ Get details for a specific model by ID.
 ```
 
 **Error Categories (from `utils/errors.js`):**
+
 | Category         | Status | Description                                         |
 | ---------------- | ------ | --------------------------------------------------- |
 | overloaded       | 529    | Provider is overloaded, try again later             |
@@ -223,17 +233,18 @@ Manages HTTP requests to `chat.deepseek.com` using browser-identical headers and
 
 ### Internal API Endpoints Used
 
-| Endpoint                            | Method | Purpose                                  |
-| ----------------------------------- | ------ | ---------------------------------------- |
-| `/api/v0/chat_session/create`       | POST   | Create a new chat session                |
-| `/api/v0/chat/create_pow_challenge` | POST   | Get POW challenge for anti-bot           |
-| `/api/v0/chat/completion`           | POST   | Send chat completion (SSE stream)        |
-| `/api/v0/file/upload_file`          | POST   | Upload file (multipart, POW-protected)   |
-| `/api/v0/file/fetch_files`          | GET    | Poll file processing status              |
-| `/api/v0/chat_session/delete`       | POST   | Delete a single session server-side      |
-| `/api/v0/chat_session/delete_all`   | POST   | Delete all sessions server-side          |
+| Endpoint                            | Method | Purpose                                |
+| ----------------------------------- | ------ | -------------------------------------- |
+| `/api/v0/chat_session/create`       | POST   | Create a new chat session              |
+| `/api/v0/chat/create_pow_challenge` | POST   | Get POW challenge for anti-bot         |
+| `/api/v0/chat/completion`           | POST   | Send chat completion (SSE stream)      |
+| `/api/v0/file/upload_file`          | POST   | Upload file (multipart, POW-protected) |
+| `/api/v0/file/fetch_files`          | GET    | Poll file processing status            |
+| `/api/v0/chat_session/delete`       | POST   | Delete a single session server-side    |
+| `/api/v0/chat_session/delete_all`   | POST   | Delete all sessions server-side        |
 
 ### Dependencies
+
 - **`DeepSeekPOW`** (`core/deepseek/pow.js`): WASM-based proof-of-work solver
 - **`CookieJar`** (`utils/cookie-jar.js`): Cookie persistence across requests
 - **`readSSE`** (`utils/sse-reader.js`): SSE stream parser (1MB buffer cap, `[DONE]` detection)
@@ -267,16 +278,17 @@ Scans backwards from `messages[length-2]` down to index 0, stopping at the first
 without extractable file/image parts.
 
 **Supported content part types:**
+
 - `{ type: 'image_url', image_url: { url: 'data:<mime>;base64,...' } }`
 - `{ type: 'file', file: { file_data: 'data:<mime>;base64,...', filename: '...' } }`
 
 **Upload flow per file:**
+
 1. POW challenge for `/api/v0/file/upload_file`
 2. Solve challenge → `x-ds-pow-response` header
 3. POST multipart/form-data with `x-file-size`, `x-model-type`, `x-thinking-enabled`
 4. Poll `GET /api/v0/file/fetch_files?file_ids=<id>` until `status: "SUCCESS"` (max 30 attempts, 1s apart)
 5. Collected `file_id`s passed as `ref_file_ids` in chat completion body
-
 
 ### DeepSeek SSE Event Format
 
@@ -289,6 +301,7 @@ without extractable file/image parts.
 | Error               | `{"type":"error","content":"reason"}`                                      | Retry once, then send error      |
 
 ### Session Object Shape
+
 ```json
 {
   "name": "2026-07-06 10:30",
@@ -314,13 +327,14 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
 
 ### Internal API Endpoints Used
 
-| Endpoint                                                          | Method | Purpose                           |
-| ----------------------------------------------------------------- | ------ | --------------------------------- |
-| `/api/organizations/{orgId}/chat_conversations/{uuid}/completion` | POST   | Send chat completion (SSE stream) |
-| `/api/organizations/{orgId}/chat_conversations/{uuid}`            | DELETE | Delete a single conversation      |
-| `/api/account_profile`                                          | PUT    | Set custom instructions (hash-cached) |
+| Endpoint                                                          | Method | Purpose                               |
+| ----------------------------------------------------------------- | ------ | ------------------------------------- |
+| `/api/organizations/{orgId}/chat_conversations/{uuid}/completion` | POST   | Send chat completion (SSE stream)     |
+| `/api/organizations/{orgId}/chat_conversations/{uuid}`            | DELETE | Delete a single conversation          |
+| `/api/account_profile`                                            | PUT    | Set custom instructions (hash-cached) |
 
 ### Dependencies
+
 - **`CookieJar`** (`utils/cookie-jar.js`): Cookie persistence
 - **`readSSE`** (`utils/sse-reader.js`): SSE stream parser
 - **`setClaudeInstructions`** (`core/claude/set-instructions.js`): PUT account_profile for custom instructions (hash-cached)
@@ -341,28 +355,40 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
    c. "message_limit" → check utilization (5h + 7d windows), if >= 90% delegates to route callback
    d. "message_stop" / "error" → sendFinalChunk or onError
 4. On rate limit (>= 90%): route callback requests a conversation summary from Claude,
-   emits an ask BPF with provider-switch options, sets waitUntil on userData,
-   then calls process.exit(0). On hard exceeded errors, emits ask BPF in SSE and exits.
+   emits an ask BPI with provider-switch options, sets waitUntil on userData,
+   then calls process.exit(0). On hard exceeded errors, emits ask BPI in SSE and exits.
    Switching Claude users requires restarting the server.
 ```
 
 ### Claude SSE Event Format
 
-| Event Type          | Shape                                                                                       | Action                                       |
-| ------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| message_start       | `{"type":"message_start","message":{"uuid":"..."}}`                                         | Capture parent msg UUID                      |
-| content_block_delta | `{"type":"content_block_delta","delta":{"type":"text_delta","text":"..."}}`                 | Scan text delta    delegate to route callback if >= 90% |
+| Event Type          | Shape                                                                                       | Action                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| message_start       | `{"type":"message_start","message":{"uuid":"..."}}`                                         | Capture parent msg UUID                                 |
+| content_block_delta | `{"type":"content_block_delta","delta":{"type":"text_delta","text":"..."}}`                 | Scan text delta delegate to route callback if >= 90%    |
 | message_limit       | `{"type":"message_limit","message_limit":{"type":"...","windows":{"5h":{...},"7d":{...}}}}` | Check utilization, delegate to route callback if >= 90% |
 
-| message_stop        | `{"type":"message_stop"}`                                                                   | Stream complete, sendFinalChunk              |
-| error               | `{"type":"error","error":{"type":"overloaded_error","message":"..."}}`                      | Classify + send error                        |
+| message_stop | `{"type":"message_stop"}` | Stream complete, sendFinalChunk |
+| error | `{"type":"error","error":{"type":"overloaded_error","message":"..."}}` | Classify + send error |
 
 ### Request Body Shape (sent to Claude API)
+
 ```json
 {
   "prompt": "user message text",
   "timezone": "America/Los_Angeles",
-  "personalized_styles": [{ "type": "default", "key": "Default", "name": "Normal", "nameKey": "normal_style_name", "prompt": "Normal\n", "summary": "Default responses from Claude", "summaryKey": "normal_style_summary", "isDefault": true }],
+  "personalized_styles": [
+    {
+      "type": "default",
+      "key": "Default",
+      "name": "Normal",
+      "nameKey": "normal_style_name",
+      "prompt": "Normal\n",
+      "summary": "Default responses from Claude",
+      "summaryKey": "normal_style_summary",
+      "isDefault": true
+    }
+  ],
   "locale": "en-US",
   "model": "claude-sonnet-4-6",
   "tools": [],
@@ -385,6 +411,7 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
 ```
 
 ### Header Ordering (exact HAR order for Cloudflare fingerprint)
+
 1. `accept` → `accept-encoding` → `accept-language`
 2. `anthropic-anonymous-id` → `anthropic-client-platform` → `anthropic-client-sha` → `anthropic-client-version` → `anthropic-device-id`
 3. `content-type` → `cookie` → `origin` → `priority` → `referer`
@@ -393,6 +420,7 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
 6. `user-agent` → `x-activity-session-id`
 
 ### Session Object Shape
+
 ```json
 {
   "name": "2026-07-06 10:30",
@@ -409,11 +437,12 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
 ```
 
 ### Usage Limit Handling
+
 When either the 5h or 7d usage window reaches >= 90% utilization, the stream handler
 delegates to the route callback. The route requests a conversation summary from Claude,
-emits an ask BPF with provider-switch options, sets `waitUntil` on userData, then calls
+emits an ask BPI with provider-switch options, sets `waitUntil` on userData, then calls
 `process.exit(0)`. On hard exceeded errors (caught in the catch block), the route emits
-an ask BPF directly in the SSE stream and exits. `userData.waitUntil` / `waitReason` are
+an ask BPI directly in the SSE stream and exits. `userData.waitUntil` / `waitReason` are
 consulted at startup in `SessionSelector.select()` — blocked users show "(limit reached)"
 suffix and auto-switch to available users is offered.
 
@@ -425,15 +454,16 @@ Manages HTTP requests to `chatgpt.com/backend-api` using browser-identical heade
 
 ### Internal API Endpoints Used
 
-| Endpoint                                          | Method | Purpose                                 |
-| ------------------------------------------------- | ------ | --------------------------------------- |
-| `/backend-api/sentinel/chat-requirements/prepare` | POST   | Refresh sentinel proof-of-work token    |
-| `/backend-api/f/conversation/prepare`             | POST   | Prepare conversation, get conduit token |
-| `/backend-api/f/conversation`                     | POST   | Send chat completion (SSE stream)       |
-| `/backend-api/conversation/{id}`                 | PATCH  | Soft-delete conversation (is_visible=false) |
-| `/backend-api/user_system_messages`              | PATCH  | Set custom instructions (currently disabled) |
+| Endpoint                                          | Method | Purpose                                      |
+| ------------------------------------------------- | ------ | -------------------------------------------- |
+| `/backend-api/sentinel/chat-requirements/prepare` | POST   | Refresh sentinel proof-of-work token         |
+| `/backend-api/f/conversation/prepare`             | POST   | Prepare conversation, get conduit token      |
+| `/backend-api/f/conversation`                     | POST   | Send chat completion (SSE stream)            |
+| `/backend-api/conversation/{id}`                  | PATCH  | Soft-delete conversation (is_visible=false)  |
+| `/backend-api/user_system_messages`               | PATCH  | Set custom instructions (currently disabled) |
 
 ### Dependencies
+
 - **`ChatGPTProofOfWork`** (`core/chatgpt/pow.js`): Sentinel POW solver — decodes proof token config, generates sentinel proof, solves POW challenges
 - **`CookieJar`** (`utils/cookie-jar.js`): Cookie persistence across requests
 - **`readSSE`** (`utils/sse-reader.js`): SSE stream parser
@@ -489,20 +519,23 @@ Manages HTTP requests to `chatgpt.com/backend-api` using browser-identical heade
 ```
 
 ### Request Body Shape (sent to ChatGPT API)
+
 ```json
 {
   "action": "next",
-  "messages": [{
-    "id": "<uuid>",
-    "author": { "role": "user" },
-    "content": { "content_type": "text", "parts": ["prompt text"] },
-    "create_time": 1234567890.123,
-    "metadata": {
-      "selected_github_repos": [],
-      "selected_all_github_repos": false,
-      "serialization_metadata": { "custom_symbol_offsets": [] }
+  "messages": [
+    {
+      "id": "<uuid>",
+      "author": { "role": "user" },
+      "content": { "content_type": "text", "parts": ["prompt text"] },
+      "create_time": 1234567890.123,
+      "metadata": {
+        "selected_github_repos": [],
+        "selected_all_github_repos": false,
+        "serialization_metadata": { "custom_symbol_offsets": [] }
+      }
     }
-  }],
+  ],
   "conversation_id": "<uuid>",
   "parent_message_id": "client-created-root",
   "client_prepare_state": "sent",
@@ -511,6 +544,7 @@ Manages HTTP requests to `chatgpt.com/backend-api` using browser-identical heade
 ```
 
 ### Header Ordering (endpoint-specific HAR order)
+
 **All endpoints:** `accept` → `accept-encoding` → `accept-language` → `authorization` → `cache-control` → `content-type` → `cookie` → `oai-client-build-number` → `oai-client-version` → `oai-device-id` → `oai-language` → `oai-session-id` → `origin` → `pragma` → `priority` → `referer` → `sec-ch-ua` → `sec-ch-ua-mobile` → `sec-ch-ua-platform` → `sec-fetch-dest` → `sec-fetch-mode` → `sec-fetch-site` → `user-agent` → `x-openai-target-path` → `x-openai-target-route`
 
 **Conversation only (additional):** `oai-echo-logs` (after `oai-device-id`), `oai-telemetry` + sentinel tokens (after `oai-session-id`), `x-oai-turn-trace-id` (after `x-oai-is`)
@@ -520,6 +554,7 @@ Manages HTTP requests to `chatgpt.com/backend-api` using browser-identical heade
 **All authenticated:** `x-oai-is`
 
 ### Session Object Shape
+
 ```json
 {
   "name": "2026-07-06 10:30",
@@ -544,6 +579,7 @@ Manages HTTP requests to `chatgpt.com/backend-api` using browser-identical heade
 **Algorithm:** Sliding window — 5 requests per 15 seconds per label (`DeepSeek`, `Claude`, `ChatGPT`).
 
 **Function:** `acquireSlot(label, reset)`
+
 - If window expired or in future → reset count
 - If under limit → increment count, resolve immediately
 - If at limit → calculate wait time, return Promise that resolves after timeout
@@ -560,6 +596,7 @@ Two calling conventions: `toOpenAIError(errorObject, providerName)` classifies v
 ### SSE Reader (`utils/sse-reader.js`)
 
 **Function:** `readSSE(stream, {onData, onDone, onError})`
+
 - Reads Web ReadableStream via `getReader()` + `TextDecoder`
 - Splits on `\n`, handles partial lines
 - Parses `data:` lines as JSON
@@ -569,15 +606,18 @@ Two calling conventions: `toOpenAIError(errorObject, providerName)` classifies v
 ### Stream Helpers (`utils/stream-helpers.js`)
 
 **`createSendFinalChunk(res, session, parser, tokenUsage)`**
+
 - Once-guard: calls `parser.flush()`, emits stop with usage, writes `[DONE]`, ends response
 - Updates `session.lastUsed` in memory (no disk flush — done on shutdown via `selector.flush()`)
 
 **`createOnError(res, parser, provider)`**
+
 - Once-guard: classifies error, emits error chunk, ends response
 
 ### Cookie Jar (`utils/cookie-jar.js`)
 
 Manages cookie persistence across requests:
+
 - `seedFromHeader(cookieHeader)` → parses `Set-Cookie` / `Cookie` header
 - `captureFromFetchHeaders(headers)` → extracts `set-cookie` from response
 - `captureFromRawHeaders(rawHeaders)` → extracts from raw header array
@@ -586,6 +626,7 @@ Manages cookie persistence across requests:
 ### Tool Compiler (`lib/engine/index.js`)
 
 Per-request singleton keyed by `ide:provider`:
+
 - **`formatPrompt(messages, isNewSession)`** → dispatches last message to role-specific handler
 - **`buildPrompt(userPrompt, dynamicGrammar)`** → prepends system instructions + dynamic grammar
 - **`syncDynamicTools(reqTools, session)`** → hashes tool array, filters inbuilts, registers passthrough entries, caches grammar
@@ -595,6 +636,7 @@ Per-request singleton keyed by `ide:provider`:
 ### Instructions (`lib/engine/instructions.js`)
 
 Singleton that loads and caches system prompts:
+
 - **`instructions.md`** — base system prompt with tool runtime format (SYNTAX/RULES/EXTRA)
 - **`skills-extra.md`** — extra blocks (memory, save_workflow)
 - SHA-256 hashed for cache invalidation
@@ -659,14 +701,16 @@ Singleton that loads and caches system prompts:
 ```
 
 **Claude-specific fields:**
+
 - `waitUntil` — timestamp (ms epoch) when rate limit resets
 - `waitReason` — e.g. `"rate_limit_error"`
 
 **Session-specific fields:**
+
 - `disableTools` — boolean; when true, tools + instructions not prepended
 - `model` — provider-specific model string (e.g. "expert", "claude-sonnet-4-6", "auto")
 - `dynamicToolsHash` — SHA-256 hash of req.body.tools[] for MCP cache invalidation
-- `_dynamicGrammarCache` — cached BPF grammar string for current tool set
+- `_dynamicGrammarCache` — cached BPI grammar string for current tool set
 - `todos` — persisted todo items from `todos_add`/`todos_set` tool calls
 
 ---
@@ -678,6 +722,7 @@ Singleton that loads and caches system prompts:
 | PORT     | 8000    | Server port (env: `PORT`) |
 
 **Models:**
+
 | ID                | Owned By  | Context Length | Max Output |
 | ----------------- | --------- | -------------- | ---------- |
 | DeepSeek V4       | deepseek  | 1,000,000      | 384,000    |
@@ -691,6 +736,7 @@ Singleton that loads and caches system prompts:
 ## IDE Support
 
 The server detects the IDE from the `Authorization: Bearer <ide>` header. Supported values:
+
 - `vscode` (default if absent or unknown)
 - `terax`
 - `opencode`
@@ -702,6 +748,7 @@ The IDE value is used by the Tool Compiler to select the correct IDE-specific to
 ## Graceful Shutdown
 
 On `SIGINT` / `SIGTERM`:
+
 1. `selector.flush()` — persist current in-memory user state to users.json (atomic write via `.tmp` rename)
 2. `server.close()` — stop accepting new connections
 3. 5-second force-kill timeout
@@ -711,6 +758,7 @@ On `SIGINT` / `SIGTERM`:
 ## Storage
 
 All user data persists in users.json (atomic writes via `.tmp` rename). Sessions are updated in-memory during operation; `lastUsed` timestamp is set in-memory after each stream completes. Full disk flush happens only on:
+
 - Graceful shutdown (`selector.flush()`)
 - Claude rate-limit exit (flushes before process.exit(0))
 - Initial session creation (eager write)

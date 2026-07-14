@@ -2,7 +2,7 @@
 
 OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** — use your own browser sessions and your own credentials to connect your own accounts with VS Code, Terax, or OpenCode. Personal use only. Just paste a fetch() call from DevTools. ZeroKey does not provide shared accounts, API access, or commercial access to third-party services.
 
-> **Using with tools?** On the first message of a new session the LLM reads `AGENTS.md` for project context, runs `git status/diff`, and asks whether to continue before making any changes. Powered by **[skills-extra.md](lib/engine/skills-extra.md)**. If it stops using BPF tools, say: **"Use BPF only."** — or restart and create a fresh session.
+> **Using with tools?** On the first message of a new session the LLM reads `AGENTS.md` for project context, runs `git status/diff`, and asks whether to continue before making any changes. Powered by **[skills-extra.md](lib/engine/skills-extra.md)**. If it stops using BPI tools, say: **"Use BPI only."** — or restart and create a fresh session.
 
 ## Features
 
@@ -25,6 +25,7 @@ start.bat
 ```
 
 On startup, the interactive wizard guides you through:
+
 1. **Provider** — DeepSeek, Claude, or ChatGPT
 2. **User** — paste a `fetch()` call from browser DevTools (captures headers + browser fingerprint)
 3. **Session** — pick or create a chat session
@@ -55,6 +56,7 @@ complies with the Terms of Service of each connected provider.
 ### Getting Credentials
 
 ### DeepSeek
+
 1. Open DevTools → Network tab
 2. Visit `chat.deepseek.com` and start a conversation
 3. Find a request to `/api/v0/chat/completion`
@@ -62,6 +64,7 @@ complies with the Terms of Service of each connected provider.
 5. Paste into the startup wizard
 
 ### ChatGPT
+
 1. Open DevTools → Network tab
 2. Visit `chatgpt.com` and start a conversation
 3. Find a request to `/backend-api/f/conversation`
@@ -69,6 +72,7 @@ complies with the Terms of Service of each connected provider.
 5. Paste into the startup wizard
 
 ### Claude
+
 1. Open DevTools → Network tab
 2. Visit `claude.ai` and start a conversation
 3. Find a request to `/api/organizations/.../chat_conversations/.../completion`
@@ -81,11 +85,11 @@ complies with the Terms of Service of each connected provider.
 
 The `Authorization: Bearer <ide>` header maps the request to the correct IDE's tool definitions. Default is `vscode` if omitted.
 
-| IDE     | Bearer Token    | Purpose             |
-| ------- | --------------- | ------------------- |
+| IDE      | Bearer Token      | Purpose              |
+| -------- | ----------------- | -------------------- |
 | VS Code  | `Bearer vscode`   | Loads VS Code tools  |
-| Terax   | `Bearer terax`   | Loads Terax tools    |
-| OpenCode| `Bearer opencode` | Loads OpenCode tools |
+| Terax    | `Bearer terax`    | Loads Terax tools    |
+| OpenCode | `Bearer opencode` | Loads OpenCode tools |
 
 ### VS Code — LLM Gateway
 
