@@ -643,10 +643,6 @@ Singleton that loads and caches system prompts:
 - `model` — provider-specific model string (e.g. "expert", "claude-sonnet-4-6", "auto")
 - `dynamicToolsHash` — SHA-256 hash of req.body.tools[] for MCP cache invalidation
 - `_dynamicGrammarCache` — cached BPF grammar string for current tool set
-- `disableTools` — boolean; when true, tools + instructions not prepended
-- `model` — provider-specific model string (e.g. "expert", "claude-sonnet-4-6", "auto")
-- `dynamicToolsHash` — SHA-256 hash of req.body.tools[] for MCP cache invalidation
-- `_dynamicGrammarCache` — cached BPF grammar string for current tool set
 - `todos` — persisted todo items from `todos_add`/`todos_set` tool calls
 
 ---
@@ -662,9 +658,9 @@ Singleton that loads and caches system prompts:
 | ----------------- | --------- | -------------- | ---------- |
 | DeepSeek V4       | deepseek  | 1,000,000      | 384,000    |
 | GPT-4o            | openai    | 128,000        | 16,384     |
-| Claude Sonnet 4.6 | anthropic | 1,000,000      | 64,000     |
-| Claude Sonnet 5   | anthropic | 1,000,000      | 64,000     |
-| Claude Haiku 4.5  | anthropic | 1,000,000      | 64,000     |
+| Claude Sonnet 4.6 | anthropic | 1,000,000      | 128,000    |
+| Claude Sonnet 5   | anthropic | 1,000,000      | 128,000    |
+| Claude Haiku 4.5  | anthropic | 200,000        | 64,000     |
 
 ---
 

@@ -100,9 +100,9 @@ class SessionSelector {
 
   async _stepProviderSelection() {
     const choices = [
-      { name: '  DeepSeek', value: 'deepseek' },
-      { name: '  Claude', value: 'claude' },
-      { name: '  ChatGPT (not recommended)', value: 'chatgpt' },
+      { name: 'DeepSeek', value: 'deepseek' },
+      { name: 'Claude', value: 'claude' },
+      { name: 'ChatGPT', value: 'chatgpt' },
     ]
 
     const { provider } = await inquirer.prompt([
@@ -128,7 +128,7 @@ class SessionSelector {
           const user = providerUsers[username]
           const limited = this.provider === 'claude' && user.waitUntil && user.waitUntil > Date.now()
           const suffix = limited ? ' (limit reached)' : ''
-          return { name: `  ${username}${suffix}`, value: username }
+          return { name: `${username}${suffix}`, value: username }
         }),
         { name: '＋ Create new user...', value: '__new__' },
       ]
@@ -206,10 +206,14 @@ class SessionSelector {
 
     const questions = [
       {
-        type: 'confirm',
+        type: 'list',
         name: 'disableTools',
-        message: 'Disable tools (raw chat mode)?',
+        message: 'Session mode:',
         default: false,
+        choices: [
+          { name: 'Tools Mode  (BPF agent — recommended)', value: false },
+          { name: 'Raw Mode    (plain chat, no tools)', value: true },
+        ],
       },
     ]
 
@@ -269,15 +273,7 @@ class SessionSelector {
       createdAt: new Date().toISOString(),
       lastUsed: new Date().toISOString(),
       disableTools: disableTools || false,
-      model:
-        model ||
-        (this.provider === 'claude'
-          ? 'claude-sonnet-4-6'
-          : this.provider === 'chatgpt'
-            ? 'auto'
-            : this.provider === 'deepseek'
-              ? 'expert'
-              : undefined),
+      model,
     }
 
     this.user.sessions.push(newSession)

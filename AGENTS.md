@@ -9,9 +9,9 @@ pnpm-lock.yaml # pnpm lockfile
 start.bat # Windows batch launcher (node server.js)
 config/ # constants, model definitions, IDE model configs
  config/constants.js # CONFIG (PORT), MODELS registry
- config/models.json # ZeroKey endpoint configs for IDEs (ZK8000–ZK8003)
+ config/models.json # ZeroKey endpoint configs for IDEs (ZK8000–ZK8003: 200K input, 64K output, vision=true, toolCalling=true)
 core/ # session management, chat router, provider API clients
- core/session-selector.js # interactive CLI wizard: provider→user→session selection; users.json persistence; Claude "(limit reached)" suffix on user list; auto-switch to available users; deleteAllSessions with provider-side cleanup
+ core/session-selector.js # interactive CLI wizard: provider→user→session selection; users.json persistence; Claude "(limit reached)" suffix on user list; auto-switch to available users; deleteAllSessions with provider-side cleanup; session mode as list pick (Tools Mode / Raw Mode)
  core/chat-router.js # builds Express router for selected provider, logs active session (no runtime hot-swap)
  core/deepseek/ # DeepSeek API client, POW solver, SSE stream handler
   core/deepseek/api.js → DeepSeekAPI — chat session CRUD (create/delete/deleteAll), POW challenge, cookie management, HTTP keep-alive
@@ -227,7 +227,7 @@ POST /v1/chat/completions # OpenAI-compatible chat completions (SSE stream)
 
 #CONFIG
 CONFIG.PORT # default 8000, auto-increment if occupied (up to +100)
-config/models.json # IDE endpoint definitions: ZK8000–ZK8003 (ports 8000–8003), all maxInputTokens=1M, maxOutputTokens=128K, toolCalling=true
+config/models.json # IDE endpoint definitions: ZK8000–ZK8003 (ports 8000–8003), all maxInputTokens=200K, maxOutputTokens=64K, toolCalling=true, vision=true
 Rate limit: 5 requests per 15-second window (per provider label: 'DeepSeek', 'Claude', 'ChatGPT')
 Session timeout: 300s (5 min) for all provider HTTP requests
 Stream buffer cap: 1MB (SSE reader)

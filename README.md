@@ -2,16 +2,16 @@
 
 OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** — use your own browser sessions and your own credentials to connect your own accounts with VS Code, Terax, or OpenCode. Personal use only. Just paste a fetch() call from DevTools. ZeroKey does not provide shared accounts, API access, or commercial access to third-party services.
 
+> **Using with tools?** On the first message of a new session the LLM reads `AGENTS.md` for project context, runs `git status/diff`, and asks whether to continue before making any changes. Powered by **[skills-extra.md](lib/engine/skills-extra.md)**. If it stops using BPF tools, say: **"Use BPF only."** — or restart and create a fresh session.
+
 ## Features
 
 - **OpenAI-compatible** — drop-in replacement for `/v1/models` and `/v1/chat/completions`
 - **Three providers** — DeepSeek, Claude, and ChatGPT — switch at startup
-- **Real browser fingerprint** — POW solving, sentinel tokens, conversation prepare, Cloudflare-safe header ordering, cookie management
 - **Streaming** — SSE response streaming for all providers
 - **Multi-IDE** — per-request IDE selection via `Authorization: Bearer <vscode|terax|opencode>`
 - **Session persistence** — in-memory session tracking; flushed to disk on graceful shutdown
 - **Tool call support** — integrated ToolCompiler translates OpenAI-style function calling into provider-compatible prompt grammar
-- **Claude usage limit handling** — auto-summarizes conversation and gracefully exits when 5h/7d usage hits >= 90%, with option to switch providers on restart
 
 ## Quick Start
 
@@ -20,6 +20,8 @@ git clone https://github.com/downloaddoctor/zerokey.git
 cd zerokey
 npm install
 npm start
+# or on Windows
+start.bat
 ```
 
 On startup, the interactive wizard guides you through:
@@ -95,7 +97,7 @@ The `Authorization: Bearer <ide>` header maps the request to the correct IDE's t
 
 1. F1 → Manage Language Model → Add models → Custom Endpoint
 2. Select Chat Completions → API key: `vscode`
-3. Copy `config/models.json` contents into the auto-opened VS Code models file
+3. Copy **[models.json](config/models.json)** contents into the auto-opened VS Code models file
 
 ### Terax
 

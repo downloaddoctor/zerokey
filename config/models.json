@@ -8,41 +8,61 @@
         "id": "ZK8000",
         "name": "ZK - 8000",
         "url": "http://localhost:8000/v1",
-        "maxInputTokens": 1000000,
-        "maxOutputTokens": 128000,
-        "editTools": ["apply-patch", "code-rewrite", "find-replace", "multi-find-replace"],
+        "maxInputTokens": 200000,
+        "maxOutputTokens": 64000,
+        "editTools": [
+          "apply-patch",
+          "code-rewrite",
+          "find-replace",
+          "multi-find-replace"
+        ],
         "toolCalling": true,
-        "vision": false
+        "vision": true
       },
       {
         "id": "ZK8001",
         "name": "ZK - 8001",
         "url": "http://localhost:8001/v1",
-        "maxInputTokens": 1000000,
-        "maxOutputTokens": 128000,
-        "editTools": ["apply-patch", "code-rewrite", "find-replace", "multi-find-replace"],
+        "maxInputTokens": 200000,
+        "maxOutputTokens": 64000,
+        "editTools": [
+          "apply-patch",
+          "code-rewrite",
+          "find-replace",
+          "multi-find-replace"
+        ],
         "toolCalling": true,
-        "vision": false
+        "vision": true
       },
       {
         "id": "ZK8002",
         "name": "ZK - 8002",
         "url": "http://localhost:8002/v1",
-        "maxInputTokens": 1000000,
-        "maxOutputTokens": 128000,
-        "editTools": ["apply-patch", "code-rewrite", "find-replace", "multi-find-replace"],
+        "maxInputTokens": 200000,
+        "maxOutputTokens": 64000,
+        "editTools": [
+          "apply-patch",
+          "code-rewrite",
+          "find-replace",
+          "multi-find-replace"
+        ],
         "toolCalling": true,
-        "vision": false
+        "vision": true
       },
       {
         "id": "ZK8003",
         "name": "ZK - 8003",
         "url": "http://localhost:8003/v1",
-        "maxInputTokens": 1000000,
-        "maxOutputTokens": 128000,
-        "editTools": ["apply-patch", "code-rewrite", "find-replace", "multi-find-replace"],
+        "maxInputTokens": 200000,
+        "maxOutputTokens": 64000,
+        "editTools": [
+          "apply-patch",
+          "code-rewrite",
+          "find-replace",
+          "multi-find-replace"
+        ],
         "toolCalling": true,
-        "vision": false
+        "vision": true
       }
     ]
   }
