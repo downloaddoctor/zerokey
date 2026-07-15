@@ -1,5 +1,7 @@
 # ZeroKey
 
+<video src="https://github.com/user-attachments/assets/6c32c6f7-564f-4e63-bbc1-2e73b1566881" autoplay muted loop playsinline width="100%"></video>
+
 OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** — use your own browser sessions and your own credentials to connect your own accounts with VS Code (Chat), Terax, or OpenCode. Personal use only. Just paste a fetch() call from DevTools. ZeroKey does not provide shared accounts, API access, or commercial access to third-party services.
 
 > **Using with tools?** On the first message of a new session the LLM reads `AGENTS.md` for project context, runs `git status/diff`, and asks whether to continue before making any changes. Powered by **[skills-extra.md](lib/engine/skills-extra.md)**. If it stops using BPI tools, say: **"Use BPI only."** — or restart and create a fresh session.
@@ -16,8 +18,6 @@ OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** �
 - **Multi-IDE** — per-request IDE selection via `Authorization: Bearer <vscode|terax|opencode>`
 - **Session persistence** — in-memory session tracking; flushed to disk on graceful shutdown
 - **Tool call support** — integrated ToolCompiler translates OpenAI-style function calling into provider-compatible prompt grammar
-
-> **Setup guide coming soon** — a walkthrough video or GIF showing how to install, capture a session, and start using ZeroKey in VS Code will be added in a future update.
 
 ## Quick Start
 
