@@ -5,24 +5,25 @@ ZeroKey — OpenAI-compatible AI proxy for DeepSeek, Claude & ChatGPT
 
 #DIRECTORY
 server.js # entrypoint, Express app setup, session selection, shutdown handling
+zerokey.bat # one-click launcher: auto-clone, install deps, check updates, start server
+start.bat # Windows batch launcher (node server.js, dev use)
 pnpm-lock.yaml # pnpm lockfile
-start.bat # Windows batch launcher (node server.js)
 config/ # constants, model definitions, IDE model configs
  config/constants.js # CONFIG (PORT), MODELS registry
  config/models.json # ZeroKey endpoint configs for IDEs (ZK8000–ZK8003: 200K input, 64K output, vision=true, toolCalling=true)
 core/ # session management, chat router, provider API clients
- core/session-selector.js # interactive CLI wizard: provider→user→session selection; users.json persistence; Claude "(limit reached)" suffix on user list; auto-switch to available users; deleteAllSessions with provider-side cleanup; session mode as list pick (Tools Mode / Raw Mode)
+ core/session-selector.js # interactive CLI wizard: provider→user→session selection; users.json persistence; Claude "(limit reached)" suffix on user list; auto-switch to available users; deleteAllSessions with provider-side cleanup; session mode as list pick (Tools Mode / Raw Mode); _validateFetchHeaders checks required headers per provider; _validateLiveConnection verifies credentials with provider API; _openBrowser auto-opens provider login page for new users
  core/chat-router.js # builds Express router for selected provider, logs active session (no runtime hot-swap)
  core/deepseek/ # DeepSeek API client, POW solver, SSE stream handler
-  core/deepseek/api.js → DeepSeekAPI — chat session CRUD (create/delete/deleteAll), POW challenge, file upload (uploadFile + _pollFile), cookie management, HTTP keep-alive
+  core/deepseek/api.js → DeepSeekAPI — chat session CRUD (create/delete/deleteAll), POW challenge, file upload (uploadFile + _pollFile), cookie management, HTTP keep-alive, optional _log flag, getCurrentUser for live validation
   core/deepseek/pow.js → DeepSeekPOW — WASM SHA3 proof-of-work solver
   core/deepseek/stream-handler.js → streamHandler — SSE parser for DeepSeek response format
  core/claude/ # Claude API client, SSE stream handler, instructions setter
-  core/claude/api.js → ClaudeAPI — conversation completion, client-side UUID gen, org ID extraction, HAR-ordered headers, session delete, cookie management, HTTP keep-alive
+  core/claude/api.js → ClaudeAPI — conversation completion, client-side UUID gen, org ID extraction, HAR-ordered headers, session delete, cookie management, HTTP keep-alive, optional _log flag, getAccountProfile for live validation
   core/claude/stream-handler.js → claudeStreamHandler(res, stream, session, parser, cb) — SSE parser, message_limit detection, delegates >=90% usage to cb callback
   core/claude/set-instructions.js → setClaudeInstructions — PUT account_profile with system prompt
  core/chatgpt/ # ChatGPT API client, POW solver, SSE stream handler, instructions setter
-  core/chatgpt/api.js → ChatGPTAPI — conversation prepare, sentinel refresh, POW, conduit token flow, session deletion (PATCH), cookie management, UA extraction from proof token, HTTP keep-alive (PATCH), cookie management, UA extraction from proof token, HTTP keep-alive
+  core/chatgpt/api.js → ChatGPTAPI — conversation prepare, sentinel refresh, POW, conduit token flow, session deletion (PATCH), cookie management, UA extraction from proof token, HTTP keep-alive, optional _log flag, getMe for live validation
   core/chatgpt/pow.js → ChatGPTProofOfWork — SHA3-512 sentinel proof-of-work solver
   core/chatgpt/stream-handler.js → chatgptStreamHandler — SSE parser for ChatGPT response format
   core/chatgpt/set-instructions.js → setChatGPTInstructions — PATCH user_system_messages
@@ -59,8 +60,8 @@ nodemon.json # nodemon config
 start.bat # Windows batch launcher
 
 #ENTRYPOINTS
+zerokey.bat # one-click launcher: auto-clone, install deps, check updates, start server
 server.js # node server.js (npm start) interactive wizard → select provider (DeepSeek/Claude/ChatGPT) → select/create user → select/create session
-server.js # pnpm start (node server.js) interactive wizard → select provider (DeepSeek/Claude/ChatGPT) → select/create user → select/create session
  builds provider-specific router via ChatRouter.mount() → mounts at /v1/chat/completions
  auto-finds available port starting from CONFIG.PORT (default 8000)
  SIGINT/SIGTERM → selector.flush() → server.close()

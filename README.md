@@ -21,6 +21,21 @@ OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** �
 
 ## Quick Start
 
+### One-click launcher (Windows)
+
+**[⬇ Download zerokey.bat](https://raw.githubusercontent.com/downloaddoctor/zerokey/main/zerokey.bat)** — right-click → Save link as, or click to download.
+
+Place `zerokey.bat` in any folder and double-click. It will:
+
+- Clone the repo (first run only)
+- Install dependencies
+- Check for updates on every launch
+- Start the server
+
+> **Prerequisites:** [Git](https://git-scm.com/download/win) and [pnpm](https://pnpm.io/installation) must be installed.
+
+### Manual setup
+
 ```bash
 git clone https://github.com/downloaddoctor/zerokey.git
 cd zerokey
