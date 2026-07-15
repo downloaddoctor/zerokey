@@ -751,30 +751,11 @@
             Drop it into VS Code, Terax, or OpenCode in under two minutes. No plugins to pay for.
             You bring your own accounts.
           </p>
+          <p class="section-sub" style="margin-top: 8px; font-size: 13px;">
+            <strong>Note:</strong> Currently only VS Code Custom Endpoint is actively tested. Other IDE integrations are supported in code but not yet verified.
+          </p>
         </div>
         <div class="ide-grid">
-          <div class="ide-card">
-            <h3>
-              <img
-                src="logos/vscode.png"
-                alt=""
-                style="width: 22px; height: 22px; vertical-align: -4px; margin-right: 6px"
-              />VS Code — LLM Gateway
-            </h3>
-            <ol>
-              <li>
-                Install
-                <a
-                  href="https://marketplace.visualstudio.com/items?itemName=AndrewButson.github-copilot-llm-gateway"
-                  target="_blank"
-                  rel="noopener"
-                  >LLM Gateway extension</a
-                >
-              </li>
-              <li>F1 → Manage Language Model → Add models → LLM Gateway</li>
-              <li>URL: <code>http://localhost:8000/v1</code> → API key: <code>vscode</code></li>
-            </ol>
-          </div>
           <div class="ide-card">
             <h3>
               <img
@@ -790,6 +771,7 @@
                 Copy <code>config/models.json</code> contents into the auto-opened VS Code models
                 file
               </li>
+              <li>In VS Code chat, select <strong>ZK - 8000</strong> (or whichever port ZeroKey is running on) as the active model</li>
             </ol>
           </div>
           <div class="ide-card">
@@ -826,7 +808,7 @@
             <div class="step-num">1</div>
             <h3>Clone &amp; install</h3>
             <p>
-              Node.js is all you need. No build step, no config files — <code>npm install</code> and
+              Node.js is all you need. No build step, no config files — <code>pnpm install</code> and
               you're halfway there.
             </p>
           </div>
@@ -858,7 +840,7 @@
           <pre class="terminal-body"><span class="c"># 1. clone, install, start</span>
 <span class="prompt">&gt;</span><span class="k">git</span> clone https://github.com/downloaddoctor/zerokey.git
 <span class="prompt">&gt;</span><span class="k">cd</span> zerokey
-<span class="prompt">&gt;</span>npm install <span class="k">&amp;&amp;</span> npm start
+<span class="prompt">&gt;</span>pnpm install <span class="k">&amp;&amp;</span> pnpm start
 <span class="blank"></span>
 <span class="c"># 2. interactive wizard — pick provider, paste fetch, choose session</span>
 <span class="blank"></span>
