@@ -1,6 +1,6 @@
 const fs = require('fs')
 const path = require('path')
-const inquirer = require('inquirer')
+const prompts = require('prompts')
 const { ClaudeAPI } = require('./claude/api')
 const { DeepSeekAPI } = require('./deepseek/api')
 const { ChatGPTAPI } = require('./chatgpt/api')
@@ -16,6 +16,10 @@ class SessionSelector {
   }
 
   async select() {
+    console.log('\n  ─────────────────────────────')
+    console.log('    ZeroKey  —  Session Setup  ')
+    console.log('  ─────────────────────────────\n')
+
     this.provider = await this._stepProviderSelection()
     if (!this.provider) return null
 
@@ -28,7 +32,6 @@ class SessionSelector {
       const allProviders = this._loadAll()
       const providerUsers = allProviders[this.provider] || {}
 
-      // Auto-clear expired waitUntil for all users
       for (const u of Object.values(providerUsers)) {
         if (u.waitUntil && u.waitUntil <= Date.now()) {
           delete u.waitUntil
@@ -44,7 +47,6 @@ class SessionSelector {
           `\n⚠  User "${this.user.username}" is at limit. Resets at ${resetsAt} (~${mins} min).`,
         )
 
-        // Check if any other user is available
         const availableUsers = Object.values(providerUsers).filter(
           (u) => u.username !== this.user.username && (!u.waitUntil || u.waitUntil <= Date.now()),
         )
@@ -54,7 +56,6 @@ class SessionSelector {
           this.user = await this._stepUserLogin()
           if (!this.user) return null
         } else {
-          // All users at limit — find soonest reset
           const soonest = Object.values(providerUsers)
             .map((u) => ({ username: u.username, ts: u.waitUntil }))
             .filter((u) => u.ts)
@@ -63,10 +64,8 @@ class SessionSelector {
           const resetsAtSoonest = new Date(soonest.ts).toLocaleTimeString()
           console.error(
             `\n🚫 All Claude users are at their usage limit.\n` +
-              `   Soonest reset: "${soonest.username}" at ${resetsAtSoonest} (~${minsLeft} min).\n` +
-              `   Please select a different provider.\n`,
+              `   Soonest reset: "${soonest.username}" at ${resetsAtSoonest} (~${minsLeft} min).\n`,
           )
-
           return this.select()
         }
       }
@@ -75,7 +74,6 @@ class SessionSelector {
     this.session = await this._stepSessionSelection()
     if (!this.session) return null
 
-    // Write initial selection to disk immediately (only time we write eagerly)
     this._saveUser(this.provider, this.user.username, this.user)
 
     return {
@@ -88,10 +86,6 @@ class SessionSelector {
     }
   }
 
-  /**
-   * Flush current in-memory user state to disk.
-   * Called by server.js on shutdown and before auto-switch.
-   */
   flush() {
     if (this.provider && this.user) {
       this._saveUser(this.provider, this.user.username, this.user)
@@ -99,21 +93,19 @@ class SessionSelector {
   }
 
   async _stepProviderSelection() {
-    const choices = [
-      { name: 'DeepSeek', value: 'deepseek' },
-      { name: 'Claude', value: 'claude' },
-      { name: 'ChatGPT', value: 'chatgpt' },
-    ]
-
-    const { provider } = await inquirer.prompt([
+    const { provider } = await prompts(
       {
-        type: 'list',
+        type: 'select',
         name: 'provider',
-        message: 'Select AI Provider:',
-        choices,
-        pageSize: 10,
+        message: 'Select AI Provider',
+        choices: [
+          { title: 'DeepSeek', value: 'deepseek' },
+          { title: 'Claude', value: 'claude' },
+          { title: 'ChatGPT', value: 'chatgpt' },
+        ],
       },
-    ])
+      { onCancel: () => process.exit(0) },
+    )
     return provider
   }
 
@@ -123,26 +115,26 @@ class SessionSelector {
     const savedUsers = Object.keys(providerUsers)
 
     if (savedUsers.length > 0) {
-      const choices = [
-        ...savedUsers.map((username) => {
-          const user = providerUsers[username]
-          const limited =
-            this.provider === 'claude' && user.waitUntil && user.waitUntil > Date.now()
-          const suffix = limited ? ' (limit reached)' : ''
-          return { name: `${username}${suffix}`, value: username }
-        }),
-        { name: '＋ Create new user...', value: '__new__' },
-      ]
+      const choices = savedUsers.map((username) => {
+        const user = providerUsers[username]
+        const limited = this.provider === 'claude' && user.waitUntil && user.waitUntil > Date.now()
+        return {
+          title: limited ? `${username} (limit reached)` : username,
+          value: username,
+          description: limited ? 'at usage limit' : undefined,
+        }
+      })
+      choices.push({ title: '＋ Create new user...', value: '__new__' })
 
-      const { username } = await inquirer.prompt([
+      const { username } = await prompts(
         {
-          type: 'list',
+          type: 'select',
           name: 'username',
-          message: `Select User (${this.provider}):`,
+          message: `Select User (${this.provider})`,
           choices,
-          pageSize: 10,
         },
-      ])
+        { onCancel: () => process.exit(0) },
+      )
 
       if (username === '__new__') return this._promptNewUser()
       return providerUsers[username]
@@ -152,129 +144,163 @@ class SessionSelector {
   }
 
   async _promptNewUser() {
-    console.log('\n=== Create New User ===\n')
-    const { username } = await inquirer.prompt([
+    console.log('\n  ── Create New User ──\n')
+
+    const { username } = await prompts(
       {
-        type: 'input',
+        type: 'text',
         name: 'username',
-        message: 'Enter Username:',
+        message: 'Username',
         validate: (v) => v.trim().length > 0 || 'Username is required',
       },
-    ])
+      { onCancel: () => process.exit(0) },
+    )
 
     if (!username) return null
 
     console.log(
-      '\nPaste the full fetch() call from browser DevTools:\n' +
-        '  DevTools → Network → Find a "conversation" request → Right-click → Copy → Copy as fetch\n' +
-        '  (This captures ALL headers + body with real browser fingerprint)\n',
+      '\n  Paste the full fetch() call from browser DevTools:\n' +
+        '  DevTools → Network → Find a "conversation" request\n' +
+        '  Right-click → Copy → Copy as fetch\n',
     )
-    const fetchStr = await this._stepFetchInput()
-    if (!fetchStr) return null
 
-    const parsedFetch = this._parseFetchDirect(fetchStr)
+    while (true) {
+      console.log('  Notepad will open — paste your fetch() call, save (Ctrl+S), close Notepad.\n')
+      const fetchStr = await this._openEditor()
+      if (!fetchStr) {
+        console.log('  Cancelled.')
+        return null
+      }
 
-    const user = { username, parsedFetch, sessions: [] }
-    this._saveUser(this.provider, username, user)
-    return user
+      if (!fetchStr.includes('fetch(')) {
+        console.error('  ✖ Must be a valid fetch() call — try again.\n')
+        continue
+      }
+
+      let parsedFetch
+      try {
+        parsedFetch = this._parseFetchDirect(fetchStr)
+      } catch (e) {
+        console.error(`  ✖ Failed to parse fetch: ${e.message}\n`)
+        continue
+      }
+
+      const { action } = await prompts(
+        {
+          type: 'select',
+          name: 'action',
+          message: `Parsed OK — ${Object.keys(parsedFetch.headers).length} headers. What next?`,
+          choices: [
+            { title: '✔  Use this user', value: 'use' },
+            { title: '↩  Re-enter fetch', value: 'retry' },
+            { title: '✖  Cancel', value: 'cancel' },
+          ],
+        },
+        { onCancel: () => process.exit(0) },
+      )
+
+      if (!action || action === 'cancel') return null
+      if (action === 'retry') continue
+
+      const user = { username, parsedFetch, sessions: [] }
+      this._saveUser(this.provider, username, user)
+      return user
+    }
   }
 
   async _stepSessionSelection() {
     const sessions = this.user.sessions || []
 
     const choices = sessions.map((s, i) => ({
-      name: `${s.name}${s.model ? `  │  ${s.model}` : ''}  │  last: ${this._formatTime(s.lastUsed)}${s.disableTools ? '  [no tools]' : ''}`,
+      title: s.name,
+      description: `${s.model || ''}  last: ${this._formatTime(s.lastUsed)}${s.disableTools ? '  [no tools]' : ''}`,
       value: i,
     }))
 
-    choices.push({ name: '＋ Create new session...', value: -1 })
+    choices.push({ title: '＋ Create new session...', value: -1 })
     if (sessions.length > 0) {
-      choices.push({ name: '🗑 Delete all sessions...', value: -2 })
+      choices.push({ title: '🗑  Delete all sessions...', value: -2 })
     }
 
-    const result = await this._prompt(choices)
+    const { result } = await prompts(
+      {
+        type: 'select',
+        name: 'result',
+        message: 'Choose session',
+        choices,
+      },
+      { onCancel: () => process.exit(0) },
+    )
 
-    if (result === null) return null
+    if (result === undefined) return null
     if (result === -1) return this._createNewSession()
     if (result === -2) return this._deleteAllSessions()
-
     return this.user.sessions[result]
   }
 
   async _createNewSession() {
-    const name = await this._promptSessionName()
-    if (!name) return null
+    const defaultName = new Date().toISOString().slice(0, 19).replace('T', ' ')
 
     const questions = [
       {
-        type: 'list',
+        type: 'text',
+        name: 'name',
+        message: 'Session name',
+        initial: defaultName,
+      },
+      {
+        type: 'select',
         name: 'disableTools',
-        message: 'Session mode:',
-        default: false,
+        message: 'Session mode',
         choices: [
-          { name: 'Tools Mode  (BPI agent — recommended)', value: false },
-          { name: 'Raw Mode    (plain chat, no tools)', value: true },
+          { title: 'Tools Mode', description: 'BPI agent — recommended', value: false },
+          { title: 'Raw Mode', description: 'Plain chat, no tools)', value: true },
         ],
       },
     ]
 
     if (this.provider === 'claude') {
       questions.push({
-        type: 'list',
+        type: 'select',
         name: 'model',
-        message: 'Claude model:',
-        default: 'claude-sonnet-4-6',
+        message: 'Claude model',
         choices: [
-          {
-            name: 'SONNET 4.6 (recommended for tools)',
-            value: 'claude-sonnet-4-6',
-          },
-          {
-            name: 'SONNET 5',
-            value: 'claude-sonnet-5',
-          },
-          {
-            name: 'HAIKU 4.5',
-            value: 'claude-haiku-4-5-20251001',
-          },
+          { title: 'SONNET 4.6  (recommended for tools)', value: 'claude-sonnet-4-6' },
+          { title: 'SONNET 5', value: 'claude-sonnet-5' },
+          { title: 'HAIKU 4.5', value: 'claude-haiku-4-5-20251001' },
+        ],
+      })
+    } else if (this.provider === 'chatgpt') {
+      questions.push({
+        type: 'select',
+        name: 'model',
+        message: 'ChatGPT model',
+        choices: [{ title: 'auto (recommended)', value: 'auto' }],
+      })
+    } else if (this.provider === 'deepseek') {
+      questions.push({
+        type: 'select',
+        name: 'model',
+        message: 'DeepSeek model',
+        choices: [
+          { title: 'V4 - Expert  (recommended)', value: 'expert' },
+          { title: 'V4 - Instant', value: 'default' },
+          { title: 'V4 - Vision', value: 'vision' },
         ],
       })
     }
 
-    if (this.provider === 'chatgpt') {
-      questions.push({
-        type: 'list',
-        name: 'model',
-        message: 'ChatGPT model:',
-        default: 'auto',
-        choices: [{ name: 'auto (recommended)', value: 'auto' }],
-      })
-    }
-
-    if (this.provider === 'deepseek') {
-      questions.push({
-        type: 'list',
-        name: 'model',
-        message: 'DeepSeek model:',
-        default: 'expert',
-        choices: [
-          { name: 'V4 - Expert (recommended)', value: 'expert' },
-          { name: 'V4 - Instant', value: 'default' },
-          { name: 'V4 - Vision', value: 'vision' },
-        ],
-      })
-    }
-
-    const { disableTools, model } = await inquirer.prompt(questions)
+    const answers = await prompts(questions, { onCancel: () => process.exit(0) })
+    if (!answers.name) return null
 
     const newSession = {
-      name,
+      name: answers.name || defaultName,
       chatSessionId: null,
       parentMessageId: null,
       createdAt: new Date().toISOString(),
       lastUsed: new Date().toISOString(),
-      disableTools: disableTools || false,
-      model,
+      disableTools: answers.disableTools || false,
+      model: answers.model,
     }
 
     this.user.sessions.push(newSession)
@@ -283,14 +309,24 @@ class SessionSelector {
 
   async _deleteAllSessions() {
     const count = this.user.sessions.length
-    const confirmed = await this._confirmDeleteAll(count)
+    const { confirmed } = await prompts(
+      {
+        type: 'confirm',
+        name: 'confirmed',
+        message: `Delete all ${count} sessions?`,
+        initial: false,
+      },
+      { onCancel: () => process.exit(0) },
+    )
+
     if (!confirmed) return this._stepSessionSelection()
 
-    // Delete server-side sessions (one per session) — unified for all providers
+    process.stdout.write('  Deleting sessions...')
     await this._deleteProviderSessions()
+    process.stdout.write(' done.\n\n')
 
     this.user.sessions = []
-    return this._createNewSession()
+    return this._stepSessionSelection()
   }
 
   async _deleteProviderSessions() {
@@ -321,20 +357,34 @@ class SessionSelector {
     const api = cfg.factory()
     await cfg.init(api)
 
-    console.log(`\n[${cfg.label}] Deleting ${toDelete.length} session(s)...`)
     let deleted = 0
     for (const session of toDelete) {
       try {
         await api.deleteSession(session.chatSessionId)
         deleted++
-        console.log(`  [${deleted}/${toDelete.length}] Deleted ${session.chatSessionId}`)
+        process.stdout.write(`\r  Deleted ${deleted}/${toDelete.length}...`)
       } catch (e) {
-        console.warn(
-          `  [${deleted + 1}/${toDelete.length}] Failed ${session.chatSessionId}: ${e.message}`,
-        )
+        console.warn(`\n  ⚠ Failed ${session.chatSessionId}: ${e.message}`)
       }
     }
-    console.log(`[${cfg.label}] Sessions deleted: ${deleted}/${toDelete.length}\n`)
+  }
+
+  _openEditor() {
+    return new Promise((resolve) => {
+      const os = require('os')
+      const tmp = path.join(os.tmpdir(), `zerokey-fetch-${Date.now()}.js`)
+      fs.writeFileSync(tmp, '', 'utf8')
+      const editor = process.platform === 'win32' ? 'notepad' : process.env.EDITOR || 'nano'
+      const { spawnSync } = require('child_process')
+      spawnSync(editor, [tmp], { stdio: 'inherit' })
+      try {
+        const content = fs.readFileSync(tmp, 'utf8').trim()
+        fs.unlinkSync(tmp)
+        resolve(content.length > 0 ? content : null)
+      } catch {
+        resolve(null)
+      }
+    })
   }
 
   _parseFetchDirect(fetchStr) {
@@ -391,19 +441,6 @@ class SessionSelector {
     return { headers, body, url: urlMatch[2] }
   }
 
-  async _stepFetchInput() {
-    const { raw } = await inquirer.prompt([
-      {
-        type: 'editor',
-        name: 'raw',
-        message: 'Paste fetch() call:',
-        default: 'fetch("https://chatgpt.com/...", { ... })',
-        validate: (v) => v.includes('fetch(') || 'Must be a valid fetch() call',
-      },
-    ])
-    return raw?.trim() || null
-  }
-
   _loadAll() {
     try {
       if (fs.existsSync(this._usersFile)) {
@@ -440,37 +477,6 @@ class SessionSelector {
     } catch {
       return 'unknown'
     }
-  }
-
-  async _prompt(choices) {
-    try {
-      const { session } = await inquirer.prompt([
-        { type: 'list', name: 'session', message: 'Choose:', choices, pageSize: 10 },
-      ])
-      return session
-    } catch {
-      return null
-    }
-  }
-
-  async _promptSessionName() {
-    const defaultName = new Date().toISOString().slice(0, 19).replace('T', ' ')
-    const { name } = await inquirer.prompt([
-      { type: 'input', name: 'name', message: 'Session name:', default: defaultName },
-    ])
-    return name?.trim() || null
-  }
-
-  async _confirmDeleteAll(count) {
-    const { confirm } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'confirm',
-        message: `Delete all ${count} sessions? (Enter = Yes, Esc = Cancel)`,
-        default: true,
-      },
-    ])
-    return confirm
   }
 }
 
