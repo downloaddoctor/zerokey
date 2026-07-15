@@ -23,7 +23,7 @@ OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** �
 
 ### One-click launcher (Windows)
 
-**[⬇ Download zerokey.bat](https://raw.githubusercontent.com/downloaddoctor/zerokey/main/zerokey.bat)** — right-click → Save link as, or click to download.
+**[⬇ Download zerokey.bat](https://raw.githubusercontent.com/downloaddoctor/zerokey/main/zerokey.bat)** — right-click → Save link as → Save
 
 Place `zerokey.bat` in any folder and double-click. It will:
 

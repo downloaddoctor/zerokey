@@ -118,7 +118,7 @@ class SessionSelector {
           description: limited ? '⚠ at usage limit' : undefined,
         }
       })
-      choices.push({ title: '＋ Create new user...', value: '__new__' })
+      choices.push({ title: '+ Create new user...', value: '__new__' })
 
       const { username } = await prompts(
         {
@@ -325,7 +325,8 @@ class SessionSelector {
       process.stdout.write('  Validating browser session...')
       try {
         await this._validateLiveConnection(parsedFetch)
-        process.stdout.write('\r  ✓ Session verified        \n\n')
+        process.stdout.write('\r                                  ')
+        process.stdout.write('\r  √ Session verified\n\n')
       } catch (e) {
         process.stdout.write(' ✖\n\n')
         console.error(`  ✖ Live check failed: ${e.message}\n`)
@@ -344,23 +345,6 @@ class SessionSelector {
         if (!invalidAction || invalidAction === 'cancel') return null
         continue
       }
-
-      const { action } = await prompts(
-        {
-          type: 'select',
-          name: 'action',
-          message: `Parsed OK — ${Object.keys(parsedFetch.headers).length} headers. What next?`,
-          choices: [
-            { title: '✔  Use this user', value: 'use' },
-            { title: '↩  Re-enter fetch', value: 'retry' },
-            { title: '✖  Cancel', value: 'cancel' },
-          ],
-        },
-        { onCancel: () => process.exit(0) },
-      )
-
-      if (!action || action === 'cancel') return null
-      if (action === 'retry') continue
 
       const user = { username, parsedFetch, sessions: [] }
       this._saveUser(this.provider, username, user)
@@ -495,7 +479,7 @@ class SessionSelector {
 
     process.stdout.write('  Deleting sessions...')
     await this._deleteProviderSessions()
-    process.stdout.write('\r  ✓ Done.                  \n\n')
+    process.stdout.write('\r  √ Done.                  \n\n')
 
     this.user.sessions = []
     return this._stepSessionSelection()
