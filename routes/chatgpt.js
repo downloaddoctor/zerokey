@@ -21,7 +21,7 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
 
   router.post('/', async (req, res) => {
     const { messages = [] } = req.body
-    const disableTools = session.disableTools || false
+    const toolCalling = session.toolCalling ?? true
     const model = session.model || 'auto'
     if (!messages || messages.length === 0) {
       return res
@@ -43,7 +43,7 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
 
     let prompt = compiler.formatPrompt(messages, isNewSession)
 
-    if (isNewSession && !disableTools) {
+    if (isNewSession && toolCalling) {
       // await setChatGPTInstructions(chatgptApi, userData)
       prompt = instructions.getFull() + '\n\n' + dynamicGrammar + '\n\n' + prompt
     }
@@ -68,7 +68,7 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
       chatgptStreamHandler(res, stream, session, parser)
     } catch (error) {
       if (res.headersSent) return
-      console.error('[ChatGPT Route] Error:', error.message)
+      console.error(`[ChatGPT] Route error: ${error.message}`)
       const err = toOpenAIError(error, 'ChatGPT')
       return res.status(err.error.status || 500).json(err)
     }

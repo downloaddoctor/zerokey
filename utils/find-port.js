@@ -15,8 +15,7 @@ function checkPort(p) {
 async function findPort(start, range = 100) {
   for (let port = start; port <= start + range; port++) {
     if (await checkPort(port)) {
-      if (port !== start)
-        console.warn(`\n⚠ Port ${start} is already in use. Using port ${port} instead.`)
+      if (port !== start) console.warn(`[Server] ⚠ Port ${start} in use, switched to ${port}\n`)
       return port
     }
   }

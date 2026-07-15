@@ -66,7 +66,7 @@ async function buildChatRouter(parsedFetch, session) {
 
   router.post('/', async (req, res) => {
     const { messages = [] } = req.body
-    const disableTools = session.disableTools || false
+    const toolCalling = session.toolCalling ?? true
     const modelType = session.model || 'expert'
 
     if (!messages || messages.length === 0) {
@@ -86,13 +86,13 @@ async function buildChatRouter(parsedFetch, session) {
     let refFileIds = []
     const files = extractFiles(messages)
     if (files.length > 0) {
-      console.log(`[DeepSeek Route] Found ${files.length} file(s) to upload`)
+      console.log(`[DeepSeek] Uploading ${files.length} file(s)...`)
       for (const file of files) {
         try {
           const fileId = await deepseekApi.uploadFile(file.filename, file.data, file.size)
           refFileIds.push(fileId)
         } catch (err) {
-          console.error('[DeepSeek Route] File upload failed:', err.message)
+          console.error(`[DeepSeek] File upload failed: ${err.message}`)
           return res
             .status(400)
             .json(
@@ -116,7 +116,7 @@ async function buildChatRouter(parsedFetch, session) {
     let model_type = null
 
     if (isNewSession) {
-      prompt = disableTools ? prompt : compiler.buildPrompt(prompt, dynamicGrammar)
+      prompt = toolCalling ? compiler.buildPrompt(prompt, dynamicGrammar) : prompt
       model_type = modelType
     }
 
@@ -156,7 +156,7 @@ async function buildChatRouter(parsedFetch, session) {
       streamHandler(res, deepseekStream, session, parser, retry)
     } catch (error) {
       if (res.headersSent) return
-      console.error('[DeepSeek Route] Error:', error.message)
+      console.error(`[DeepSeek] Route error: ${error.message}`)
       const err = toOpenAIError(error, 'DeepSeek')
       return res.status(err.error.status || 500).json(err)
     }
@@ -167,19 +167,17 @@ async function buildChatRouter(parsedFetch, session) {
 
 async function initDeepSeekAPI(session, headers) {
   await deepseekApi.initialize(headers)
-  console.log('[API] initialized successfully')
+  console.log('[DeepSeek] Initialized from capture JSON')
 
   if (!session) throw new Error('No session provided')
 
   if (session.chatSessionId) {
-    return console.log(
-      `[CHAT] Using session: "${session.name}" (chatSessionId: ${session.chatSessionId})`,
-    )
+    return console.log(`[DeepSeek] Session: "${session.name}" (${session.chatSessionId})`)
   }
 
   const chatSessionId = await deepseekApi.createChatSession()
   session.chatSessionId = chatSessionId
-  console.log(`[CHAT] Session "${session.name}" created with chatSessionId: ${chatSessionId}`)
+  console.log(`[DeepSeek] Session created: "${session.name}" (${chatSessionId})`)
 }
 
 module.exports = { buildChatRouter, initDeepSeekAPI }

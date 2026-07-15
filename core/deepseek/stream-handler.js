@@ -19,9 +19,9 @@ function streamHandler(res, stream, session, parser, retry) {
 
   const doRetry = (reason) => {
     cancelled = true
-    console.error('[DeepSeek] Error event:', reason)
+    console.error(`[DeepSeek] Stream error: ${reason}`)
     if (retry) {
-      console.log('[DeepSeek] Retrying request...')
+      console.log('[DeepSeek] Retrying...')
       try {
         stream.destroy()
       } catch (_) {}
@@ -30,7 +30,7 @@ function streamHandler(res, stream, session, parser, retry) {
           streamHandler(res, newStream, session, parser, retry)
         })
         .catch((err) => {
-          console.error('[DeepSeek] Retry failed:', err.message)
+          console.error(`[DeepSeek] Retry failed: ${err.message}`)
           sendFinalChunk()
         })
       return
@@ -56,10 +56,7 @@ function streamHandler(res, stream, session, parser, retry) {
         tokenUsage.prompt_tokens = 0
         tokenUsage.completion_tokens = usageEntry.v
         tokenUsage.total_tokens = tokenUsage.completion_tokens + tokenUsage.prompt_tokens
-        console.log('[DeepSeek] Token usage:', {
-          accumulated: usageEntry.v,
-          status: statusEntry?.v ?? null,
-        })
+        console.log(`[DeepSeek] Tokens: ${usageEntry.v} (status: ${statusEntry?.v ?? '-'})`)
       }
     } else {
       const response = data.v?.response

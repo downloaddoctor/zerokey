@@ -25,7 +25,7 @@ function createOnError(res, parser, provider) {
   let finished = false
   return (err) => {
     const classified = classifyError(err, provider)
-    console.error(`[${provider} Stream] ${classified.category}: ${err.message}`)
+    console.error(`[${provider}] Stream error (${classified.category}): ${err.message}`)
     if (finished) return
     finished = true
     parser.emit({}, 'error', {})

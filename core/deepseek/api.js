@@ -50,7 +50,7 @@ class DeepSeekAPI {
       const body = resp.data
       const id = body.data.biz_data.id || body.data.biz_data.chat_session.id
 
-      console.log('[DeepSeekAPI] NEW SESSION:', id)
+      console.log(`[DeepSeek] New session: ${id}`)
       return id
     } catch (error) {
       throw new Error('Failed to create chat session: ' + error.message)
@@ -164,7 +164,7 @@ class DeepSeekAPI {
     }
 
     const fileId = body.data.biz_data.id
-    console.log('[DeepSeekAPI] File uploaded:', fileId, `(${fileName}, ${fileSize} bytes)`)
+    console.log(`[DeepSeek] File uploaded: ${fileName} (${fileSize} bytes) → ${fileId}`)
 
     // 4. Poll until processing completes
     return this._pollFile(fileId, fileName)
@@ -195,7 +195,7 @@ class DeepSeekAPI {
       if (!file) throw new Error(`File ${fileId} not found in fetch_files response`)
 
       if (file.status === 'SUCCESS') {
-        console.log('[DeepSeekAPI] File ready:', fileId, `(tokens: ${file.token_usage})`)
+        console.log(`[DeepSeek] File ready: ${fileId} (tokens: ${file.token_usage})`)
         return fileId
       }
 
@@ -233,7 +233,7 @@ class DeepSeekAPI {
    * Delete all chat sessions server-side (single bulk endpoint).
    */
   async deleteAllSessions() {
-    console.log('[DeepSeekAPI] Deleting all sessions...')
+    console.log('[DeepSeek] Deleting all sessions...')
     const res = await this._fetch(
       `${DeepSeekAPI.BASE_URL}/chat_session/delete_all`,
       {
@@ -249,7 +249,7 @@ class DeepSeekAPI {
       throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
     }
 
-    console.log('[DeepSeekAPI] All sessions deleted successfully')
+    console.log('[DeepSeek] All sessions deleted')
   }
 
   /**

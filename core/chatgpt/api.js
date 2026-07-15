@@ -50,10 +50,10 @@ class ChatGPTAPI {
     const realUA = this._config[4]
     if (realUA && typeof realUA === 'string' && realUA.length > 20) {
       this._headers['user-agent'] = realUA
-      console.log('[ChatGPT] Extracted user-agent from proof token:', realUA.slice(0, 60) + '...')
+      console.log(`[ChatGPT] User-agent: ${realUA.slice(0, 60)}...`)
     }
 
-    console.log('[ChatGPT] Loaded from saved JSON')
+    console.log('[ChatGPT] Initialized from capture JSON')
 
     await this._refreshSentinel()
     this._ready = true

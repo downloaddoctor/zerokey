@@ -46,9 +46,17 @@ app.use('/', healthRouter)
     process.exit(0)
   }
 
-  console.log(
-    `\n[Server] ${preSelected.user} - ${preSelected.provider} - ${preSelected.sessionName}\n`,
-  )
+  const _s = preSelected.session
+  const _tags = [
+    preSelected.user,
+    preSelected.provider,
+    preSelected.sessionName,
+    _s.model || 'default',
+    _s.toolCalling ? 'tools' : 'no tools',
+    _s.vision ? 'vision' : 'no vision',
+  ].join(' · ')
+
+  console.log(`\n[Server] ${_tags}`)
 
   const port = await findPort(CONFIG.PORT)
 
@@ -69,7 +77,7 @@ app.use('/', healthRouter)
   })
 
   const server = app.listen(port, () => {
-    console.log(`\n✅ ZeroKey running on http://localhost:${port}`)
+    console.log(`\n√ ZeroKey running on http://localhost:${port}`)
     console.log('Endpoints:')
     console.log(`  GET  http://localhost:${port}/`)
     console.log(`  GET  http://localhost:${port}/health`)

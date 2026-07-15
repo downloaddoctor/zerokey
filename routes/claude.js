@@ -20,7 +20,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
 
   router.post('/', async (req, res) => {
     const { messages = [] } = req.body
-    const disableTools = session.disableTools
+    const toolCalling = session.toolCalling ?? true
     const model = session.model
 
     if (!messages || messages.length === 0) {
@@ -44,7 +44,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
     const prompt = compiler.formatPrompt(messages, isNewSession)
 
     if (isNewSession) {
-      await setClaudeInstructions(claudeApi, userData, dynamicGrammar, disableTools)
+      await setClaudeInstructions(claudeApi, userData, dynamicGrammar, toolCalling)
     }
 
     await acquireSlot('Claude')
@@ -102,7 +102,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
               },
             )
           } catch (summaryErr) {
-            console.error('[Claude] Summary call failed:', summaryErr.message)
+            console.error(`[Claude] Summary failed: ${summaryErr.message}`)
           }
 
           setImmediate(() => process.exit(0))
@@ -111,7 +111,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
       })
     } catch (error) {
       if (res.headersSent) return
-      console.error('[Claude Route] Error:', error.message)
+      console.error(`[Claude] Route error: ${error.message}`)
 
       try {
         const raw = JSON.parse(error.message)

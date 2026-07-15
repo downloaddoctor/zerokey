@@ -8,9 +8,7 @@ async function buildRouter(selected) {
   const build = BUILDERS[selected.provider]
   if (!build) throw new Error(`Unknown provider: ${selected.provider}`)
   const router = await build(selected.parsedFetch, selected.session, selected.userData)
-  console.log(
-    `\n[ChatRouter] ✅ Active: ${selected.user} - ${selected.provider} - ${selected.sessionName}\n`,
-  )
+  // console.log(`[ChatRouter] Active: ${selected.user} - ${selected.provider} - ${selected.sessionName}`)
   return router
 }
 

@@ -43,7 +43,7 @@ async function readSSE(stream, { onData, onDone, onError }) {
   const processChunk = (chunk) => {
     buffer += chunk
     if (buffer.length > MAX_BUFFER_SIZE) {
-      console.warn('[SSE] Buffer exceeded 1MB cap — dropping malformed line')
+      console.warn('[SSE] ⚠ Buffer exceeded 1MB — dropping line')
       buffer = ''
       return
     }

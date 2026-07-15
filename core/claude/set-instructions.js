@@ -1,12 +1,12 @@
 const instructions = require('../../lib/engine/instructions')
 
-async function setClaudeInstructions(claudeApi, userData, dynamicGrammar, disableTools = false) {
+async function setClaudeInstructions(claudeApi, userData, dynamicGrammar, toolCalling = true) {
   if (!userData) return false
 
   const currentHash = instructions.getHash()
   if (userData.instructionsHash === currentHash) return false
 
-  const content = disableTools ? '' : instructions.getFull() + (dynamicGrammar || '')
+  const content = toolCalling ? instructions.getFull() + (dynamicGrammar || '') : ''
   const payload = JSON.stringify({ conversation_preferences: content })
   const headers = claudeApi._buildHeaders(
     { accept: '*/*', origin: 'https://claude.ai' },

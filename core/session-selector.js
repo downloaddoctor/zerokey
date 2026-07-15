@@ -16,10 +16,6 @@ class SessionSelector {
   }
 
   async select() {
-    console.log('\n  ─────────────────────────────')
-    console.log('    ZeroKey  —  Session Setup  ')
-    console.log('  ─────────────────────────────\n')
-
     this.provider = await this._stepProviderSelection()
     if (!this.provider) return null
 
@@ -39,23 +35,18 @@ class SessionSelector {
         }
       }
 
-      const waitUntil = this.user.waitUntil || null
-      if (waitUntil && waitUntil > Date.now()) {
-        const mins = Math.ceil((waitUntil - Date.now()) / 60000)
-        const resetsAt = new Date(waitUntil).toLocaleTimeString()
+      while (this.user.waitUntil && this.user.waitUntil > Date.now()) {
+        const mins = Math.ceil((this.user.waitUntil - Date.now()) / 60000)
+        const resetsAt = new Date(this.user.waitUntil).toLocaleTimeString()
         console.warn(
-          `\n⚠  User "${this.user.username}" is at limit. Resets at ${resetsAt} (~${mins} min).`,
+          `\n⚠  User "${this.user.username}" is at limit. Resets at ${resetsAt} (~${mins} min).\n`,
         )
 
         const availableUsers = Object.values(providerUsers).filter(
           (u) => u.username !== this.user.username && (!u.waitUntil || u.waitUntil <= Date.now()),
         )
 
-        if (availableUsers.length > 0) {
-          console.log('  Switching to another user...\n')
-          this.user = await this._stepUserLogin()
-          if (!this.user) return null
-        } else {
+        if (availableUsers.length === 0) {
           const soonest = Object.values(providerUsers)
             .map((u) => ({ username: u.username, ts: u.waitUntil }))
             .filter((u) => u.ts)
@@ -63,11 +54,14 @@ class SessionSelector {
           const minsLeft = Math.ceil((soonest.ts - Date.now()) / 60000)
           const resetsAtSoonest = new Date(soonest.ts).toLocaleTimeString()
           console.error(
-            `\n🚫 All Claude users are at their usage limit.\n` +
-              `   Soonest reset: "${soonest.username}" at ${resetsAtSoonest} (~${minsLeft} min).\n`,
+            `\n⚠ All Claude users are at their usage limit.\n` +
+              `    Soonest reset: "${soonest.username}" at ${resetsAtSoonest} (~${minsLeft} min).\n`,
           )
           return this.select()
         }
+
+        this.user = await this._stepUserLogin()
+        if (!this.user) return null
       }
     }
 
@@ -119,9 +113,9 @@ class SessionSelector {
         const user = providerUsers[username]
         const limited = this.provider === 'claude' && user.waitUntil && user.waitUntil > Date.now()
         return {
-          title: limited ? `${username} (limit reached)` : username,
+          title: username,
           value: username,
-          description: limited ? 'at usage limit' : undefined,
+          description: limited ? '⚠ at usage limit' : undefined,
         }
       })
       choices.push({ title: '＋ Create new user...', value: '__new__' })
@@ -211,11 +205,17 @@ class SessionSelector {
   async _stepSessionSelection() {
     const sessions = this.user.sessions || []
 
-    const choices = sessions.map((s, i) => ({
-      title: s.name,
-      description: `${s.model || ''}  last: ${this._formatTime(s.lastUsed)}${s.disableTools ? '  [no tools]' : ''}`,
-      value: i,
-    }))
+    const choices = sessions.map((s, i) => {
+      const tags = [
+        s.model || '',
+        s.toolCalling ? 'tools' : 'no tools',
+        s.vision ? 'vision' : 'no vision',
+        `last: ${this._formatTime(s.lastUsed)}`,
+      ]
+        .filter(Boolean)
+        .join('  ·  ')
+      return { title: s.name, description: tags, value: i }
+    })
 
     choices.push({ title: '＋ Create new session...', value: -1 })
     if (sessions.length > 0) {
@@ -250,11 +250,11 @@ class SessionSelector {
       },
       {
         type: 'select',
-        name: 'disableTools',
+        name: 'toolCalling',
         message: 'Session mode',
         choices: [
-          { title: 'Tools Mode', description: 'BPI agent — recommended', value: false },
-          { title: 'Raw Mode', description: 'Plain chat, no tools)', value: true },
+          { title: 'Tools Mode', description: 'BPI agent — recommended', value: true },
+          { title: 'Raw Mode', description: 'Plain chat, no tools', value: false },
         ],
       },
     ]
@@ -265,7 +265,7 @@ class SessionSelector {
         name: 'model',
         message: 'Claude model',
         choices: [
-          { title: 'SONNET 4.6  (recommended for tools)', value: 'claude-sonnet-4-6' },
+          { title: 'SONNET 4.6', description: 'recommended for tools', value: 'claude-sonnet-4-6' },
           { title: 'SONNET 5', value: 'claude-sonnet-5' },
           { title: 'HAIKU 4.5', value: 'claude-haiku-4-5-20251001' },
         ],
@@ -275,7 +275,7 @@ class SessionSelector {
         type: 'select',
         name: 'model',
         message: 'ChatGPT model',
-        choices: [{ title: 'auto (recommended)', value: 'auto' }],
+        choices: [{ title: 'auto', description: 'recommended', value: 'auto' }],
       })
     } else if (this.provider === 'deepseek') {
       questions.push({
@@ -283,7 +283,7 @@ class SessionSelector {
         name: 'model',
         message: 'DeepSeek model',
         choices: [
-          { title: 'V4 - Expert  (recommended)', value: 'expert' },
+          { title: 'V4 - Expert', description: 'recommended', value: 'expert' },
           { title: 'V4 - Instant', value: 'default' },
           { title: 'V4 - Vision', value: 'vision' },
         ],
@@ -293,13 +293,19 @@ class SessionSelector {
     const answers = await prompts(questions, { onCancel: () => process.exit(0) })
     if (!answers.name) return null
 
+    const vision =
+      this.provider === 'claude' ||
+      this.provider === 'chatgpt' ||
+      (this.provider === 'deepseek' && answers.model !== 'expert')
+
     const newSession = {
       name: answers.name || defaultName,
       chatSessionId: null,
       parentMessageId: null,
       createdAt: new Date().toISOString(),
       lastUsed: new Date().toISOString(),
-      disableTools: answers.disableTools || false,
+      toolCalling: answers.toolCalling ?? true,
+      vision,
       model: answers.model,
     }
 
