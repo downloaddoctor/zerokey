@@ -28,7 +28,8 @@ function generateUUID() {
 class ClaudeAPI {
   static BASE_URL = 'https://claude.ai/api'
 
-  constructor() {
+  constructor(options = {}) {
+    this._log = options.log !== false
     this._headers = null
     this._orgId = null
     this._cookies = new CookieJar()
@@ -51,8 +52,8 @@ class ClaudeAPI {
     const initialCookie = this._headers.cookie || this._headers.Cookie || ''
     if (initialCookie) {
       const count = this._cookies.seedFromHeader(initialCookie)
-      console.log(`[Claude] Seeded cookie jar with ${count} initial cookies`)
-    } else {
+      if (this._log) console.log(`[Claude] Seeded cookie jar with ${count} initial cookies`)
+    } else if (this._log) {
       console.warn('[Claude] WARNING: No cookies in headers! Cloudflare will block.')
     }
 
@@ -61,12 +62,12 @@ class ClaudeAPI {
     const orgMatch = url.match(/\/organizations\/([a-f0-9-]+)/i)
     if (orgMatch) {
       this._orgId = orgMatch[1]
-      console.log(`[Claude] Extracted org ID from URL: ${this._orgId}`)
-    } else {
+      if (this._log) console.log(`[Claude] Extracted org ID from URL: ${this._orgId}`)
+    } else if (this._log) {
       console.warn('[Claude] WARNING: No org ID found in URL. Will need discovery.')
     }
 
-    console.log('[Claude] Initialized from capture JSON')
+    if (this._log) console.log('[Claude] Initialized from capture JSON')
   }
 
   /**
@@ -140,12 +141,13 @@ class ClaudeAPI {
 
     const path = `/organizations/${this._orgId}/chat_conversations/${chatSessionId}/completion`
 
-    console.log('[PROMPT] REQ', {
-      chatSessionId,
-      parentMessageId,
-      prompt,
-      promptLength: prompt.length,
-    })
+    if (this._log)
+      console.log('[PROMPT] REQ', {
+        chatSessionId,
+        parentMessageId,
+        prompt,
+        promptLength: prompt.length,
+      })
 
     const res = await this._fetch(
       `${ClaudeAPI.BASE_URL}${path}`,
@@ -189,6 +191,31 @@ class ClaudeAPI {
       const text = await res.text().catch(() => '')
       throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
     }
+  }
+
+  /**
+   * Fetch account profile from /api/account_profile.
+   * Used to verify session credentials are valid.
+   * Returns account profile data on success, throws on failure.
+   */
+  async getAccountProfile() {
+    const headers = this._buildHeaders()
+    delete headers['accept-encoding']
+
+    const res = await this._fetch(
+      `${ClaudeAPI.BASE_URL}/account_profile`,
+      {
+        method: 'GET',
+        headers,
+      },
+      true,
+    )
+
+    if (res.status !== 200 || !res.data) {
+      throw new Error(`Failed to get account profile: HTTP ${res.status}`)
+    }
+
+    return res.data
   }
 
   _captureResponseHeaders(res) {

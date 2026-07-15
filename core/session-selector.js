@@ -137,6 +137,88 @@ class SessionSelector {
     return this._promptNewUser()
   }
 
+  _validateFetchHeaders(parsedFetch) {
+    const h = Object.fromEntries(
+      Object.entries(parsedFetch.headers).map(([k, v]) => [k.toLowerCase(), v]),
+    )
+    const b = parsedFetch.body || {}
+    const url = parsedFetch.url || ''
+    const errors = []
+
+    if (this.provider === 'deepseek') {
+      if (!h['cookie']) errors.push('cookie — required for session auth')
+      if (!h['authorization']) errors.push('authorization — required (Bearer token)')
+      if (!url.endsWith('/api/v0/chat/completion'))
+        errors.push('URL must be /api/v0/chat/completion — wrong request copied')
+    }
+
+    if (this.provider === 'claude') {
+      if (!h['cookie']) errors.push('cookie — required for session auth')
+      if (!h['anthropic-device-id'])
+        errors.push('anthropic-device-id — missing; copy from the /completion request on claude.ai')
+      if (!/\/organizations\/[a-f0-9-]{36}/i.test(url))
+        errors.push(
+          'URL must contain /organizations/<uuid>/chat_conversations — wrong request copied',
+        )
+      if (!url.endsWith('/completion'))
+        errors.push(
+          'URL must end in /completion — copy the streaming completion request, not a GET',
+        )
+    }
+
+    if (this.provider === 'chatgpt') {
+      if (!h['cookie']) errors.push('cookie — required for session auth')
+      if (!h['authorization']) errors.push('authorization — required (Bearer token)')
+      if (!h['openai-sentinel-proof-token'])
+        errors.push(
+          'openai-sentinel-proof-token — missing; copy /backend-api/f/conversation, not a /sentinel/ request',
+        )
+      if (!h['oai-language'])
+        errors.push('oai-language — missing; copy from /backend-api/f/conversation request')
+      if (!h['oai-device-id'])
+        errors.push('oai-device-id — missing; copy from /backend-api/f/conversation request')
+      if (!url.endsWith('/backend-api/f/conversation'))
+        errors.push('URL must be /backend-api/f/conversation — wrong request copied')
+      if (!b['client_contextual_info'])
+        errors.push(
+          'body.client_contextual_info — missing; copy /backend-api/f/conversation, not /prepare or /sentinel/',
+        )
+    }
+
+    return errors
+  }
+
+  async _validateLiveConnection(parsedFetch) {
+    const cfg = this._getProvider(parsedFetch, this.provider, { log: false })
+    const api = cfg.factory()
+    await cfg.init(api)
+
+    if (this.provider === 'deepseek') {
+      await api.getCurrentUser()
+      return
+    }
+
+    if (this.provider === 'claude') {
+      await api.getAccountProfile()
+      return
+    }
+
+    if (this.provider === 'chatgpt') {
+      await api.getMe()
+    }
+  }
+
+  _openBrowser(url) {
+    const { spawn } = require('child_process')
+    const cmd =
+      process.platform === 'win32'
+        ? ['cmd', ['/c', 'start', '', url]]
+        : process.platform === 'darwin'
+          ? ['open', [url]]
+          : ['xdg-open', [url]]
+    spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore' }).unref()
+  }
+
   async _promptNewUser() {
     console.log('\n  ── Create New User ──\n')
 
@@ -152,22 +234,62 @@ class SessionSelector {
 
     if (!username) return null
 
-    console.log(
-      '\n  Paste the full fetch() call from browser DevTools:\n' +
-        '  DevTools → Network → Find a "conversation" request\n' +
-        '  Right-click → Copy → Copy as fetch\n',
-    )
+    const PROVIDER_URLS = {
+      deepseek: 'https://chat.deepseek.com',
+      claude: 'https://claude.ai/new',
+      chatgpt: 'https://chatgpt.com',
+    }
+
+    const providerUrl = PROVIDER_URLS[this.provider]
+    if (providerUrl) {
+      console.log(`\n  Opening ${providerUrl} in your browser...`)
+      this._openBrowser(providerUrl)
+    }
+
+    const PROVIDER_STEPS = {
+      deepseek: [
+        '  1. Open DevTools (F12) → Network tab',
+        '  2. Send any message on chat.deepseek.com',
+        '  3. Find a request to /api/v0/chat/completion',
+        '  4. Right-click → Copy → Copy as fetch',
+      ],
+      claude: [
+        '  1. Open DevTools (F12) → Network tab',
+        '  2. Send any message on claude.ai',
+        '  3. Find a request to /api/organizations/.../completion',
+        '  4. Right-click → Copy → Copy as fetch',
+      ],
+      chatgpt: [
+        '  1. Open DevTools (F12) → Network tab',
+        '  2. Send any message on chatgpt.com',
+        '  3. Find a request to /backend-api/f/conversation',
+        '  4. Right-click → Copy → Copy as fetch',
+      ],
+    }
+
+    const steps = PROVIDER_STEPS[this.provider] || []
+    console.log('\n  Paste the full fetch() call from browser DevTools:')
+    steps.forEach((s) => console.log(s))
+    console.log()
 
     while (true) {
       console.log('  Notepad will open — paste your fetch() call, save (Ctrl+S), close Notepad.\n')
       const fetchStr = await this._openEditor()
-      if (!fetchStr) {
-        console.log('  Cancelled.')
-        return null
-      }
 
-      if (!fetchStr.includes('fetch(')) {
-        console.error('  ✖ Must be a valid fetch() call — try again.\n')
+      if (!fetchStr || !fetchStr.includes('fetch(')) {
+        const { invalidAction } = await prompts(
+          {
+            type: 'select',
+            name: 'invalidAction',
+            message: '✖ Not a valid fetch() call — what would you like to do?',
+            choices: [
+              { title: '↩  Try again', value: 'retry' },
+              { title: '✖  Cancel', value: 'cancel' },
+            ],
+          },
+          { onCancel: () => process.exit(0) },
+        )
+        if (!invalidAction || invalidAction === 'cancel') return null
         continue
       }
 
@@ -176,6 +298,50 @@ class SessionSelector {
         parsedFetch = this._parseFetchDirect(fetchStr)
       } catch (e) {
         console.error(`  ✖ Failed to parse fetch: ${e.message}\n`)
+        continue
+      }
+
+      const missing = this._validateFetchHeaders(parsedFetch)
+      if (missing.length > 0) {
+        console.error(
+          `  ✖ Fetch is missing required headers:\n${missing.map((h) => `     • ${h}`).join('\n')}\n`,
+        )
+        const { invalidAction } = await prompts(
+          {
+            type: 'select',
+            name: 'invalidAction',
+            message: 'Make sure you copied the right request — what would you like to do?',
+            choices: [
+              { title: '↩  Try again', value: 'retry' },
+              { title: '✖  Cancel', value: 'cancel' },
+            ],
+          },
+          { onCancel: () => process.exit(0) },
+        )
+        if (!invalidAction || invalidAction === 'cancel') return null
+        continue
+      }
+
+      process.stdout.write('  Validating browser session...')
+      try {
+        await this._validateLiveConnection(parsedFetch)
+        process.stdout.write('\r  ✓ Session verified        \n\n')
+      } catch (e) {
+        process.stdout.write(' ✖\n\n')
+        console.error(`  ✖ Live check failed: ${e.message}\n`)
+        const { invalidAction } = await prompts(
+          {
+            type: 'select',
+            name: 'invalidAction',
+            message: 'Credentials rejected by provider — what would you like to do?',
+            choices: [
+              { title: '↩  Try again', value: 'retry' },
+              { title: '✖  Cancel', value: 'cancel' },
+            ],
+          },
+          { onCancel: () => process.exit(0) },
+        )
+        if (!invalidAction || invalidAction === 'cancel') return null
         continue
       }
 
@@ -320,7 +486,7 @@ class SessionSelector {
         type: 'confirm',
         name: 'confirmed',
         message: `Delete all ${count} sessions?`,
-        initial: false,
+        initial: true,
       },
       { onCancel: () => process.exit(0) },
     )
@@ -329,33 +495,38 @@ class SessionSelector {
 
     process.stdout.write('  Deleting sessions...')
     await this._deleteProviderSessions()
-    process.stdout.write(' done.\n\n')
+    process.stdout.write('\r  ✓ Done.                  \n\n')
 
     this.user.sessions = []
     return this._stepSessionSelection()
   }
 
-  async _deleteProviderSessions() {
-    const PROVIDERS = {
+  _getProvider(parsedFetch, provider, options = {}) {
+    const providers = {
       deepseek: {
         label: 'DeepSeek',
-        factory: () => new DeepSeekAPI(),
-        init: (api) => api.initialize(this.user.parsedFetch?.headers || {}),
+        factory: () => new DeepSeekAPI(options),
+        init: (api) => api.initialize(parsedFetch?.headers || {}),
       },
       claude: {
         label: 'Claude',
-        factory: () => new ClaudeAPI(),
-        init: (api) => api.initializeFromJSON(this.user.parsedFetch || {}),
+        factory: () => new ClaudeAPI(options),
+        init: (api) => api.initializeFromJSON(parsedFetch || {}),
       },
       chatgpt: {
         label: 'ChatGPT',
-        factory: () => new ChatGPTAPI(),
-        init: (api) => api.initializeFromJSON(this.user.parsedFetch || {}),
+        factory: () => new ChatGPTAPI(options),
+        init: (api) => api.initializeFromJSON(parsedFetch || {}),
       },
     }
 
-    const cfg = PROVIDERS[this.provider]
-    if (!cfg) return
+    const cfg = providers[provider]
+    if (!cfg) throw new Error(`Unknown provider: ${provider}`)
+    return cfg
+  }
+
+  async _deleteProviderSessions() {
+    const cfg = this._getProvider(this.user.parsedFetch, this.provider, { log: false })
 
     const toDelete = this.user.sessions.filter((s) => s.chatSessionId)
     if (toDelete.length === 0) return
@@ -364,11 +535,12 @@ class SessionSelector {
     await cfg.init(api)
 
     let deleted = 0
+    process.stdout.write(`\r                                      `)
     for (const session of toDelete) {
       try {
-        await api.deleteSession(session.chatSessionId)
         deleted++
-        process.stdout.write(`\r  Deleted ${deleted}/${toDelete.length}...`)
+        process.stdout.write(`\r  Deleting ${deleted}/${toDelete.length}`)
+        await api.deleteSession(session.chatSessionId)
       } catch (e) {
         console.warn(`\n  ⚠ Failed ${session.chatSessionId}: ${e.message}`)
       }

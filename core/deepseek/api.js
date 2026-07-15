@@ -6,7 +6,8 @@ const { DeepSeekPOW } = require('./pow')
 class DeepSeekAPI {
   static BASE_URL = 'https://chat.deepseek.com/api/v0'
 
-  constructor() {
+  constructor(options = {}) {
+    this._log = options.log !== false
     this.powSolver = null
     this._cookies = new CookieJar()
     this._headers = {}
@@ -29,7 +30,7 @@ class DeepSeekAPI {
     const initialCookie = headers.cookie || headers.Cookie || ''
     if (initialCookie) {
       const count = this._cookies.seedFromHeader(initialCookie)
-      if (count > 0) {
+      if (count > 0 && this._log) {
         console.log(`[DeepSeek] Seeded cookie jar with ${count} initial cookies`)
       }
     }
@@ -50,7 +51,7 @@ class DeepSeekAPI {
       const body = resp.data
       const id = body.data.biz_data.id || body.data.biz_data.chat_session.id
 
-      console.log(`[DeepSeek] New session: ${id}`)
+      if (this._log) console.log(`[DeepSeek] New session: ${id}`)
       return id
     } catch (error) {
       throw new Error('Failed to create chat session: ' + error.message)
@@ -82,12 +83,13 @@ class DeepSeekAPI {
       search_enabled: searchEnabled,
     }
 
-    console.log('[PROMPT] REQ', {
-      chatSessionId,
-      parentMessageId,
-      prompt,
-      promptLength: prompt.length,
-    })
+    if (this._log)
+      console.log('[PROMPT] REQ', {
+        chatSessionId,
+        parentMessageId,
+        prompt,
+        promptLength: prompt.length,
+      })
 
     const res = await this._fetch(
       `${DeepSeekAPI.BASE_URL}/chat/completion`,
@@ -164,7 +166,8 @@ class DeepSeekAPI {
     }
 
     const fileId = body.data.biz_data.id
-    console.log(`[DeepSeek] File uploaded: ${fileName} (${fileSize} bytes) → ${fileId}`)
+    if (this._log)
+      console.log(`[DeepSeek] File uploaded: ${fileName} (${fileSize} bytes) → ${fileId}`)
 
     // 4. Poll until processing completes
     return this._pollFile(fileId, fileName)
@@ -195,7 +198,7 @@ class DeepSeekAPI {
       if (!file) throw new Error(`File ${fileId} not found in fetch_files response`)
 
       if (file.status === 'SUCCESS') {
-        console.log(`[DeepSeek] File ready: ${fileId} (tokens: ${file.token_usage})`)
+        if (this._log) console.log(`[DeepSeek] File ready: ${fileId} (tokens: ${file.token_usage})`)
         return fileId
       }
 
@@ -233,7 +236,7 @@ class DeepSeekAPI {
    * Delete all chat sessions server-side (single bulk endpoint).
    */
   async deleteAllSessions() {
-    console.log('[DeepSeek] Deleting all sessions...')
+    if (this._log) console.log('[DeepSeek] Deleting all sessions...')
     const res = await this._fetch(
       `${DeepSeekAPI.BASE_URL}/chat_session/delete_all`,
       {
@@ -249,7 +252,7 @@ class DeepSeekAPI {
       throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
     }
 
-    console.log('[DeepSeek] All sessions deleted')
+    if (this._log) console.log('[DeepSeek] All sessions deleted')
   }
 
   /**
@@ -271,6 +274,28 @@ class DeepSeekAPI {
       const text = await res.text().catch(() => '')
       throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
     }
+  }
+
+  /**
+   * Fetch current user info from /api/v0/users/current.
+   * Used to verify session credentials are valid.
+   * Returns user profile data on success, throws on failure.
+   */
+  async getCurrentUser() {
+    const res = await this._fetch(
+      `${DeepSeekAPI.BASE_URL}/users/current`,
+      {
+        method: 'GET',
+        headers: this._buildHeaders(),
+      },
+      true,
+    )
+
+    if (res.status !== 200 || !res.data) {
+      throw new Error(`Failed to get user info: HTTP ${res.status}`)
+    }
+
+    return res.data
   }
 
   // ─── Response header capture ─────────────────────────────────

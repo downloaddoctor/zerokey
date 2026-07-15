@@ -15,7 +15,8 @@ const { CookieJar } = require('../../utils/cookie-jar')
  * Without User-Agent, Cloudflare returns 403.
  */
 class ChatGPTAPI {
-  constructor() {
+  constructor(options = {}) {
+    this._log = options.log !== false
     this.BASE_URL = 'https://chatgpt.com'
     this._headers = null
     this._bodyTemplate = null
@@ -38,7 +39,7 @@ class ChatGPTAPI {
     const initialCookie = this._headers.cookie || this._headers.Cookie || ''
     if (initialCookie) {
       const count = this._cookies.seedFromHeader(initialCookie)
-      console.log(`[ChatGPT] Seeded cookie jar with ${count} initial cookies`)
+      if (this._log) console.log(`[ChatGPT] Seeded cookie jar with ${count} initial cookies`)
     }
 
     const existingProof = this._headers['openai-sentinel-proof-token']
@@ -50,10 +51,10 @@ class ChatGPTAPI {
     const realUA = this._config[4]
     if (realUA && typeof realUA === 'string' && realUA.length > 20) {
       this._headers['user-agent'] = realUA
-      console.log(`[ChatGPT] User-agent: ${realUA.slice(0, 60)}...`)
+      if (this._log) console.log(`[ChatGPT] User-agent: ${realUA.slice(0, 60)}...`)
     }
 
-    console.log('[ChatGPT] Initialized from capture JSON')
+    if (this._log) console.log('[ChatGPT] Initialized from capture JSON')
 
     await this._refreshSentinel()
     this._ready = true
@@ -106,12 +107,13 @@ class ChatGPTAPI {
         body.client_contextual_info.time_since_loaded
     }
 
-    console.log('[PROMPT] REQ', {
-      chatSessionId,
-      parentMessageId,
-      prompt,
-      promptLength: prompt.length,
-    })
+    if (this._log)
+      console.log('[PROMPT] REQ', {
+        chatSessionId,
+        parentMessageId,
+        prompt,
+        promptLength: prompt.length,
+      })
 
     const url = `${this.BASE_URL}/backend-api/f/conversation`
 
@@ -121,12 +123,12 @@ class ChatGPTAPI {
       body: JSON.stringify(body),
     })
 
-    console.log(res.status, res.statusText)
+    if (this._log) console.log(res.status, res.statusText)
 
     // Non-200 status is logged here; the error branch below throws for the caller to handle.
     // No automatic sentinel-refresh-and-retry is implemented.
     if (res.status !== 200) {
-      console.log(`[ChatGPT] Got ${res.status}`)
+      if (this._log) console.log(`[ChatGPT] Got ${res.status}`)
     }
 
     if (!res.ok) {
@@ -182,7 +184,7 @@ class ChatGPTAPI {
     })
 
     if (!res.ok) {
-      console.log(`[ChatGPT] Prepare conversation returned ${res.status}`)
+      if (this._log) console.log(`[ChatGPT] Prepare conversation returned ${res.status}`)
       return
     }
 
@@ -191,7 +193,8 @@ class ChatGPTAPI {
     const data = await res.json()
     if (data.conduit_token) {
       this._headers['x-conduit-token'] = data.conduit_token
-      console.log('[ChatGPT] Conduit token from body for conversation:', conversationId)
+      if (this._log)
+        console.log('[ChatGPT] Conduit token from body for conversation:', conversationId)
     }
   }
 
@@ -240,6 +243,28 @@ class ChatGPTAPI {
 
     // Cookies captured automatically via _captureResponseHeaders → CookieJar
     // console.log('[ChatGPT] Sentinel refreshed')
+  }
+
+  /**
+   * Fetch current user info from /backend-api/me.
+   * Used to verify session credentials are valid.
+   * Returns user profile data on success, throws on failure.
+   */
+  async getMe() {
+    const res = await this._fetch(
+      `${this.BASE_URL}/backend-api/me`,
+      {
+        method: 'GET',
+        headers: this._buildHeaders(),
+      },
+      true,
+    )
+
+    if (res.status !== 200 || !res.data) {
+      throw new Error(`Failed to get user info: HTTP ${res.status}`)
+    }
+
+    return res.data
   }
 
   // ─── Response header capture ─────────────────────────────────
