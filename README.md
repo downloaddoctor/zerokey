@@ -25,8 +25,10 @@ OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** �
 
 Download the latest launcher for your OS from the **[Releases page](https://github.com/downloaddoctor/zerokey/releases/latest)**:
 
-- **Windows:** [⬇ zerokey.bat](https://github.com/downloaddoctor/zerokey/releases/latest/download/zerokey.bat) — double-click to run
-- **Linux / macOS:** [⬇ zerokey.sh](https://github.com/downloaddoctor/zerokey/releases/latest/download/zerokey.sh) — run `chmod +x zerokey.sh && ./zerokey.sh`
+| OS            | Download                                                                                              | Run                                     |
+| ------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| Windows       | [⬇ zerokey.bat](https://github.com/downloaddoctor/zerokey/releases/latest/download/zerokey.bat) | double-click to run                      |
+| Linux / macOS | [⬇ zerokey.sh](https://github.com/downloaddoctor/zerokey/releases/latest/download/zerokey.sh)   | `chmod +x zerokey.sh && ./zerokey.sh`    |
 
 Place the script in any folder and run it. It will:
 
