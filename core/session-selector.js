@@ -4,6 +4,7 @@ const prompts = require('prompts')
 const { ClaudeAPI } = require('./claude/api')
 const { DeepSeekAPI } = require('./deepseek/api')
 const { ChatGPTAPI } = require('./chatgpt/api')
+const { MODEL_HASH } = require('../config/constants')
 
 class SessionSelector {
   constructor() {
@@ -409,34 +410,25 @@ class SessionSelector {
       },
     ]
 
-    if (this.provider === 'claude') {
+    const MODEL_DESCRIPTIONS = {
+      claude: { 'claude-sonnet-4-6': 'recommended for tools' },
+      chatgpt: { auto: 'recommended' },
+      deepseek: { expert: 'recommended' },
+    }
+
+    if (this.provider === 'claude' || this.provider === 'chatgpt' || this.provider === 'deepseek') {
+      const providerHash = MODEL_HASH[this.provider] || {}
+      const label = providerHash.title || this.provider
+      const descriptions = MODEL_DESCRIPTIONS[this.provider] || {}
       questions.push({
         type: 'select',
         name: 'model',
-        message: 'Claude model',
-        choices: [
-          { title: 'SONNET 4.6', description: 'recommended for tools', value: 'claude-sonnet-4-6' },
-          { title: 'SONNET 5', value: 'claude-sonnet-5' },
-          { title: 'HAIKU 4.5', value: 'claude-haiku-4-5-20251001' },
-        ],
-      })
-    } else if (this.provider === 'chatgpt') {
-      questions.push({
-        type: 'select',
-        name: 'model',
-        message: 'ChatGPT model',
-        choices: [{ title: 'auto', description: 'recommended', value: 'auto' }],
-      })
-    } else if (this.provider === 'deepseek') {
-      questions.push({
-        type: 'select',
-        name: 'model',
-        message: 'DeepSeek model',
-        choices: [
-          { title: 'V4 - Expert', description: 'recommended', value: 'expert' },
-          { title: 'V4 - Instant', value: 'default' },
-          { title: 'V4 - Vision', value: 'vision' },
-        ],
+        message: `${label} model`,
+        choices: Object.entries(providerHash.models || {}).map(([value, meta]) => ({
+          title: meta.name,
+          value,
+          description: descriptions[value],
+        })),
       })
     }
 

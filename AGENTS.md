@@ -9,7 +9,7 @@ zerokey.bat # one-click launcher: auto-clone, install deps, check updates, start
 start.bat # Windows batch launcher (node server.js, dev use)
 pnpm-lock.yaml # pnpm lockfile
 config/ # constants, model definitions
- config/constants.js # CONFIG (PORT), MODELS registry
+ config/constants.js # CONFIG (PORT), MODEL_HASH (nested provider→model→meta with id/name/vision/created/context_length/max_output_length), MODELS registry (keyed by meta.id slug)
 core/ # session management, chat router, provider API clients
  core/session-selector.js # interactive CLI wizard: provider→user→session selection; users.json persistence; Claude "(limit reached)" suffix on user list; auto-switch to available users; deleteAllSessions with provider-side cleanup; session mode as list pick (Tools Mode / Raw Mode); _validateFetchHeaders checks required headers per provider; _validateLiveConnection verifies credentials with provider API; _openBrowser auto-opens provider login page for new users
  core/chat-router.js # builds Express router for selected provider, logs active session (no runtime hot-swap)
@@ -30,7 +30,7 @@ routes/ # Express route builders (one per provider + models + health)
  routes/deepseek.js → buildChatRouter(headers, session)
  routes/claude.js → buildClaudeRouter(parsedFetch, session, userData)
  routes/chatgpt.js → buildChatGPTRouter(parsedFetch, session, userData)
- routes/models.js → GET /v1/models, GET /v1/models/:model
+ routes/models.js → buildModelsRouter(preSelected) — GET /v1/models (returns object: 'list', data, activeModel), GET /v1/models/:model (lookup by meta.id slug)
  routes/health.js → buildHealthRouter(preSelected) — GET /health (returns status, uptime, timestamp, provider, model, username)
  routes/info.js → GET / — API info (name, version, endpoints, models)
 lib/engine/ # tool compilation, prompt formatting, IDE mappings
@@ -53,7 +53,7 @@ utils/ # shared utilities
  utils/stream-helpers.js → createSendFinalChunk, createOnError — shared SSE finalizers (flush tools, emit [DONE], update session.lastUsed; onError writes error JSON to SSE stream)
  utils/har-to-capture.js → harToCapture — convert HAR files to network-capture JSON format
  utils/find-port.js → findPort(start, range=100) — scans ports via checkPort socket probe (resolves true when free) until an open one is found; isPortActive(p) — inverse of checkPort, resolves true when something is actively listening
- utils/sync-ide-config.js → async syncIdeConfig(preSelected?, port?) — syncs ZeroKey model entries into VS Code's chatLanguageModels.json (%APPDATA%\Code\User\); base is the existing target file's ZeroKey.models array (falls back to an empty models list on first run), preserving non-ZeroKey entries; with args, live-checks every existing model's port via isPortActive (utils/find-port.js) and drops any not currently listening (except the current-port entry, always kept), then edits in place (or appends) the model with id `ZK-{port}`, name resolved via MODEL_HASH[provider][model] lookup (config/constants.js); if another live port already resolves to the same name, appends ` — {port}` to disambiguate; queries each other live port's /health for its provider/model via node-fetch; non-fatal on failure
+ utils/sync-ide-config.js → async syncIdeConfig(preSelected?, port?) — syncs ZeroKey model entries into VS Code's chatLanguageModels.json (%APPDATA%\Code\User\); base is the existing target file's ZeroKey.models array (falls back to an empty models list on first run), preserving non-ZeroKey entries; with args, live-checks every existing model's port via isPortActive (utils/find-port.js) and drops any not currently listening (except the current-port entry, always kept), then edits in place (or appends) the model with id `ZK-{port}`, name resolved via MODEL_HASH[provider].models[model]?.name lookup (config/constants.js); if another live port already resolves to the same name, appends ` — {port}` to disambiguate; queries each other live port's /health for its provider/model via node-fetch; non-fatal on failure
 temp/ # runtime data: users.json, errors.txt (server error log), scratch files (not committed)
 docs/ # static docs site
  docs/index.html
@@ -93,7 +93,7 @@ server.js
    → returns { user, userData, provider, parsedFetch, session, sessionName }
  → findPort(CONFIG.PORT) # resolves actual running port
  → app.use('/', buildHealthRouter(preSelected)) # mounts /health with provider/model/username in payload
- → await syncIdeConfig(preSelected, port) # post-selection: live-checks each existing model's port (socket probe), drops any not currently listening (current-port entry always kept), edits in place (or appends) the model entry with id ZK-{port}, name via MODEL_HASH lookup, disambiguates with ` — {port}` suffix on collision (queries other live ports' /health), non-fatal
+ → await syncIdeConfig(preSelected, port) # post-selection: live-checks each existing model's port (socket probe), drops any not currently listening (current-port entry always kept), edits in place (or appends) the model entry with id ZK-{port}, name via MODEL_HASH[provider].models[model]?.name lookup, disambiguates with ` — {port}` suffix on collision (queries other live ports' /health), non-fatal
  → ChatRouter.mount(selected)
    → buildChatRouter(headers, session) # DeepSeek
    → buildClaudeRouter(parsedFetch, session, userData) # Claude
@@ -230,7 +230,7 @@ prettier ^3.8.3 # dev only
 #PUBLIC-API
 GET / # API info (name, version, endpoints, models)
 GET /health # { status: 'healthy', uptime, timestamp, provider, model, username }
-GET /v1/models # { object: 'list', data: [DeepSeek V4, GPT-4o, Claude Sonnet 4.6] }
+GET /v1/models # { object: 'list', data: [{ id: 'expert', name: 'DeepSeek V4 - Expert', ... }, ...], activeModel: { id, name, ... } }
 GET /v1/models/:model # single model object or 404 with OpenAI error
 POST /v1/chat/completions # OpenAI-compatible chat completions (SSE stream)
  Authorization: Bearer <vscode|terax|opencode> (default: vscode)
@@ -245,6 +245,9 @@ Session timeout: 300s (5 min) for all provider HTTP requests
 Stream buffer cap: 1MB (SSE reader)
 
 #KNOWN-INVARIANTS
+- MODELS keyed by meta.id (machine-readable slug, e.g. 'claude-sonnet-4-6'), not display name; id field = meta.id, name field = meta.name (display label) added for IDE consumption
+- MODEL_HASH: nested { provider: { title, owned_by, models: { [slug]: { id, name, vision, created, context_length, max_output_length } } } } — id is canonical slug, name is display label
+- /v1/models returns id = meta.id (slug) per OpenAI convention; activeModel = full meta object of pre-selected model
 - No API keys — all auth via browser session cookies captured from DevTools fetch()
 - ToolCompiler is singleton per (ideName, provider) pair — second instantiation returns cached instance
 - Session state (parentMessageId, chatSessionId, lastUsed, todos) mutated in-memory; persisted to users.json only on shutdown via selector.flush()

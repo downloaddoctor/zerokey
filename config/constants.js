@@ -6,63 +6,96 @@ const CONFIG = {
   PORT: process.env.PORT || 8000,
 }
 
-const MODELS = {
-  'DeepSeek V4': {
-    id: 'DeepSeek V4',
-    object: 'model',
-    created: 1_784_736_000,
-    owned_by: 'deepseek',
-    context_length: 1_000_000,
-    max_output_length: 384_000,
+const MODEL_HASH = {
+  claude: {
+    title: 'Claude',
+    owned_by: 'anthropic',
+    models: {
+      'claude-sonnet-4-6': {
+        id: 'claude-sonnet-4-6',
+        name: 'Claude Sonnet 4.6',
+        vision: true,
+        created: 1_772_736_000,
+        context_length: 1_000_000,
+        max_output_length: 128_000,
+      },
+      'claude-sonnet-5': {
+        id: 'claude-sonnet-5',
+        name: 'Claude Sonnet 5',
+        vision: true,
+        created: 1_772_736_000,
+        context_length: 1_000_000,
+        max_output_length: 128_000,
+      },
+      'claude-haiku-4-5-20251001': {
+        id: 'claude-haiku-4-5-20251001',
+        name: 'Claude Haiku 4.5',
+        vision: true,
+        created: 1_772_736_000,
+        context_length: 200_000,
+        max_output_length: 64_000,
+      },
+    },
   },
-  'GPT-4o': {
-    id: 'GPT-4o',
-    object: 'model',
-    created: 1_712_822_400,
+  chatgpt: {
+    title: 'Chatgpt',
     owned_by: 'openai',
-    context_length: 128_000,
-    max_output_length: 16_384,
+    models: {
+      auto: {
+        id: 'auto',
+        name: 'GPT-4o',
+        vision: true,
+        created: 1_712_822_400,
+        context_length: 128_000,
+        max_output_length: 16_384,
+      },
+    },
   },
-  'Claude Sonnet 4.6': {
-    id: 'Claude Sonnet 4.6',
-    object: 'model',
-    created: 1_772_736_000,
-    owned_by: 'anthropic',
-    context_length: 1_000_000,
-    max_output_length: 128_000,
-  },
-  'Claude Sonnet 5': {
-    id: 'Claude Sonnet 5',
-    object: 'model',
-    created: 1_772_736_000,
-    owned_by: 'anthropic',
-    context_length: 1_000_000,
-    max_output_length: 128_000,
-  },
-  'Claude Haiku 4.5': {
-    id: 'Claude Haiku 4.5',
-    object: 'model',
-    created: 1_772_736_000,
-    owned_by: 'anthropic',
-    context_length: 200_000,
-    max_output_length: 64_000,
+  deepseek: {
+    title: 'DeepSeek',
+    owned_by: 'deepseek',
+    models: {
+      expert: {
+        id: 'expert',
+        name: 'DeepSeek V4 - Expert',
+        vision: false,
+        created: 1_784_736_000,
+        context_length: 1_000_000,
+        max_output_length: 384_000,
+      },
+      default: {
+        id: 'default',
+        name: 'DeepSeek V4 - Instant',
+        vision: true,
+        created: 1_784_736_000,
+        context_length: 1_000_000,
+        max_output_length: 384_000,
+      },
+      vision: {
+        id: 'vision',
+        name: 'DeepSeek V4 - Vision',
+        vision: true,
+        created: 1_784_736_000,
+        context_length: 1_000_000,
+        max_output_length: 384_000,
+      },
+    },
   },
 }
 
-const MODEL_HASH = {
-  claude: {
-    'claude-sonnet-4-6': 'Claude Sonnet 4.6',
-    'claude-sonnet-5': 'Claude Sonnet 5',
-    'claude-haiku-4-5-20251001': 'Claude Haiku 4.5',
-  },
-  chatgpt: {
-    auto: 'Gpt-4o',
-  },
-  deepseek: {
-    expert: 'Deepseek V4 - Expert',
-    default: 'Deepseek V4 - Instant',
-    vision: 'Deepseek V4 - Vision',
-  },
+const MODELS = {}
+for (const provider of Object.values(MODEL_HASH)) {
+  for (const meta of Object.values(provider.models)) {
+    MODELS[meta.id] = {
+      id: meta.id,
+      name: meta.name,
+      object: 'model',
+      created: meta.created,
+      owned_by: provider.owned_by,
+      context_length: meta.context_length,
+      max_output_length: meta.max_output_length,
+    }
+  }
 }
 
 module.exports = { CONFIG, MODELS, MODEL_HASH }

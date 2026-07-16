@@ -1,32 +1,39 @@
 const express = require('express')
-const { MODELS } = require('../config/constants')
+const { MODELS, MODEL_HASH } = require('../config/constants')
 const { toOpenAIError } = require('../utils/errors')
 
-const router = express.Router()
+function buildModelsRouter(preSelected) {
+  const router = express.Router()
 
-// GET /v1/models - List available models
-router.get('/', (req, res) => {
-  res.json({
-    object: 'list',
-    data: Object.values(MODELS),
+  const activeModel = MODEL_HASH[preSelected?.provider]?.models?.[preSelected?.session?.model]
+
+  // GET /v1/models - List all supported models, with the active one flagged
+  router.get('/', (req, res) => {
+    res.json({
+      object: 'list',
+      data: Object.values(MODELS),
+      activeModel,
+    })
   })
-})
 
-// GET /v1/models/:model - Get specific model
-router.get('/:model', (req, res) => {
-  const model = MODELS[req.params.model]
-  if (model) return res.json(model)
+  // GET /v1/models/:model - Get a specific model (from the full registry)
+  router.get('/:model', (req, res) => {
+    const model = MODELS[req.params.model]
+    if (model) return res.json(model)
 
-  res
-    .status(404)
-    .json(
-      toOpenAIError(
-        404,
-        `Model '${req.params.model}' not found`,
-        'invalid_request_error',
-        'model_not_found',
-      ),
-    )
-})
+    res
+      .status(404)
+      .json(
+        toOpenAIError(
+          404,
+          `Model '${req.params.model}' not found`,
+          'invalid_request_error',
+          'model_not_found',
+        ),
+      )
+  })
 
-module.exports = router
+  return router
+}
+
+module.exports = buildModelsRouter

@@ -1,7 +1,7 @@
 const fs = require('fs')
 const express = require('express')
 const infoRouter = require('./routes/info')
-const modelsRouter = require('./routes/models')
+const buildModelsRouter = require('./routes/models')
 const buildHealthRouter = require('./routes/health')
 const buildRouter = require('./core/chat-router')
 
@@ -39,7 +39,6 @@ app.use((req, res, next) => {
 })
 
 app.use('/', infoRouter)
-app.use('/v1/models', modelsRouter)
 ;(async () => {
   const selector = new SessionSelector()
   const preSelected = await selector.select()
@@ -54,7 +53,7 @@ app.use('/v1/models', modelsRouter)
     preSelected.user,
     preSelected.provider,
     preSelected.sessionName,
-    _s.model || 'default',
+    _s.model,
     _s.toolCalling ? 'tools' : 'no tools',
     _s.vision ? 'vision' : 'no vision',
   ].join(' · ')
@@ -64,6 +63,7 @@ app.use('/v1/models', modelsRouter)
   const port = await findPort(CONFIG.PORT)
 
   app.use('/', buildHealthRouter(preSelected))
+  app.use('/v1/models', buildModelsRouter(preSelected))
 
   await syncIdeConfig(preSelected, port)
 

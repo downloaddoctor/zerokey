@@ -80,7 +80,7 @@ async function syncIdeConfig(preSelected, port) {
       )
       zeroKeyEntry.models = zeroKeyEntry.models.filter((_, i) => liveFlags[i])
 
-      modelName = MODEL_HASH[preSelected.provider][preSelected.session.model]
+      modelName = MODEL_HASH[preSelected.provider]?.models?.[preSelected.session.model]?.name
 
       const activePorts = zeroKeyEntry.models
         .filter((m) => m.id !== targetId)
@@ -93,7 +93,7 @@ async function syncIdeConfig(preSelected, port) {
             const data = await _fetchHealth(p)
 
             if (!data || !data.provider || !data.model) return null
-            return MODEL_HASH[data.provider]?.[data.model] || null
+            return MODEL_HASH[data.provider]?.models?.[data.model]?.name || null
           }),
         )
 

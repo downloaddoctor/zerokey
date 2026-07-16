@@ -10,9 +10,9 @@ router.get('/', (req, res) => {
     version: '1.0.0',
     description: 'OpenAI-compatible AI proxy for DeepSeek, Claude & ChatGPT',
     endpoints: {
+      health: 'GET /health',
       models: 'GET /v1/models',
       chat_completions: 'POST /v1/chat/completions',
-      health: 'GET /health',
     },
     models: Object.keys(MODELS),
   })

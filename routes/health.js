@@ -9,9 +9,9 @@ function buildHealthRouter(preSelected) {
       status: 'healthy',
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
+      username: preSelected?.user || null,
       provider: preSelected?.provider || null,
       model: preSelected?.session?.model || null,
-      username: preSelected?.user || null,
     })
   })
 
