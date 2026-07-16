@@ -167,6 +167,15 @@
         color: var(--fg);
       }
 
+      @media (max-width: 600px) {
+        .nav-links a {
+          display: none;
+        }
+        #theme-toggle {
+          display: inline-block !important;
+        }
+      }
+
       .hero {
         padding: 80px 0 48px;
         text-align: center;
@@ -175,25 +184,50 @@
       .badge {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
+        gap: 12px;
         padding: 6px 14px;
         border-radius: 999px;
-        background: var(--card);
-        color: var(--fg);
-        font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
-        font-size: 12px;
-        font-weight: 500;
-        letter-spacing: 0.05em;
-        border: 1px solid var(--border);
+        background: var(--fg);
+        color: var(--bg);
+        font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        border: none;
+      }
+
+      .badge-providers {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .badge-provider {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .badge-provider img {
+        width: 14px;
+        height: 14px;
+        display: block;
+        filter: brightness(0) invert(1); /* force white on dark background */
       }
 
       .badge-dot {
-        width: 6px;
-        height: 6px;
+        width: 5px;
+        height: 5px;
         border-radius: 50%;
         background: var(--green);
-        box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.15);
+        box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
         animation: pulse 2s ease-in-out infinite;
+        flex-shrink: 0;
+      }
+
+      .badge-separator {
+        opacity: 0.4;
+        font-weight: 300;
       }
 
       @keyframes pulse {
@@ -264,52 +298,66 @@
 
       /* Fetch stat block */
       .fetch-stat {
-        margin: 64px auto;
-        max-width: 760px;
+        margin: 48px auto 32px;
+        max-width: 720px;
         background: var(--fg);
         color: var(--bg);
         border-radius: var(--radius-lg);
-        padding: 64px 32px;
+        padding: 48px 28px;
         text-align: center;
         box-shadow: var(--shadow-lg);
       }
 
       .fetch-label {
         font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
-        font-size: 12px;
+        font-size: 11px;
         text-transform: uppercase;
-        letter-spacing: 0.25em;
-        opacity: 0.6;
+        letter-spacing: 0.2em;
+        opacity: 0.5;
       }
 
       .fetch-big {
         font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
-        font-size: clamp(40px, 8vw, 80px);
+        font-size: clamp(32px, 6vw, 60px);
         font-weight: 700;
-        line-height: 1;
-        margin: 22px 0 14px;
-        letter-spacing: -0.03em;
+        line-height: 1.1;
+        margin: 14px 0 6px;
+        letter-spacing: -0.02em;
         display: block;
+        word-break: break-word;
       }
 
       .fetch-unit {
         display: block;
         font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
-        font-size: clamp(13px, 1.4vw, 15px);
+        font-size: clamp(11px, 1.2vw, 13px);
         font-weight: 500;
         text-transform: uppercase;
-        letter-spacing: 0.4em;
-        opacity: 0.6;
-        margin-top: 4px;
+        letter-spacing: 0.3em;
+        opacity: 0.5;
+        margin-top: 2px;
       }
 
       .fetch-sub {
-        margin-top: 28px;
+        margin-top: 20px;
         opacity: 0.7;
-        font-size: 14px;
-        max-width: 520px;
+        font-size: 13px;
+        max-width: 480px;
         margin-left: auto;
         margin-right: auto;
+        line-height: 1.7;
+      }
+
+      @media (max-width: 600px) {
+        .fetch-stat {
+          margin: 32px auto 24px;
+          padding: 32px 16px;
+          border-radius: var(--radius);
+        }
+        .fetch-sub {
+          font-size: 12px;
+          padding: 0 4px;
+        }
       }
 
       /* Sections */
@@ -584,6 +632,21 @@
         font-weight: 700;
       }
 
+      @media (max-width: 600px) {
+        .chip-grid {
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+        }
+        .chip {
+          width: 100%;
+          max-width: 280px;
+          text-align: center;
+          padding: 10px 16px;
+          font-size: 14px;
+        }
+      }
+
       footer {
         margin-top: 64px;
         padding: 40px 0;
@@ -651,10 +714,15 @@
       </nav>
 
       <header class="hero">
-        <span class="badge"
-          ><span class="badge-dot"></span> DeepSeek · Claude · ChatGPT — your own accounts, your own
-          sessions</span
-        >
+        <span class="badge">
+          <span class="badge-providers">
+            <span class="badge-provider"><img src="logos/deepseek.svg" alt="" />DeepSeek</span>
+            <span class="badge-separator"></span>
+            <span class="badge-provider"><img src="logos/claude.svg" alt="" />Claude</span>
+            <span class="badge-separator"></span>
+            <span class="badge-provider"><img src="logos/chatgpt.svg" alt="" />ChatGPT</span>
+          </span>
+        </span>
         <h1>Your IDE.<br /><span class="gradient">Your Accounts.</span><br />Your sessions.</h1>
         <p class="subtitle">
           ZeroKey is a personal-use self-hosted proxy that connects your own browser sessions to
@@ -765,7 +833,9 @@
               />VS Code — Built-in
             </h3>
             <ol>
-              <li>In VS Code chat, select the model ZeroKey just added as the active model</li>
+              <li>Server prints the model name to select in the console.</li>
+              <li>Open VS Code Chat → pick that model from the dropdown.</li>
+              <li>The model appears under the <strong>ZeroKey</strong> provider.</li>
             </ol>
           </div>
           <div class="ide-card">

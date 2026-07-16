@@ -119,7 +119,9 @@ The `Authorization: Bearer <ide>` header maps the request to the correct IDE's t
 
 ### VS Code — Built-in
 
-1. In VS Code chat, select the model ZeroKey just added as the active model
+1. Server prints the model name to select in the console.
+2. Open VS Code Chat → pick that model from the dropdown.
+3. The model appears under the **ZeroKey** provider.
 
 ### Terax
 
