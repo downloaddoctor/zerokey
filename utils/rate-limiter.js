@@ -25,7 +25,7 @@ function acquireSlot(label = 'API', reset = false) {
     return Promise.resolve()
   }
 
-  console.log(`[${label}] ⚠ Rate limit — waiting ${(wait / 1000).toFixed(1)}s`)
+  console.warn(`[${label}] ⚠ Rate limit — waiting ${(wait / 1000).toFixed(1)}s`)
   return new Promise((resolve) => {
     setTimeout(() => {
       s.count = 0

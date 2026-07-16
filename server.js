@@ -1,3 +1,5 @@
+require('./utils/logger')
+
 const fs = require('fs')
 const express = require('express')
 const infoRouter = require('./routes/info')
@@ -58,7 +60,7 @@ app.use('/', infoRouter)
     _s.vision ? 'vision' : 'no vision',
   ].join(' · ')
 
-  console.log(`\n[Server] ${_tags}`)
+  console.info(`\n[Server] ${_tags}`)
 
   const port = await findPort(CONFIG.PORT)
 
@@ -95,7 +97,7 @@ app.use('/', infoRouter)
   })
 
   const server = app.listen(port, () => {
-    console.log(`\n√ ZeroKey running on http://localhost:${port}`)
+    console.success(`\n√ ZeroKey running on http://localhost:${port}`)
     console.log('Endpoints:')
     console.log(`  GET  http://localhost:${port}/`)
     console.log(`  GET  http://localhost:${port}/health`)
@@ -105,10 +107,10 @@ app.use('/', infoRouter)
   })
 
   const shutdown = (signal) => {
-    console.log(`\n[Server] ${signal} received — shutting down...`)
+    console.warn(`\n[Server] ${signal} received — shutting down...`)
     selector.flush()
     server.close(() => {
-      console.log('[Server] Closed.')
+      console.success('[Server] Closed.')
       process.exit(0)
     })
     setTimeout(() => {

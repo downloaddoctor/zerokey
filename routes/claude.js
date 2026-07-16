@@ -9,11 +9,7 @@ const claudeApi = new ClaudeAPI()
 const { acquireSlot } = require('../utils/rate-limiter')
 
 async function buildClaudeRouter(parsedFetch, session, userData = null) {
-  if (!parsedFetch || !parsedFetch.headers) {
-    throw new Error('parsedFetch with headers is required')
-  }
-
-  console.log('[Claude] Initializing from parsed capture JSON')
+  console.debug('[Claude] Initializing from parsed capture JSON')
   await claudeApi.initializeFromJSON(parsedFetch)
 
   const router = express.Router()
@@ -71,7 +67,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
 
       await claudeStreamHandler(res, stream, session, parser, async (limitReached) => {
         if (limitReached?.resets_at) {
-          console.log(`[Claude] ⚠ Usage at ${limitReached.pct} — requesting summary`)
+          console.warn(`[Claude] ⚠ Usage at ${limitReached.pct} — requesting summary`)
 
           userData.waitUntil = limitReached.resets_at * 1000
           userData.waitReason = 'Claude rate limit'

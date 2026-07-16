@@ -52,7 +52,7 @@ function harToCapture(harPath, outputDir) {
 
     fs.writeFileSync(filePath, JSON.stringify(capture, null, 2), 'utf8')
     generatedFiles.push(filePath)
-    console.log(`[harToCapture] Generated: ${filename}`)
+    console.success(`[harToCapture] Generated: ${filename}`)
   }
 
   return generatedFiles

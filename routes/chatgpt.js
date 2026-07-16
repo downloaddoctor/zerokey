@@ -10,11 +10,7 @@ const { setChatGPTInstructions } = require('../core/chatgpt/set-instructions')
 const chatgptApi = new ChatGPTAPI()
 
 async function buildChatGPTRouter(parsedFetch, session, userData = null) {
-  if (!parsedFetch || !parsedFetch.headers || !parsedFetch.body) {
-    throw new Error('parsedFetch with headers and body is required')
-  }
-
-  console.log('[ChatGPT] Initializing from parsed fetch JSON')
+  console.debug('[ChatGPT] Initializing from parsed capture JSON')
   await chatgptApi.initializeFromJSON(parsedFetch)
 
   const router = express.Router()

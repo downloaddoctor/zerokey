@@ -1,8 +1,9 @@
 const express = require('express')
+const ToolCompiler = require('../lib/engine')
+
 const { DeepSeekAPI } = require('../core/deepseek/api')
 const { toOpenAIError } = require('../utils/errors')
 const { streamHandler } = require('../core/deepseek/stream-handler')
-const ToolCompiler = require('../lib/engine')
 const { acquireSlot } = require('../utils/rate-limiter')
 
 const deepseekApi = new DeepSeekAPI()
@@ -59,7 +60,8 @@ function extractFiles(messages) {
   return files
 }
 
-async function buildChatRouter(parsedFetch, session) {
+async function buildDeepSeekRouter(parsedFetch, session) {
+  console.debug('[Deepseek] Initializing from parsed capture JSON')
   await initDeepSeekAPI(session, parsedFetch.headers)
 
   const router = express.Router()
@@ -86,7 +88,7 @@ async function buildChatRouter(parsedFetch, session) {
     let refFileIds = []
     const files = extractFiles(messages)
     if (files.length > 0) {
-      console.log(`[DeepSeek] Uploading ${files.length} file(s)...`)
+      console.debug(`[DeepSeek] Uploading ${files.length} file(s)...`)
       for (const file of files) {
         try {
           const fileId = await deepseekApi.uploadFile(file.filename, file.data, file.size)
@@ -167,17 +169,18 @@ async function buildChatRouter(parsedFetch, session) {
 
 async function initDeepSeekAPI(session, headers) {
   await deepseekApi.initialize(headers)
-  console.log('[DeepSeek] Initialized from capture JSON')
+  console.debug('[DeepSeek] Initialized from capture JSON')
 
   if (!session) throw new Error('No session provided')
 
   if (session.chatSessionId) {
-    return console.log(`[DeepSeek] Session: "${session.name}" (${session.chatSessionId})`)
+    // console.debug(`[DeepSeek] Session: "${session.name}" (${session.chatSessionId})`)
+    return
   }
 
   const chatSessionId = await deepseekApi.createChatSession()
   session.chatSessionId = chatSessionId
-  console.log(`[DeepSeek] Session created: "${session.name}" (${chatSessionId})`)
+  // console.success(`[DeepSeek] Session created: "${session.name}" (${chatSessionId})`)
 }
 
-module.exports = { buildChatRouter, initDeepSeekAPI }
+module.exports = { buildDeepSeekRouter, initDeepSeekAPI }

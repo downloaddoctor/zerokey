@@ -25,7 +25,7 @@ async function setClaudeInstructions(claudeApi, userData, dynamicGrammar, toolCa
     if (res.ok) {
       userData.instructionsHash = currentHash
       userData.instructionsAppliedAt = new Date().toISOString()
-      console.log('[Claude] Custom instructions set successfully')
+      console.success('[Claude] Custom instructions set successfully')
       return true
     } else {
       console.warn(`[Claude] Failed to set instructions: ${res.status} ${data}`)

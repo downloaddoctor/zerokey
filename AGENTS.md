@@ -27,7 +27,7 @@ core/ # session management, chat router, provider API clients
   core/chatgpt/stream-handler.js → chatgptStreamHandler — SSE parser for ChatGPT response format
   core/chatgpt/set-instructions.js → setChatGPTInstructions — PATCH user_system_messages
 routes/ # Express route builders (one per provider + models + health)
- routes/deepseek.js → buildChatRouter(headers, session)
+ routes/deepseek.js → buildDeepSeekRouter(headers, session)
  routes/claude.js → buildClaudeRouter(parsedFetch, session, userData)
  routes/chatgpt.js → buildChatGPTRouter(parsedFetch, session, userData)
  routes/models.js → buildModelsRouter(preSelected) — GET /v1/models (returns object: 'list', data, activeModel), GET /v1/models/:model (lookup by meta.id slug)
@@ -48,6 +48,7 @@ lib/engine/ # tool compilation, prompt formatting, IDE mappings
 utils/ # shared utilities
  utils/cookie-jar.js → CookieJar — parse Set-Cookie, seed from header, capture from fetch/raw headers, serialize to Cookie string, size getter
  utils/errors.js → toOpenAIError, classifyError — error categories: overloaded, session_expired, rate_limited, cloudflare_block, network, invalid_request, provider_error, internal
+ utils/logger.js → overrides console.warn (yellow), console.error (red), console.debug (dim), adds console.success (green), console.info (blue), console.debug.mix (dim with inner ANSI preserved); exports text.* color functions (dim/bold/green/cyan/yellow/blue/red)
  utils/rate-limiter.js → acquireSlot — sliding-window rate limiter (5 req / 15s per label)
  utils/sse-reader.js → readSSE — generic SSE stream parser with 1MB buffer cap
  utils/stream-helpers.js → createSendFinalChunk, createOnError — shared SSE finalizers (flush tools, emit [DONE], update session.lastUsed; onError writes error JSON to SSE stream)
@@ -95,7 +96,7 @@ server.js
  → app.use('/', buildHealthRouter(preSelected)) # mounts /health with provider/model/username in payload
  → await syncIdeConfig(preSelected, port) # post-selection: live-checks each existing model's port (socket probe), drops any not currently listening (current-port entry always kept), edits in place (or appends) the model entry with id ZK-{port}, name via MODEL_HASH[provider].models[model]?.name lookup, disambiguates with ` — {port}` suffix on collision (queries other live ports' /health), non-fatal
  → ChatRouter.mount(selected)
-   → buildChatRouter(headers, session) # DeepSeek
+   → buildDeepSeekRouter(headers, session) # DeepSeek
    → buildClaudeRouter(parsedFetch, session, userData) # Claude
    → buildChatGPTRouter(parsedFetch, session, userData) # ChatGPT
    → each returns Express router with POST / handler

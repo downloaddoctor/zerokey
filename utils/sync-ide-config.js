@@ -5,6 +5,7 @@ const fetch = require('node-fetch')
 
 const { isPortActive } = require('./find-port')
 const { MODEL_HASH } = require('../config/constants')
+const { text } = require('./logger')
 
 async function _fetchHealth(p) {
   try {
@@ -47,7 +48,7 @@ async function syncIdeConfig(preSelected, port) {
         existing = raw ? JSON.parse(raw) : []
         if (!Array.isArray(existing)) existing = []
       } catch {
-        console.log('[IDE-CFG] Existing chatLanguageModels.json unreadable — will recreate.')
+        console.warn('[IDE-CFG] Existing chatLanguageModels.json unreadable — will recreate.')
         existing = []
       }
     }
@@ -126,11 +127,10 @@ async function syncIdeConfig(preSelected, port) {
     fs.writeFileSync(tmpPath, JSON.stringify(merged, null, 2))
     fs.renameSync(tmpPath, TARGET_PATH)
 
-    console.log(
-      `[IDE-CFG] Synced ZeroKey models!\n   Active model — ${modelName || ZK_ENTRY_NAME}\n\n`,
-    )
+    console.success('[Server] ZeroKey model synced to VS Code.')
+    console.log('         Select in VS Code Chat →', text.cyan(modelName), '\n')
   } catch (error) {
-    console.log(`[IDE-CFG] Sync skipped (non-fatal): ${error.message}`)
+    console.debug(`[IDE-CFG] Sync skipped (non-fatal): ${error.message}`)
   }
 }
 

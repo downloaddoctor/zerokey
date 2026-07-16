@@ -31,7 +31,7 @@ async function setChatGPTInstructions(chatgptApi, userData) {
     if (res.ok) {
       userData.instructionsHash = currentHash
       userData.instructionsAppliedAt = new Date().toISOString()
-      console.log('[ChatGPT] Custom instructions set successfully')
+      console.success('[ChatGPT] Custom instructions set successfully')
       return true
     } else {
       console.warn(`[ChatGPT] Failed to set instructions: ${res.status} ${data}`)

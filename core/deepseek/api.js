@@ -31,7 +31,7 @@ class DeepSeekAPI {
     if (initialCookie) {
       const count = this._cookies.seedFromHeader(initialCookie)
       if (count > 0 && this._log) {
-        console.log(`[DeepSeek] Seeded cookie jar with ${count} initial cookies`)
+        console.debug(`[DeepSeek] Seeded cookie jar with ${count} initial cookies`)
       }
     }
   }
@@ -51,7 +51,7 @@ class DeepSeekAPI {
       const body = resp.data
       const id = body.data.biz_data.id || body.data.biz_data.chat_session.id
 
-      if (this._log) console.log(`[DeepSeek] New session: ${id}`)
+      // if (this._log) console.debug(`[DeepSeek] New session: ${id}`)
       return id
     } catch (error) {
       throw new Error('Failed to create chat session: ' + error.message)
@@ -84,7 +84,7 @@ class DeepSeekAPI {
     }
 
     if (this._log)
-      console.log('[PROMPT] REQ', {
+      console.debug('[PROMPT] REQ', {
         chatSessionId,
         parentMessageId,
         prompt,
@@ -167,7 +167,7 @@ class DeepSeekAPI {
 
     const fileId = body.data.biz_data.id
     if (this._log)
-      console.log(`[DeepSeek] File uploaded: ${fileName} (${fileSize} bytes) → ${fileId}`)
+      console.debug(`[DeepSeek] File uploaded: ${fileName} (${fileSize} bytes) → ${fileId}`)
 
     // 4. Poll until processing completes
     return this._pollFile(fileId, fileName)
@@ -198,7 +198,8 @@ class DeepSeekAPI {
       if (!file) throw new Error(`File ${fileId} not found in fetch_files response`)
 
       if (file.status === 'SUCCESS') {
-        if (this._log) console.log(`[DeepSeek] File ready: ${fileId} (tokens: ${file.token_usage})`)
+        if (this._log)
+          console.success(`[DeepSeek] File ready: ${fileId} (tokens: ${file.token_usage})`)
         return fileId
       }
 
@@ -236,7 +237,7 @@ class DeepSeekAPI {
    * Delete all chat sessions server-side (single bulk endpoint).
    */
   async deleteAllSessions() {
-    if (this._log) console.log('[DeepSeek] Deleting all sessions...')
+    if (this._log) console.debug('[DeepSeek] Deleting all sessions...')
     const res = await this._fetch(
       `${DeepSeekAPI.BASE_URL}/chat_session/delete_all`,
       {
@@ -252,7 +253,7 @@ class DeepSeekAPI {
       throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
     }
 
-    if (this._log) console.log('[DeepSeek] All sessions deleted')
+    if (this._log) console.debug('[DeepSeek] All sessions deleted')
   }
 
   /**

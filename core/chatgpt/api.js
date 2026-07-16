@@ -39,7 +39,7 @@ class ChatGPTAPI {
     const initialCookie = this._headers.cookie || this._headers.Cookie || ''
     if (initialCookie) {
       const count = this._cookies.seedFromHeader(initialCookie)
-      if (this._log) console.log(`[ChatGPT] Seeded cookie jar with ${count} initial cookies`)
+      if (this._log) console.debug(`[ChatGPT] Seeded cookie jar with ${count} initial cookies`)
     }
 
     const existingProof = this._headers['openai-sentinel-proof-token']
@@ -51,10 +51,10 @@ class ChatGPTAPI {
     const realUA = this._config[4]
     if (realUA && typeof realUA === 'string' && realUA.length > 20) {
       this._headers['user-agent'] = realUA
-      if (this._log) console.log(`[ChatGPT] User-agent: ${realUA.slice(0, 60)}...`)
+      // if (this._log) console.debug(`[ChatGPT] User-agent: ${realUA.slice(0, 60)}...`)
     }
 
-    if (this._log) console.log('[ChatGPT] Initialized from capture JSON')
+    if (this._log) console.debug('[ChatGPT] Initialized from capture JSON')
 
     await this._refreshSentinel()
     this._ready = true
@@ -108,7 +108,7 @@ class ChatGPTAPI {
     }
 
     if (this._log)
-      console.log('[PROMPT] REQ', {
+      console.debug('[PROMPT] REQ', {
         chatSessionId,
         parentMessageId,
         prompt,
@@ -123,12 +123,12 @@ class ChatGPTAPI {
       body: JSON.stringify(body),
     })
 
-    if (this._log) console.log(res.status, res.statusText)
+    if (this._log) console.debug(res.status, res.statusText)
 
     // Non-200 status is logged here; the error branch below throws for the caller to handle.
     // No automatic sentinel-refresh-and-retry is implemented.
     if (res.status !== 200) {
-      if (this._log) console.log(`[ChatGPT] Got ${res.status}`)
+      console.error(`[ChatGPT] Got ${res.status}`)
     }
 
     if (!res.ok) {
@@ -184,7 +184,7 @@ class ChatGPTAPI {
     })
 
     if (!res.ok) {
-      if (this._log) console.log(`[ChatGPT] Prepare conversation returned ${res.status}`)
+      if (this._log) console.error(`[ChatGPT] Prepare conversation returned ${res.status}`)
       return
     }
 
@@ -194,7 +194,7 @@ class ChatGPTAPI {
     if (data.conduit_token) {
       this._headers['x-conduit-token'] = data.conduit_token
       if (this._log)
-        console.log('[ChatGPT] Conduit token from body for conversation:', conversationId)
+        console.debug('[ChatGPT] Conduit token from body for conversation:', conversationId)
     }
   }
 
@@ -242,7 +242,7 @@ class ChatGPTAPI {
     }
 
     // Cookies captured automatically via _captureResponseHeaders → CookieJar
-    // console.log('[ChatGPT] Sentinel refreshed')
+    // console.debug('[ChatGPT] Sentinel refreshed')
   }
 
   /**
@@ -276,13 +276,13 @@ class ChatGPTAPI {
     const oaiIsUpdate = res.headers.get('x-oai-is-update')
     if (oaiIsUpdate) {
       this._headers['x-oai-is'] = oaiIsUpdate
-      // console.log('[ChatGPT] Updated x-oai-is from response header')
+      // console.debug('[ChatGPT] Updated x-oai-is from response header')
     }
 
     const conduitToken = res.headers.get('x-conduit-token')
     if (conduitToken) {
       this._headers['x-conduit-token'] = conduitToken
-      // console.log('[ChatGPT] Updated x-conduit-token from response header')
+      // console.debug('[ChatGPT] Updated x-conduit-token from response header')
     }
 
     this._headers['cookie'] = this._cookies.toString()

@@ -52,7 +52,7 @@ class ClaudeAPI {
     const initialCookie = this._headers.cookie || this._headers.Cookie || ''
     if (initialCookie) {
       const count = this._cookies.seedFromHeader(initialCookie)
-      if (this._log) console.log(`[Claude] Seeded cookie jar with ${count} initial cookies`)
+      if (this._log) console.debug(`[Claude] Seeded cookie jar with ${count} initial cookies`)
     } else if (this._log) {
       console.warn('[Claude] WARNING: No cookies in headers! Cloudflare will block.')
     }
@@ -62,12 +62,12 @@ class ClaudeAPI {
     const orgMatch = url.match(/\/organizations\/([a-f0-9-]+)/i)
     if (orgMatch) {
       this._orgId = orgMatch[1]
-      if (this._log) console.log(`[Claude] Extracted org ID from URL: ${this._orgId}`)
+      if (this._log) console.debug(`[Claude] Extracted org ID from URL: ${this._orgId}`)
     } else if (this._log) {
       console.warn('[Claude] WARNING: No org ID found in URL. Will need discovery.')
     }
 
-    if (this._log) console.log('[Claude] Initialized from capture JSON')
+    if (this._log) console.debug('[Claude] Initialized from capture JSON')
   }
 
   /**
@@ -142,7 +142,7 @@ class ClaudeAPI {
     const path = `/organizations/${this._orgId}/chat_conversations/${chatSessionId}/completion`
 
     if (this._log)
-      console.log('[PROMPT] REQ', {
+      console.debug('[PROMPT] REQ', {
         chatSessionId,
         parentMessageId,
         prompt,

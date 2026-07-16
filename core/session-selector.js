@@ -5,6 +5,7 @@ const { ClaudeAPI } = require('./claude/api')
 const { DeepSeekAPI } = require('./deepseek/api')
 const { ChatGPTAPI } = require('./chatgpt/api')
 const { MODEL_HASH } = require('../config/constants')
+const { text } = require('../utils/logger')
 
 class SessionSelector {
   constructor() {
@@ -221,7 +222,7 @@ class SessionSelector {
   }
 
   async _promptNewUser() {
-    console.log('\n  ── Create New User ──\n')
+    console.info('\n  ── Create New User ──\n')
 
     const { username } = await prompts(
       {
@@ -243,7 +244,7 @@ class SessionSelector {
 
     const providerUrl = PROVIDER_URLS[this.provider]
     if (providerUrl) {
-      console.log(`\n  Opening ${providerUrl} in your browser...`)
+      console.debug.mix(`\n  Opening ${text.blue(providerUrl)} in your browser...`)
       this._openBrowser(providerUrl)
     }
 
@@ -251,30 +252,32 @@ class SessionSelector {
       deepseek: [
         '  1. Open DevTools (F12) → Network tab',
         '  2. Send any message on chat.deepseek.com',
-        '  3. Find a request to /api/v0/chat/completion',
+        `  3. Find a request to ${text.cyan('/api/v0/chat/completion')}`,
         '  4. Right-click → Copy → Copy as fetch',
       ],
       claude: [
         '  1. Open DevTools (F12) → Network tab',
         '  2. Send any message on claude.ai',
-        '  3. Find a request to /api/organizations/.../completion',
+        `  3. Find a request to ${text.cyan('/api/organizations/.../completion')}`,
         '  4. Right-click → Copy → Copy as fetch',
       ],
       chatgpt: [
         '  1. Open DevTools (F12) → Network tab',
         '  2. Send any message on chatgpt.com',
-        '  3. Find a request to /backend-api/f/conversation',
+        `  3. Find a request to ${text.cyan('/backend-api/f/conversation')}`,
         '  4. Right-click → Copy → Copy as fetch',
       ],
     }
 
     const steps = PROVIDER_STEPS[this.provider] || []
-    console.log('\n  Paste the full fetch() call from browser DevTools:')
-    steps.forEach((s) => console.log(s))
-    console.log()
+    console.debug('\n  Paste the full fetch() call from browser DevTools:')
+    steps.forEach((s) => console.debug.mix(s))
+    console.debug('')
 
     while (true) {
-      console.log('  Notepad will open — paste your fetch() call, save (Ctrl+S), close Notepad.\n')
+      console.debug(
+        '  Notepad will open — paste your fetch() call, save (Ctrl+S), close Notepad.\n',
+      )
       const fetchStr = await this._openEditor()
 
       if (!fetchStr || !fetchStr.includes('fetch(')) {
@@ -323,11 +326,11 @@ class SessionSelector {
         continue
       }
 
-      process.stdout.write('  Validating browser session...')
+      process.stdout.write(text.dim('  Validating browser session...'))
       try {
         await this._validateLiveConnection(parsedFetch)
         process.stdout.write('\r                                  ')
-        process.stdout.write('\r  √ Session verified\n\n')
+        process.stdout.write('\r  ' + text.green('√ Session verified') + '\n\n')
       } catch (e) {
         process.stdout.write(' ✖\n\n')
         console.error(`  ✖ Live check failed: ${e.message}\n`)
@@ -469,9 +472,9 @@ class SessionSelector {
 
     if (!confirmed) return this._stepSessionSelection()
 
-    process.stdout.write('  Deleting sessions...')
+    process.stdout.write(text.dim('  Deleting sessions...'))
     await this._deleteProviderSessions()
-    process.stdout.write('\r  √ Done.                  \n\n')
+    process.stdout.write('\r  ' + text.green('√ Done.') + '                  \n\n')
 
     this.user.sessions = []
     return this._stepSessionSelection()
@@ -511,11 +514,11 @@ class SessionSelector {
     await cfg.init(api)
 
     let deleted = 0
-    process.stdout.write(`\r                                      `)
+    process.stdout.write('\r                                      ')
     for (const session of toDelete) {
       try {
         deleted++
-        process.stdout.write(`\r  Deleting ${deleted}/${toDelete.length}`)
+        process.stdout.write(text.dim(`\r  Deleting ${deleted}/${toDelete.length}`))
         await api.deleteSession(session.chatSessionId)
       } catch (e) {
         console.warn(`\n  ⚠ Failed ${session.chatSessionId}: ${e.message}`)
