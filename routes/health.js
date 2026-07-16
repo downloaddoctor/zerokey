@@ -1,30 +1,21 @@
 const express = require('express')
-const { MODELS } = require('../config/constants')
 
-const router = express.Router()
+function buildHealthRouter(preSelected) {
+  const router = express.Router()
 
-// GET /health - Health check endpoint
-router.get('/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
+  // GET /health - Health check endpoint
+  router.get('/health', (req, res) => {
+    res.json({
+      status: 'healthy',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      provider: preSelected?.provider || null,
+      model: preSelected?.session?.model || null,
+      username: preSelected?.user || null,
+    })
   })
-})
 
-// GET / - Root endpoint with API info
-router.get('/', (req, res) => {
-  res.json({
-    name: 'ZeroKey API Server',
-    version: '1.0.0',
-    description: 'OpenAI-compatible AI proxy for DeepSeek, Claude & ChatGPT',
-    endpoints: {
-      models: 'GET /v1/models',
-      chat_completions: 'POST /v1/chat/completions',
-      health: 'GET /health',
-    },
-    models: Object.keys(MODELS),
-  })
-})
+  return router
+}
 
-module.exports = router
+module.exports = buildHealthRouter

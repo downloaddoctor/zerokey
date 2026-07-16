@@ -49,4 +49,20 @@ const MODELS = {
   },
 }
 
-module.exports = { CONFIG, MODELS }
+const MODEL_HASH = {
+  claude: {
+    'claude-sonnet-4-6': 'Claude Sonnet 4.6',
+    'claude-sonnet-5': 'Claude Sonnet 5',
+    'claude-haiku-4-5-20251001': 'Claude Haiku 4.5',
+  },
+  chatgpt: {
+    auto: 'Gpt-4o',
+  },
+  deepseek: {
+    expert: 'Deepseek V4 - Expert',
+    default: 'Deepseek V4 - Instant',
+    vision: 'Deepseek V4 - Vision',
+  },
+}
+
+module.exports = { CONFIG, MODELS, MODEL_HASH }

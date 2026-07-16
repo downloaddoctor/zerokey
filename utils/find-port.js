@@ -12,6 +12,14 @@ function checkPort(p) {
   })
 }
 
+/**
+ * Resolves true if something is actively listening on the given port, false otherwise.
+ * Inverse of checkPort (checkPort resolves true when a port is free).
+ */
+async function isPortActive(p) {
+  return !(await checkPort(p))
+}
+
 async function findPort(start, range = 100) {
   for (let port = start; port <= start + range; port++) {
     if (await checkPort(port)) {
@@ -23,4 +31,4 @@ async function findPort(start, range = 100) {
   process.exit(1)
 }
 
-module.exports = { findPort }
+module.exports = { findPort, isPortActive }

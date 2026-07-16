@@ -1,13 +1,15 @@
 const fs = require('fs')
 const express = require('express')
+const infoRouter = require('./routes/info')
 const modelsRouter = require('./routes/models')
-const healthRouter = require('./routes/health')
+const buildHealthRouter = require('./routes/health')
 const buildRouter = require('./core/chat-router')
 
 const { CONFIG } = require('./config/constants')
 const { SessionSelector } = require('./core/session-selector')
 const { toOpenAIError } = require('./utils/errors')
 const { findPort } = require('./utils/find-port')
+const { syncIdeConfig } = require('./utils/sync-ide-config')
 
 const app = express()
 
@@ -36,8 +38,8 @@ app.use((req, res, next) => {
   next()
 })
 
+app.use('/', infoRouter)
 app.use('/v1/models', modelsRouter)
-app.use('/', healthRouter)
 ;(async () => {
   const selector = new SessionSelector()
   const preSelected = await selector.select()
@@ -60,6 +62,10 @@ app.use('/', healthRouter)
   console.log(`\n[Server] ${_tags}`)
 
   const port = await findPort(CONFIG.PORT)
+
+  app.use('/', buildHealthRouter(preSelected))
+
+  await syncIdeConfig(preSelected, port)
 
   try {
     const router = await buildRouter(preSelected)

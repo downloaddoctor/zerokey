@@ -25,10 +25,10 @@ OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** �
 
 Download the latest launcher for your OS from the **[Releases page](https://github.com/downloaddoctor/zerokey/releases/latest)**:
 
-| OS            | Download                                                                                              | Run                                     |
-| ------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
-| Windows       | [⬇ zerokey.bat](https://github.com/downloaddoctor/zerokey/releases/latest/download/zerokey.bat) | double-click to run                      |
-| Linux / macOS | [⬇ zerokey.sh](https://github.com/downloaddoctor/zerokey/releases/latest/download/zerokey.sh)   | `chmod +x zerokey.sh && ./zerokey.sh`    |
+| OS            | Download                                                                                        | Run                                   |
+| ------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Windows       | [⬇ zerokey.bat](https://github.com/downloaddoctor/zerokey/releases/latest/download/zerokey.bat) | double-click to run                   |
+| Linux / macOS | [⬇ zerokey.sh](https://github.com/downloaddoctor/zerokey/releases/latest/download/zerokey.sh)   | `chmod +x zerokey.sh && ./zerokey.sh` |
 
 Place the script in any folder and run it. It will:
 
@@ -119,10 +119,7 @@ The `Authorization: Bearer <ide>` header maps the request to the correct IDE's t
 
 ### VS Code — Built-in
 
-1. F1 → Manage Language Model → Add models → Custom Endpoint
-2. Select Chat Completions → API key: `vscode`
-3. Copy **[models.json](config/models.json)** contents into the auto-opened VS Code models file
-4. In VS Code chat, select **ZK - 8000** (or whichever port ZeroKey is running on) as the active model
+1. In VS Code chat, select the model ZeroKey just added as the active model
 
 ### Terax
 
