@@ -23,7 +23,6 @@ if not exist "%DIR%\.git" (
         exit /b 1
     )
     cd /d "%DIR%"
-    git remote rename origin main 2>nul
     goto install_deps
 )
 
@@ -37,14 +36,14 @@ if not exist "node_modules\" goto install_deps
 echo.
 echo Checking for updates...
 call :hr
-git fetch %BRANCH% 2>nul
+git fetch origin 2>nul
 if %errorlevel% neq 0 (
     echo Could not check for updates (no network?^)
     goto start
 )
 
 for /f "delims=" %%i in ('git rev-parse HEAD') do set LOCAL=%%i
-for /f "delims=" %%i in ('git rev-parse %BRANCH%/%BRANCH% 2^>nul') do set REMOTE=%%i
+for /f "delims=" %%i in ('git rev-parse origin/%BRANCH% 2^>nul') do set REMOTE=%%i
 
 if "%REMOTE%"=="" (
     echo Could not reach remote — skipping.
@@ -67,7 +66,7 @@ if /i "!DOUPDATE!"=="y" (
     echo.
     echo Pulling latest changes...
     call :hr
-    git pull %BRANCH% %BRANCH%
+    git pull origin %BRANCH%
     call :hr
     goto install_deps
 )

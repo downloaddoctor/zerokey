@@ -1,3 +1,4 @@
+const fs = require('fs')
 const express = require('express')
 const modelsRouter = require('./routes/models')
 const healthRouter = require('./routes/health')
@@ -72,6 +73,17 @@ app.use('/', healthRouter)
     console.error('[Server] Unhandled error:', err.message || err)
     const openaiErr = toOpenAIError(err, preSelected.provider)
     const status = openaiErr.error?.status || err.statusCode || err.status || 500
+    try {
+      const detail = [
+        `[${new Date().toISOString()}]`,
+        `${req.method} ${req.originalUrl}`,
+        `Status: ${status}`,
+        `Message: ${err.message || err}`,
+        err.stack || '',
+        `Body: ${JSON.stringify(req.body, null, 2)}`,
+      ].join('\n')
+      fs.appendFileSync(`temp/errors.txt`, detail + '\n\n---\n\n')
+    } catch {}
     if (!res.headersSent) res.status(status).json(openaiErr)
     else res.end()
   })

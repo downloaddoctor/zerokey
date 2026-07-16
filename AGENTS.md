@@ -37,7 +37,7 @@ lib/engine/ # tool compilation, prompt formatting, IDE mappings
  lib/engine/index.js → ToolCompiler (singleton per ide+provider); formatPrompt dispatches by role; parse/compile/emit tool calls; _mergeTodo; inferType
  lib/engine/dynamic-tools.js → syncDynamicTools — hash req.body.tools[], register MCP passthrough tools
  lib/engine/instructions.js → Instructions singleton; lazy-loads instructions.md + skills-extra.md
- lib/engine/instructions.md # system prompt for LLM (BPI syntax, tool grammar, coding rules)
+ lib/engine/instructions.md # system prompt for LLM (BPI syntax, tool grammar, coding rules; XML-tagged sections: CONTEXT/ROLE/CODE-STYLE/BPI-SYNTAX/BPI-LIST/EXECUTION-MODEL/CRITICAL-RULES/OUTPUT-CONTRACT)
  lib/engine/skills-extra.md # extra skills appended to instructions (editing instructions themselves)
  lib/engine/stream.js → Stream class; iterative state machine scans LLM output for ⟦tool⟧ markers, emits SSE chunks + tool_calls; _maxToolLen from tool registry
  lib/engine/tool-defs.js → TOOLS registry (read/write/replace/ask/ls/mkdir/glob/grep/cmd/todos_add/todos_set), getIDEMapper(ide), IDE-specific prompt optimizers (vscode/terax/opencode user/tool formatters)
@@ -52,7 +52,7 @@ utils/ # shared utilities
  utils/sse-reader.js → readSSE — generic SSE stream parser with 1MB buffer cap
  utils/stream-helpers.js → createSendFinalChunk, createOnError — shared SSE finalizers (flush tools, emit [DONE], update session.lastUsed; onError writes error JSON to SSE stream)
  utils/har-to-capture.js → harToCapture — convert HAR files to network-capture JSON format
-temp/ # runtime data: users.json, scratch files (not committed)
+temp/ # runtime data: users.json, errors.txt (server error log), scratch files (not committed)
 docs/ # static docs site
  docs/index.html
  docs/logos/
@@ -256,6 +256,11 @@ Stream buffer cap: 1MB (SSE reader)
 - Claude instructions set via PUT /api/account_profile only on new session and only if hash changed
 - ChatGPT instructions set via PATCH /backend-api/user_system_messages only on new session (currently commented out in route)
 - write tool (vscode) deletes existing file before creating new one to avoid conflict
+- tool-defs.js: '$workspace' marker in userRequest opts a new-session message into receiving the <WORKSPACE> struct block; without it only <CWD> is prepended on new sessions
+- tool-defs.js shortenToolOutput: replaces skip/cancel IDE messages with '[SKIPPED BY USER]' / '[CANCELLED BY USER]' before per-tool shortener runs
+- lib/engine/index.js: user/tool message formatting shares toolFormatter(messages, lastIdx) helper; toolMapping.transform(args, item) hook runs on parsed tool-call args before dispatch (IDE-specific arg mutation point)
+- server.js: unhandled route errors appended to temp/errors.txt (timestamp, method+url, status, message, stack, request body) best-effort, swallows its own write failures
+- zerokey.bat: fetch/pull/rev-parse use literal 'origin' remote instead of %BRANCH% (previous version aliased origin→main incorrectly)
 - temp/users.json written atomically via .tmp rename to prevent corruption
 - Cookie jar shared per API client instance; cookies captured from all response headers, serialized into Cookie header for subsequent requests
  headers captured: Set-Cookie, x-oai-is, x-conduit-token (ChatGPT)
