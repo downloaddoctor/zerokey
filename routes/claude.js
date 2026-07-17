@@ -4,7 +4,7 @@ const { claudeStreamHandler } = require('../core/claude/stream-handler')
 const { toOpenAIError } = require('../utils/errors')
 const ToolCompiler = require('../lib/engine')
 const { setClaudeInstructions } = require('../core/claude/set-instructions')
-const { extractFiles, uploadExtractedFiles } = require('../utils/extract-files')
+const { extractFiles, uploadFiles } = require('../utils/extract-files')
 
 const claudeApi = new ClaudeAPI()
 const { acquireSlot } = require('../utils/rate-limiter')
@@ -33,20 +33,18 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
         )
     }
 
+    const fileIds = []
+    const uploadFile = async (f) => fileIds.push(await claudeApi.uploadFile(f))
     const compiler = new ToolCompiler(req.ide, 'claude')
     const isNewSession = session.parentMessageId == null
 
     const { dynamicGrammar } = compiler.syncDynamicTools(req.body.tools || [], session)
 
-    const prompt = compiler.formatPrompt(messages, isNewSession)
+    const prompt = await compiler.formatPrompt(messages, isNewSession, uploadFile)
 
     if (isNewSession) {
       await setClaudeInstructions(claudeApi, userData, dynamicGrammar, toolCalling)
     }
-
-    // Extract and upload files from messages
-    const files = extractFiles(messages)
-    const fileIds = await uploadExtractedFiles(files, (f) => claudeApi.uploadFile(f), 'Claude')
 
     await acquireSlot('Claude')
 

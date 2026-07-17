@@ -20,12 +20,13 @@ Single quotes. LF line endings.
 - ⟦ls¦path={abs_path}⟧
 - ⟦mkdir¦path={abs_path}⟧
 - ⟦glob¦pattern={glob}(¦max={int:1-200})?⟧
-- ⟦grep¦query={str}(¦regex={bool})?(¦glob={glob})?(¦max={int:1-200})?⟧ — regex=true: query is a regex; omitted/false: literal string
+- ⟦grep¦(query={str}|queryR={regex})(¦glob={glob})?(¦max={int:1-200})?⟧
 - ⟦cmd(¦run={str}(¦till={int:1-300})?)+⟧ — till=seconds; omit for no timeout.
 - ⟦cmd_bg¦run={str}⟧ — starts detached, returns {termId} immediately, no output wait
 - ⟦cmd_poll¦termId={str}⟧ — fetch output/status of a cmd_bg (or timed-out cmd) terminal by id
 - ⟦cmd_kill¦termId={str}⟧ — terminate a cmd_bg (or async) terminal by id
-- ⟦fetch¦url={str}(¦query={str})?⟧ — fetch main content from a URL; query focuses extraction (vscode only)
+- ⟦fetch¦url={str}(¦query={str})?⟧ — fetch main content from a URL
+- ⟦view_image¦path={abs_path}⟧ — supports - png, jpg, jpeg, gif, webp
 - ⟦errors¦all={bool}(¦path={str})?⟧ — get compile/lint errors
 - ⟦todos_add(¦id={int}¦title={str}¦desc={str})+⟧
 - ⟦todos_set(¦id={int}¦status={active|done})+⟧

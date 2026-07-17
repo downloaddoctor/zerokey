@@ -88,6 +88,7 @@ class DeepSeekAPI {
         chatSessionId,
         parentMessageId,
         prompt,
+        refFileIds,
         promptLength: prompt.length,
       })
 

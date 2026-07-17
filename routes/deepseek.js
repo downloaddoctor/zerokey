@@ -5,7 +5,6 @@ const { DeepSeekAPI } = require('../core/deepseek/api')
 const { toOpenAIError } = require('../utils/errors')
 const { streamHandler } = require('../core/deepseek/stream-handler')
 const { acquireSlot } = require('../utils/rate-limiter')
-const { extractFiles, uploadExtractedFiles } = require('../utils/extract-files')
 
 const deepseekApi = new DeepSeekAPI()
 
@@ -18,7 +17,6 @@ async function buildDeepSeekRouter(parsedFetch, session) {
   router.post('/', async (req, res) => {
     const { messages = [] } = req.body
     const toolCalling = session.toolCalling ?? true
-    const modelType = session.model || 'expert'
 
     if (!messages || messages.length === 0) {
       return res
@@ -34,20 +32,19 @@ async function buildDeepSeekRouter(parsedFetch, session) {
     }
 
     // Extract and upload files from messages
-    const files = extractFiles(messages)
-    const fileIds = await uploadExtractedFiles(files, (f) => deepseekApi.uploadFile(f), 'DeepSeek')
+    const fileIds = []
+    const uploadFile = async (f) => fileIds.push(await deepseekApi.uploadFile(f))
 
     const compiler = new ToolCompiler(req.ide, 'deepseek')
     const isNewSession = session.parentMessageId == null
+    const modelType = isNewSession ? session.model || 'expert' : null
 
     const { dynamicGrammar } = compiler.syncDynamicTools(req.body.tools || [], session)
 
-    let prompt = compiler.formatPrompt(messages, isNewSession)
-    let model_type = null
+    let prompt = await compiler.formatPrompt(messages, isNewSession, uploadFile)
 
     if (isNewSession) {
       prompt = toolCalling ? compiler.buildPrompt(prompt, dynamicGrammar) : prompt
-      model_type = modelType
     }
 
     await acquireSlot('DeepSeek')
@@ -59,7 +56,7 @@ async function buildDeepSeekRouter(parsedFetch, session) {
         session.parentMessageId,
         false,
         true,
-        model_type,
+        modelType,
         fileIds,
       )
 
@@ -78,8 +75,8 @@ async function buildDeepSeekRouter(parsedFetch, session) {
           session.parentMessageId,
           false,
           true,
-          model_type,
-          refFileIds,
+          modelType,
+          fileIds,
         )
       }
 

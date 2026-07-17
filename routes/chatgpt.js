@@ -37,7 +37,7 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
 
     const { dynamicGrammar } = compiler.syncDynamicTools(req.body.tools || [], session)
 
-    let prompt = compiler.formatPrompt(messages, isNewSession)
+    let prompt = await compiler.formatPrompt(messages, isNewSession, () => {})
 
     if (isNewSession && toolCalling) {
       // await setChatGPTInstructions(chatgptApi, userData)
