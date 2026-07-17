@@ -79,12 +79,57 @@ class ClaudeAPI {
    * @param {string} model - Model identifier (default: claude-sonnet-4-6)
    * @param {Array} tools - Tool definitions array
    */
+  async uploadFile(fileContent, fileName) {
+    if (!this._orgId) throw new Error('Organization ID not set')
+
+    const boundary = '----WebKitFormBoundary' + Math.random().toString(36).slice(2)
+    const CRLF = '\r\n'
+    const header =
+      `--${boundary}${CRLF}` +
+      `Content-Disposition: form-data; name="file"; filename="${fileName}"${CRLF}` +
+      `Content-Type: application/octet-stream${CRLF}${CRLF}`
+    const footer = `${CRLF}--${boundary}--${CRLF}`
+
+    const bodyBuffer = Buffer.concat([
+      Buffer.from(header, 'utf-8'),
+      fileContent,
+      Buffer.from(footer, 'utf-8'),
+    ])
+
+    const res = await this._fetch(
+      `${ClaudeAPI.BASE_URL}/${this._orgId}/upload`,
+      {
+        method: 'POST',
+        headers: this._buildHeaders(
+          { 'content-type': `multipart/form-data; boundary=${boundary}` },
+          `/${this._orgId}/upload`,
+        ),
+        body: bodyBuffer,
+      },
+      true,
+    )
+
+    const body = res.data
+    if (!body.success || !body.file_uuid) {
+      throw new Error(`Claude file upload failed: ${JSON.stringify(body)}`)
+    }
+
+    if (this._log) {
+      console.debug(
+        `[Claude] File uploaded: ${fileName} (${fileContent.length} bytes) → ${body.file_uuid} (${body.file_kind})`,
+      )
+    }
+
+    return body.file_uuid
+  }
+
   async chatCompletion(
     prompt,
     chatSessionId = null,
     parentMessageId = null,
     model = 'claude-sonnet-4-6',
     tools = [],
+    fileIds = [],
   ) {
     if (!this._orgId) throw new Error('Organization ID not set')
 
@@ -119,7 +164,7 @@ class ClaudeAPI {
         assistant_message_uuid: assistantMessageUuid,
       },
       attachments: [],
-      files: [],
+      files: fileIds,
       sync_sources: [],
       rendering_mode: 'messages',
     }
@@ -237,7 +282,7 @@ class ClaudeAPI {
 
     // Block 1: Common prefix — exact HAR order from capture
     h.push(['accept', overrides.accept || '*/*'])
-    h.push(['accept-encoding', 'gzip, deflate, br, zstd'])
+    h.push(['accept-encoding', 'gzip, deflate, br'])
     h.push(['accept-language', src['accept-language'] || 'en-US,en;q=0.9'])
 
     // Anthropic client headers

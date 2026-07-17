@@ -55,7 +55,7 @@ class CookieJar {
       if (!parsed) continue
       this._jar.set(parsed.name, parsed.value)
       count++
-      // console.log(`[CookieJar${label}] captured: ${parsed.name}=${parsed.value.slice(0, 20)}...`)
+      // console.debug(`[CookieJar${label}] captured: ${parsed.name}=${parsed.value.slice(0, 20)}...`)
     }
 
     return count
@@ -73,7 +73,7 @@ class CookieJar {
       if (!parsed) continue
       this._jar.set(parsed.name, parsed.value)
       count++
-      // console.log(`[CookieJar${label}] captured: ${parsed.name}=${parsed.value.slice(0, 20)}...`)
+      // console.debug(`[CookieJar${label}] captured: ${parsed.name}=${parsed.value.slice(0, 20)}...`)
     }
     return count
   }

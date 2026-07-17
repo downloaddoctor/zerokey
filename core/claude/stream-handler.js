@@ -63,7 +63,7 @@ async function claudeStreamHandler(res, stream, session, parser, cb) {
             const h5 = formatWindow(ml.windows?.['5h'], 'time')
             const d7 = formatWindow(ml.windows?.['7d'], 'full')
 
-            console.log(
+            console.warn(
               `[Claude] Limit: ${ml.type} | 5h: ${h5.pct} (resets ${h5.reset}) | 7d: ${d7.pct} (resets ${d7.reset})`,
             )
 

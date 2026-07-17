@@ -22,7 +22,7 @@ app.use((req, res, next) => {
   res.on('finish', () => {
     const duration = Date.now() - start
     const bodySize = req.body?.messages?.length ? `${req.body.messages.length} msgs` : '-'
-    console.log(
+    console.debug(
       `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} → ${res.statusCode} (${duration}ms) | IDE: ${req.ide || '?'} | body: ${bodySize}`,
     )
   })

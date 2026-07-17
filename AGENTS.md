@@ -18,7 +18,7 @@ core/ # session management, chat router, provider API clients
   core/deepseek/pow.js → DeepSeekPOW — WASM SHA3 proof-of-work solver
   core/deepseek/stream-handler.js → streamHandler — SSE parser for DeepSeek response format
  core/claude/ # Claude API client, SSE stream handler, instructions setter
-  core/claude/api.js → ClaudeAPI — conversation completion, client-side UUID gen, org ID extraction, HAR-ordered headers, session delete, cookie management, HTTP keep-alive, optional _log flag, getAccountProfile for live validation
+  core/claude/api.js → ClaudeAPI — conversation completion, file upload (multipart POST to /api/{orgId}/upload → file_uuid), client-side UUID gen, org ID extraction, HAR-ordered headers, session delete, cookie management, HTTP keep-alive, optional _log flag, getAccountProfile for live validation
   core/claude/stream-handler.js → claudeStreamHandler(res, stream, session, parser, cb) — SSE parser, message_limit detection, delegates >=90% usage to cb callback
   core/claude/set-instructions.js → setClaudeInstructions — PUT account_profile with system prompt
  core/chatgpt/ # ChatGPT API client, POW solver, SSE stream handler, instructions setter
@@ -138,10 +138,12 @@ Claude deep flow:
  → ClaudeAPI.initializeFromJSON(parsedFetch)
    → extract orgId from URL
    → seed CookieJar from initial headers
- → per-request (new session):
-   → setClaudeInstructions(claudeApi, userData, dynamicGrammar, disableTools)
+ → per-request:
+   → extractFiles(messages) # scan messages backwards for image_url / file content parts
+     → decode base64 data URIs → for each: uploadFile() → POST multipart/form-data to /api/{orgId}/upload → file_uuid
+   → (new session): setClaudeInstructions(claudeApi, userData, dynamicGrammar, disableTools)
      → PUT /api/account_profile with instructions.getFull() + dynamicGrammar
- → POST /organizations/{orgId}/chat_conversations/{uuid}/completion
+ → POST /organizations/{orgId}/chat_conversations/{uuid}/completion (files: [file_uuid, ...])
    → header order: accept, accept-encoding, accept-language, anthropic-*, content-type, cookie, origin, priority, referer, sec-ch-ua*, sec-fetch-*, user-agent, x-activity-session-id
  → claudeStreamHandler → readSSE:
    → message_start → session.parentMessageId = message.uuid

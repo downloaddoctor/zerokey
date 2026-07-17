@@ -37,7 +37,7 @@ async function syncIdeConfig(preSelected, port) {
   try {
     const targetDir = path.dirname(TARGET_PATH)
     if (!fs.existsSync(targetDir)) {
-      console.log(`[IDE-CFG] Skipped sync — directory not found: ${targetDir}`)
+      console.warn(`[IDE-CFG] Skipped sync — directory not found: ${targetDir}`)
       return
     }
 

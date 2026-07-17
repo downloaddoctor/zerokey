@@ -8,6 +8,51 @@ const { setClaudeInstructions } = require('../core/claude/set-instructions')
 const claudeApi = new ClaudeAPI()
 const { acquireSlot } = require('../utils/rate-limiter')
 
+function extractFiles(messages) {
+  if (messages.length < 2) return []
+
+  const files = []
+
+  for (let i = messages.length - 2; i >= 0; i--) {
+    const msg = messages[i]
+    const content = msg.content
+    if (!Array.isArray(content)) break
+
+    let found = false
+    for (const part of content) {
+      if (part.type === 'image_url' && part.image_url?.url?.startsWith('data:')) {
+        const match = part.image_url.url.match(/^data:([^;]*);base64,(.+)$/)
+        if (match) {
+          const mime = match[1]
+          const data = Buffer.from(match[2], 'base64')
+          const ext = mime.split('/')[1] || 'png'
+          files.push({
+            filename: `image_${Date.now()}_${files.length}.${ext}`,
+            data,
+            size: data.length,
+          })
+          found = true
+        }
+      } else if (part.type === 'file' && part.file?.file_data?.startsWith('data:')) {
+        const match = part.file.file_data.match(/^data:([^;]*);base64,(.+)$/)
+        if (match) {
+          const data = Buffer.from(match[2], 'base64')
+          files.push({
+            filename: part.file.filename || `file_${Date.now()}_${files.length}`,
+            data,
+            size: data.length,
+          })
+          found = true
+        }
+      }
+    }
+
+    if (!found) break
+  }
+
+  return files
+}
+
 async function buildClaudeRouter(parsedFetch, session, userData = null) {
   console.debug('[Claude] Initializing from parsed capture JSON')
   await claudeApi.initializeFromJSON(parsedFetch)
@@ -43,6 +88,17 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
       await setClaudeInstructions(claudeApi, userData, dynamicGrammar, toolCalling)
     }
 
+    // Extract and upload files from messages
+    let fileIds = []
+    const files = extractFiles(messages)
+    if (files.length > 0) {
+      console.debug(`[Claude] Uploading ${files.length} file(s)...`)
+      for (const file of files) {
+        const id = await claudeApi.uploadFile(file.data, file.filename)
+        fileIds.push(id)
+      }
+    }
+
     await acquireSlot('Claude')
 
     try {
@@ -52,6 +108,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
         session.parentMessageId,
         model,
         [],
+        fileIds,
       )
 
       if (chatSessionId && !session.chatSessionId) {
@@ -76,7 +133,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
           const mins = Math.max(1, Math.ceil((userData.waitUntil - Date.now()) / 60000))
 
           try {
-            const summaryPrompt = `Please write a concise but complete summary of this entire conversation — topics discussed, decisions made, code written, and any open tasks — so it can be pasted into a fresh session to resume work seamlessly.`
+            const summaryPrompt = `Please write a concise but complete summary of this entire conversation — so it can be pasted into a fresh session to resume work seamlessly.`
             const { stream: summaryStream } = await claudeApi.chatCompletion(
               summaryPrompt,
               session.chatSessionId,
@@ -92,7 +149,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
               session,
               parser,
               (limitReached, sendFinalChunk) => {
-                parser.scan('```')
+                parser.scan('\n```')
                 sendLimitMessage(parser, resetTime, mins)
                 sendFinalChunk()
               },
