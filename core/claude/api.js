@@ -79,20 +79,22 @@ class ClaudeAPI {
    * @param {string} model - Model identifier (default: claude-sonnet-4-6)
    * @param {Array} tools - Tool definitions array
    */
-  async uploadFile(fileContent, fileName) {
+  async uploadFile(file) {
     if (!this._orgId) throw new Error('Organization ID not set')
+
+    const { filename, data } = file
 
     const boundary = '----WebKitFormBoundary' + Math.random().toString(36).slice(2)
     const CRLF = '\r\n'
     const header =
       `--${boundary}${CRLF}` +
-      `Content-Disposition: form-data; name="file"; filename="${fileName}"${CRLF}` +
+      `Content-Disposition: form-data; name="file"; filename="${filename}"${CRLF}` +
       `Content-Type: application/octet-stream${CRLF}${CRLF}`
     const footer = `${CRLF}--${boundary}--${CRLF}`
 
     const bodyBuffer = Buffer.concat([
       Buffer.from(header, 'utf-8'),
-      fileContent,
+      data,
       Buffer.from(footer, 'utf-8'),
     ])
 
@@ -116,7 +118,7 @@ class ClaudeAPI {
 
     if (this._log) {
       console.debug(
-        `[Claude] File uploaded: ${fileName} (${fileContent.length} bytes) → ${body.file_uuid} (${body.file_kind})`,
+        `[Claude] File uploaded: ${filename} (${data.length} bytes) → ${body.file_uuid} (${body.file_kind})`,
       )
     }
 

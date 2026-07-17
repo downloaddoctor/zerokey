@@ -4,54 +4,10 @@ const { claudeStreamHandler } = require('../core/claude/stream-handler')
 const { toOpenAIError } = require('../utils/errors')
 const ToolCompiler = require('../lib/engine')
 const { setClaudeInstructions } = require('../core/claude/set-instructions')
+const { extractFiles, uploadExtractedFiles } = require('../utils/extract-files')
 
 const claudeApi = new ClaudeAPI()
 const { acquireSlot } = require('../utils/rate-limiter')
-
-function extractFiles(messages) {
-  if (messages.length < 2) return []
-
-  const files = []
-
-  for (let i = messages.length - 2; i >= 0; i--) {
-    const msg = messages[i]
-    const content = msg.content
-    if (!Array.isArray(content)) break
-
-    let found = false
-    for (const part of content) {
-      if (part.type === 'image_url' && part.image_url?.url?.startsWith('data:')) {
-        const match = part.image_url.url.match(/^data:([^;]*);base64,(.+)$/)
-        if (match) {
-          const mime = match[1]
-          const data = Buffer.from(match[2], 'base64')
-          const ext = mime.split('/')[1] || 'png'
-          files.push({
-            filename: `image_${Date.now()}_${files.length}.${ext}`,
-            data,
-            size: data.length,
-          })
-          found = true
-        }
-      } else if (part.type === 'file' && part.file?.file_data?.startsWith('data:')) {
-        const match = part.file.file_data.match(/^data:([^;]*);base64,(.+)$/)
-        if (match) {
-          const data = Buffer.from(match[2], 'base64')
-          files.push({
-            filename: part.file.filename || `file_${Date.now()}_${files.length}`,
-            data,
-            size: data.length,
-          })
-          found = true
-        }
-      }
-    }
-
-    if (!found) break
-  }
-
-  return files
-}
 
 async function buildClaudeRouter(parsedFetch, session, userData = null) {
   console.debug('[Claude] Initializing from parsed capture JSON')
@@ -89,15 +45,8 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
     }
 
     // Extract and upload files from messages
-    let fileIds = []
     const files = extractFiles(messages)
-    if (files.length > 0) {
-      console.debug(`[Claude] Uploading ${files.length} file(s)...`)
-      for (const file of files) {
-        const id = await claudeApi.uploadFile(file.data, file.filename)
-        fileIds.push(id)
-      }
-    }
+    const fileIds = await uploadExtractedFiles(files, (f) => claudeApi.uploadFile(f), 'Claude')
 
     await acquireSlot('Claude')
 

@@ -121,23 +121,25 @@ class DeepSeekAPI {
    * @param {number} fileSize - bytes
    * @returns {Promise<string>} file_id
    */
-  async uploadFile(fileName, fileContent, fileSize) {
+  async uploadFile(file) {
     // 1. Get POW challenge for file upload
     const challenge = await this._getPowChallenge('/api/v0/file/upload_file')
     const powResponse = await this.powSolver.solveChallenge(challenge)
+
+    const { filename, data, size } = file
 
     // 2. Build multipart form data
     const boundary = '----WebKitFormBoundary' + Math.random().toString(36).slice(2)
     const CRLF = '\r\n'
     const header =
       `--${boundary}${CRLF}` +
-      `Content-Disposition: form-data; name="file"; filename="${fileName}"${CRLF}` +
+      `Content-Disposition: form-data; name="file"; filename="${filename}"${CRLF}` +
       `Content-Type: application/octet-stream${CRLF}${CRLF}`
     const footer = `${CRLF}--${boundary}--${CRLF}`
 
     const bodyBuffer = Buffer.concat([
       Buffer.from(header, 'utf-8'),
-      Buffer.isBuffer(fileContent) ? fileContent : Buffer.from(fileContent, 'utf-8'),
+      Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf-8'),
       Buffer.from(footer, 'utf-8'),
     ])
 
@@ -145,7 +147,7 @@ class DeepSeekAPI {
     const uploadHeaders = this._buildHeaders({
       'content-type': `multipart/form-data; boundary=${boundary}`,
       'x-ds-pow-response': powResponse,
-      'x-file-size': String(fileSize),
+      'x-file-size': String(size),
       'x-model-type': 'default',
       'x-thinking-enabled': '0',
     })
@@ -167,10 +169,10 @@ class DeepSeekAPI {
 
     const fileId = body.data.biz_data.id
     if (this._log)
-      console.debug(`[DeepSeek] File uploaded: ${fileName} (${fileSize} bytes) → ${fileId}`)
+      console.debug(`[DeepSeek] File uploaded: ${filename} (${size} bytes) → ${fileId}`)
 
     // 4. Poll until processing completes
-    return this._pollFile(fileId, fileName)
+    return this._pollFile(fileId, filename)
   }
 
   /**

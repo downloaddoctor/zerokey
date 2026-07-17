@@ -14,11 +14,11 @@ core/ # session management, chat router, provider API clients
  core/session-selector.js # interactive CLI wizard: provider→user→session selection; users.json persistence; Claude "(limit reached)" suffix on user list; auto-switch to available users; deleteAllSessions with provider-side cleanup; session mode as list pick (Tools Mode / Raw Mode); _validateFetchHeaders checks required headers per provider; _validateLiveConnection verifies credentials with provider API; _openBrowser auto-opens provider login page for new users
  core/chat-router.js # builds Express router for selected provider, logs active session (no runtime hot-swap)
  core/deepseek/ # DeepSeek API client, POW solver, SSE stream handler
-  core/deepseek/api.js → DeepSeekAPI — chat session CRUD (create/delete/deleteAll), POW challenge, file upload (uploadFile + _pollFile), cookie management, HTTP keep-alive, optional _log flag, getCurrentUser for live validation
+  core/deepseek/api.js → DeepSeekAPI — chat session CRUD (create/delete/deleteAll), POW challenge, file upload (uploadFile({ filename, data, size }) + _pollFile), cookie management, HTTP keep-alive, optional _log flag, getCurrentUser for live validation
   core/deepseek/pow.js → DeepSeekPOW — WASM SHA3 proof-of-work solver
   core/deepseek/stream-handler.js → streamHandler — SSE parser for DeepSeek response format
  core/claude/ # Claude API client, SSE stream handler, instructions setter
-  core/claude/api.js → ClaudeAPI — conversation completion, file upload (multipart POST to /api/{orgId}/upload → file_uuid), client-side UUID gen, org ID extraction, HAR-ordered headers, session delete, cookie management, HTTP keep-alive, optional _log flag, getAccountProfile for live validation
+  core/claude/api.js → ClaudeAPI — conversation completion, file upload (uploadFile({ filename, data }) — multipart POST to /api/{orgId}/upload → file_uuid), client-side UUID gen, org ID extraction, HAR-ordered headers, session delete, cookie management, HTTP keep-alive, optional _log flag, getAccountProfile for live validation
   core/claude/stream-handler.js → claudeStreamHandler(res, stream, session, parser, cb) — SSE parser, message_limit detection, delegates >=90% usage to cb callback
   core/claude/set-instructions.js → setClaudeInstructions — PUT account_profile with system prompt
  core/chatgpt/ # ChatGPT API client, POW solver, SSE stream handler, instructions setter
@@ -53,6 +53,7 @@ utils/ # shared utilities
  utils/sse-reader.js → readSSE — generic SSE stream parser with 1MB buffer cap
  utils/stream-helpers.js → createSendFinalChunk, createOnError — shared SSE finalizers (flush tools, emit [DONE], update session.lastUsed; onError writes error JSON to SSE stream)
  utils/har-to-capture.js → harToCapture — convert HAR files to network-capture JSON format
+ utils/extract-files.js → extractFiles(messages) — scan messages backwards for image_url/file content parts, decode base64 data URIs, return [{ filename, data: Buffer, size }]; uploadExtractedFiles(files, uploadFn, label) — shared upload loop, calls uploadFn(file) for each, returns file ID array
  utils/find-port.js → findPort(start, range=100) — scans ports via checkPort socket probe (resolves true when free) until an open one is found; isPortActive(p) — inverse of checkPort, resolves true when something is actively listening
  utils/sync-ide-config.js → async syncIdeConfig(preSelected?, port?) — syncs ZeroKey model entries into VS Code's chatLanguageModels.json (%APPDATA%\Code\User\); base is the existing target file's ZeroKey.models array (falls back to an empty models list on first run), preserving non-ZeroKey entries; with args, live-checks every existing model's port via isPortActive (utils/find-port.js) and drops any not currently listening (except the current-port entry, always kept), then edits in place (or appends) the model with id `ZK-{port}`, name resolved via MODEL_HASH[provider].models[model]?.name lookup (config/constants.js); if another live port already resolves to the same name, appends ` — {port}` to disambiguate; queries each other live port's /health for its provider/model via node-fetch; non-fatal on failure
 temp/ # runtime data: users.json, errors.txt (server error log), scratch files (not committed)
