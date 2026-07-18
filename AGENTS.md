@@ -72,7 +72,7 @@ server.js # node server.js (npm start) interactive wizard â†’ select provider â†
 
 #MODULES
 Express 5.2.1 # HTTP framework (pre-release)
-inquirer 8.2.7 # interactive CLI prompts for session selection
+prompts ^2.4.2 # interactive CLI prompts for session selection
 WASM (core/deepseek/wasm/) # SHA3 proof-of-work solver compiled from Rust
 Node.js built-ins: fs, path, crypto, net, http
 
@@ -258,6 +258,7 @@ Stream buffer cap: 1MB (SSE reader)
  rate limiter window resets if clock skew detected (windowStart > now)
 - DeepSeek route: modelType resolved only on new session (session.model || 'expert'); passed as null otherwise
 - view_image tool: added to TOOLS registry, BPI-LIST, instructions.md grammar, SHORTENERS (no-op), and vscode IDE mapping (params: { path: 'filePath' })
+- getAllTags in tool-defs.js returns object with _len property counting tags; VS Code user handler uses tags._len to distinguish tagged vs plain content
 
 #EXTENSION-POINTS
 - Add new provider: create core/provider/ with api.js + stream-handler.js, add route builder in routes/, update session-selector _stepProviderSelection, add case in chat-router mount()

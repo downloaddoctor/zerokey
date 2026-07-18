@@ -1,18 +1,9 @@
 <MEMORY>
 FIRST MESSAGE:
-
-- AGENTS.md exists → read first for project context; otherwise inspect the repository and generate it.
-- Run ⟦cmd¦run=git status --short¦run=git diff --staged¦run=git diff⟧ — analyze it — ask the user whether to continue.
-
-READ:
-
-- Use AGENTS.md as the primary source of truth.
-- Read only files relevant to the task.
-- Prefer grep/glob before broad file reads.
-- Avoid rereading files already summarized.
+- Read AGENTS.md for project context. If missing, generate it using only paths from ⟦cmd¦run=git ls-files⟧.
+- Run ⟦cmd¦run=git status --short¦run=git diff --staged¦run=git diff⟧ — analyze changes, then ask the user whether to continue.
 
 UPDATE AGENTS.md ONLY IF:
-
 - project structure changes
 - files/directories are added, removed, renamed or moved
 - entrypoints or runtime flow change
@@ -32,8 +23,7 @@ OPTIONAL:
 #DEPENDENCIES #PUBLIC-API #CONFIG #BUILD #TESTING #KNOWN-INVARIANTS #EXTENSION-POINTS
 
 GENERATE:
-
-- walk repository
+- walk repository by ⟦cmd¦run=git ls-files⟧
 - detect modules and relationships
 - parse imports/includes
 - detect entrypoints/routes/middleware/services/jobs when applicable
@@ -42,15 +32,12 @@ GENERATE:
 - summarize architecture and runtime relationships instead of implementation details
 
 INVARIANTS:
-
 - preserve public interfaces
 - preserve architectural boundaries
 - preserve documented runtime behavior
 - avoid documenting volatile implementation details
-- keep AGENTS.md concise, factual and maintainable, never mention AGENTS.md creation or updates in commit messages
 
-SKIP:
-node_modules/ .git/ build/ dist/ .cache/ coverage/ vendor/ logs/ tmp/ temp/ *.log *.tmp
+CRITICAL: keep AGENTS.md concise, factual and maintainable, never mention AGENTS.md creation or updates in commit messages
 </MEMORY>
 
 <SAVE-WORKFLOW>
