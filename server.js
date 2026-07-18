@@ -1,6 +1,7 @@
 require('./utils/logger')
 
 const fs = require('fs')
+const path = require('path')
 const express = require('express')
 const infoRouter = require('./routes/info')
 const buildModelsRouter = require('./routes/models')
@@ -78,15 +79,24 @@ app.use('/', infoRouter)
     const openaiErr = toOpenAIError(err, preSelected.provider)
     const status = openaiErr.error?.status || err.statusCode || err.status || 500
     try {
+      const { tools, ...body } = req.body
       const detail = [
         `[${new Date().toISOString()}]`,
         `${req.method} ${req.originalUrl}`,
         `Status: ${status}`,
         `Message: ${err.message || err}`,
         err.stack || '',
-        `Body: ${JSON.stringify(req.body, null, 2)}`,
+        `Body: ${JSON.stringify(body, null, 2)}`,
       ].join('\n')
-      fs.appendFileSync(`temp/errors.txt`, detail + '\n\n---\n\n')
+
+      const errorsFile = path.join('temp', 'errors.txt')
+      const MAX = 1024 * 1024 // 1MB
+      if (fs.existsSync(errorsFile) && fs.statSync(errorsFile).size > MAX) {
+        const ts = new Date().toISOString().replace(/[:.]/g, '-')
+        fs.renameSync(errorsFile, path.join('temp', `errors.${ts}.txt`))
+      }
+
+      fs.appendFileSync(errorsFile, detail + '\n\n---\n\n')
     } catch {}
     if (!res.headersSent) res.status(status).json(openaiErr)
     else res.end()

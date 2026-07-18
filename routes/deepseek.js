@@ -56,7 +56,9 @@ async function buildDeepSeekRouter(parsedFetch, session) {
       const parser = new ToolCompiler.Stream(res, 'deepseek', compiler, session)
 
       if (skill) {
-        console.info(`[DeepSeek] Skill trigger detected (${skill.triggers[0]}) — bypassing provider API`)
+        console.info(
+          `[DeepSeek] Skill trigger detected (${skill.triggers[0]}) — bypassing provider API`,
+        )
         return ToolCompiler.emitSkill(res, parser, skill)
       }
 
