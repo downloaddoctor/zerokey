@@ -41,15 +41,26 @@ async function buildDeepSeekRouter(parsedFetch, session) {
 
     const { dynamicGrammar } = compiler.syncDynamicTools(req.body.tools || [], session)
 
-    let prompt = await compiler.formatPrompt(messages, isNewSession, uploadFile)
+    let { prompt, skill } = await compiler.formatPrompt(messages, isNewSession, uploadFile)
 
     if (isNewSession) {
       prompt = toolCalling ? compiler.buildPrompt(prompt, dynamicGrammar) : prompt
     }
 
-    await acquireSlot('DeepSeek')
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Connection', 'keep-alive')
+    res.setHeader('Access-Control-Allow-Origin', '*')
 
     try {
+      const parser = new ToolCompiler.Stream(res, 'deepseek', compiler, session)
+
+      if (skill) {
+        console.info(`[DeepSeek] Skill trigger detected (${skill.triggers[0]}) — bypassing provider API`)
+        return ToolCompiler.emitSkill(res, parser, skill)
+      }
+
+      await acquireSlot('DeepSeek')
       const deepseekStream = await deepseekApi.chatCompletion(
         session.chatSessionId,
         prompt,
@@ -59,13 +70,6 @@ async function buildDeepSeekRouter(parsedFetch, session) {
         modelType,
         fileIds,
       )
-
-      res.setHeader('Content-Type', 'text/event-stream')
-      res.setHeader('Cache-Control', 'no-cache')
-      res.setHeader('Connection', 'keep-alive')
-      res.setHeader('Access-Control-Allow-Origin', '*')
-
-      const parser = new ToolCompiler.Stream(res, 'deepseek', compiler, session)
 
       const retry = async () => {
         await acquireSlot('DeepSeek', true)

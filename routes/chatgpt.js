@@ -37,7 +37,19 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
 
     const { dynamicGrammar } = compiler.syncDynamicTools(req.body.tools || [], session)
 
-    let prompt = await compiler.formatPrompt(messages, isNewSession, () => {})
+    let { prompt, skill } = await compiler.formatPrompt(messages, isNewSession, () => {})
+
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Connection', 'keep-alive')
+    res.setHeader('Access-Control-Allow-Origin', '*')
+
+    const parser = new ToolCompiler.Stream(res, 'chatgpt', compiler, session)
+
+    if (skill) {
+      console.info(`[ChatGPT] Skill trigger detected (${skill.triggers[0]}) — bypassing provider API`)
+      return ToolCompiler.emitSkill(res, parser, skill)
+    }
 
     if (isNewSession && toolCalling) {
       // await setChatGPTInstructions(chatgptApi, userData)
@@ -53,13 +65,6 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
         session.parentMessageId,
         model,
       )
-
-      res.setHeader('Content-Type', 'text/event-stream')
-      res.setHeader('Cache-Control', 'no-cache')
-      res.setHeader('Connection', 'keep-alive')
-      res.setHeader('Access-Control-Allow-Origin', '*')
-
-      const parser = new ToolCompiler.Stream(res, 'chatgpt', compiler, session)
 
       chatgptStreamHandler(res, stream, session, parser)
     } catch (error) {

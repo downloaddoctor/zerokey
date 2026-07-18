@@ -40,7 +40,19 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
 
     const { dynamicGrammar } = compiler.syncDynamicTools(req.body.tools || [], session)
 
-    const prompt = await compiler.formatPrompt(messages, isNewSession, uploadFile)
+    const { prompt, skill } = await compiler.formatPrompt(messages, isNewSession, uploadFile)
+
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Connection', 'keep-alive')
+    res.setHeader('Access-Control-Allow-Origin', '*')
+
+    const parser = new ToolCompiler.Stream(res, 'claude', compiler, session)
+
+    if (skill) {
+      console.info(`[Claude] Skill trigger detected (${skill.triggers[0]}) — bypassing provider API`)
+      return ToolCompiler.emitSkill(res, parser, skill)
+    }
 
     if (isNewSession) {
       await setClaudeInstructions(claudeApi, userData, dynamicGrammar, toolCalling)
@@ -61,13 +73,6 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
       if (chatSessionId && !session.chatSessionId) {
         session.chatSessionId = chatSessionId
       }
-
-      res.setHeader('Content-Type', 'text/event-stream')
-      res.setHeader('Cache-Control', 'no-cache')
-      res.setHeader('Connection', 'keep-alive')
-      res.setHeader('Access-Control-Allow-Origin', '*')
-
-      const parser = new ToolCompiler.Stream(res, 'claude', compiler, session)
 
       await claudeStreamHandler(res, stream, session, parser, async (limitReached) => {
         if (limitReached?.resets_at) {

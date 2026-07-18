@@ -40,7 +40,8 @@ lib/engine/ # tool compilation, prompt formatting, IDE mappings
  lib/engine/instructions.md # system prompt for LLM (BPI syntax, tool grammar, coding rules; XML-tagged sections)
  lib/engine/skills-extra.md # extra skills appended to instructions (editing instructions themselves)
  lib/engine/stream.js → Stream class; iterative state machine scans LLM output for tool markers, emits SSE chunks + tool_calls; _maxToolLen from tool registry
- lib/engine/tool-defs.js → TOOLS registry (read/write/replace/ask/ls/mkdir/glob/grep/cmd/view_image/todos_add/todos_set), getIDEMapper(ide), IDE-specific prompt optimizers (vscode/terax/opencode user/tool formatters)
+ lib/engine/tool-defs.js → TOOLS registry (read/write/replace/ask/ls/mkdir/glob/grep/cmd/view_image/todos_add/todos_set), getIDEMapper(ide), IDE-specific prompt optimizers (vscode/terax/opencode user/tool formatters); each IDES_PROMPT_OPTIMIZER[ide] also exposes rawUser(content) — pure raw user-text extraction (no USER: prefix/attachments handling) used only for trigger matching, not prompt formatting
+ lib/engine/triggers.js # exports array of { triggers: string[], bpi: string } — currently one entry (['$save']); deterministic, no-reasoning first-step BPI text only, matched/emitted by ToolCompiler.matchSkill/emitSkill in lib/engine/index.js
  lib/engine/templates/ # IDE tool schemas
   lib/engine/templates/vscode.json # VS Code tool definitions
   lib/engine/templates/terax.json # Terax tool definitions
@@ -248,12 +249,14 @@ Stream buffer cap: 1MB (SSE reader)
 - write tool (vscode) deletes existing file before creating new one to avoid conflict
 - tool-defs.js: VS Code user handler reads workspace_info from current message (not session's first message); CWD prepended from workspace_info.full on new sessions; $workspace and WORKSPACE block currently commented out
 - tool-defs.js shortenToolOutput: replaces skip/cancel IDE messages with '[SKIPPED BY USER]' / '[CANCELLED BY USER]' before per-tool shortener runs
-- lib/engine/index.js: formatPrompt is async; handlers receive (mes, messages, isNewSession, uploadFile); iterates from last assistant turn forward; system handler returns empty string; user handler returns empty string for attachments (file upload handled via uploadFile); tool handler uploads view_image content parts via uploadFile
+- lib/engine/index.js: formatPrompt is async; handlers receive (mes, messages, isNewSession, uploadFile); iterates from last assistant turn forward; system handler returns empty string; user handler returns empty string for attachments (file upload handled via uploadFile); tool handler uploads view_image content parts via uploadFile; returns { prompt, skill } — skill is the matched trigger entry from lib/engine/triggers.js (or null), computed only when the last message is role 'user' (never on a 'tool' follow-up turn) via that IDE's rawUser(content) text trimmed/lowercased against skillsByTrigger
+- lib/engine/index.js: skillsByTrigger — Map<trigger, entry> built once at module load from every lib/engine/triggers.js entry's triggers array, giving O(1) lookup in ToolCompiler.matchSkill(text); ToolCompiler.emitSkill(res, parser, skill) scans skill.bpi through the caller-supplied Stream, flushes, writes [DONE], ends response
+- routes/deepseek.js, routes/claude.js, routes/chatgpt.js: each builds response headers + Stream parser before calling the provider API; if formatPrompt's skill is non-null, calls emitSkill and returns early, bypassing the provider API for that turn only; the triggering user message never reaches the provider; the follow-up turn (client sends back the tool results) has last message role 'tool', so skill is null again and the request proceeds to the real provider/LLM normally — multi-step reasoning (e.g. AGENTS.md staleness check, commit message) is handled entirely by the LLM via instructions.md, not by the trigger system, since triggers are intentionally limited to deterministic, no-reasoning first steps only
 - lib/engine/index.js: toolFormatter helper removed; tool results formatted inline as BPI(name): output
 - server.js: unhandled route errors appended to temp/errors.txt (timestamp, method+url, status, message, stack, request body) best-effort, swallows its own write failures
 - zerokey.bat: fetch/pull/rev-parse use literal 'origin' remote instead of %BRANCH% (previous version aliased origin→main incorrectly)
 - temp/users.json written atomically via .tmp rename to prevent corruption
-- SessionSelector.select() offers up to 3 recentSessions as a quick-pick before the provider/user/session wizard; picking one resolves directly, skipping remaining wizard steps; "Show menu" or no valid recent entries falls through to the normal wizard¦</parameter>
+- SessionSelector.select() offers up to 3 recentSessions as a quick-pick before the provider/user/session wizard; picking one resolves directly, skipping remaining wizard steps; "Show menu" or no valid recent entries falls through to the normal wizard
 - Cookie jar shared per API client instance; cookies captured from all response headers, serialized into Cookie header for subsequent requests
  headers captured: Set-Cookie, x-oai-is, x-conduit-token (ChatGPT)
  session lastUsed updated on every successful response via sendFinalChunk
