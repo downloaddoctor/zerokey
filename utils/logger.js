@@ -44,10 +44,12 @@ console.debug = function (...args) {
 }
 
 console.debug.mix = function (...args) {
-  _debug(...args.map((a) => {
-    if (typeof a !== 'string') return a
-    return codes.dim + a.replace(/\x1b\[0m/g, '\x1b[0m' + codes.dim) + codes.reset
-  }))
+  _debug(
+    ...args.map((a) => {
+      if (typeof a !== 'string') return a
+      return codes.dim + a.replace(/\x1b\[0m/g, '\x1b[0m' + codes.dim) + codes.reset
+    }),
+  )
 }
 
 console.success = function (...args) {

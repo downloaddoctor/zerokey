@@ -50,7 +50,9 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
     const parser = new ToolCompiler.Stream(res, 'claude', compiler, session)
 
     if (skill) {
-      console.info(`[Claude] Skill trigger detected (${skill.triggers[0]}) — bypassing provider API`)
+      console.info(
+        `[Claude] Skill trigger detected (${skill.triggers[0]}) — bypassing provider API`,
+      )
       return ToolCompiler.emitSkill(res, parser, skill)
     }
 

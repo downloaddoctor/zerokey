@@ -84,7 +84,7 @@ class SessionSelector {
       parsedFetch: this.user.parsedFetch || null,
       session: this.session,
       sessionName: this.session.name,
-      sessionTags: this.formatSessionTags(this.session)
+      sessionTags: this.formatSessionTags(this.session),
     }
   }
 
@@ -464,7 +464,7 @@ class SessionSelector {
 
     const MODEL_DESCRIPTIONS = {
       claude: { 'claude-sonnet-4-6': 'recommended for tools' },
-      chatgpt: { auto: 'recommended' },
+      chatgpt: { auto: text.red('often forgets tools in Tools Mode') },
       deepseek: { expert: 'recommended' },
     }
 

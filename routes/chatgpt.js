@@ -47,7 +47,9 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
     const parser = new ToolCompiler.Stream(res, 'chatgpt', compiler, session)
 
     if (skill) {
-      console.info(`[ChatGPT] Skill trigger detected (${skill.triggers[0]}) — bypassing provider API`)
+      console.info(
+        `[ChatGPT] Skill trigger detected (${skill.triggers[0]}) — bypassing provider API`,
+      )
       return ToolCompiler.emitSkill(res, parser, skill)
     }
 
