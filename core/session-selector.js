@@ -18,6 +18,9 @@ class SessionSelector {
   }
 
   async select() {
+    const continued = await this._stepContinueRecentSession()
+    if (continued) return continued
+
     this.provider = await this._stepProviderSelection()
     if (!this.provider) return null
 
@@ -71,6 +74,7 @@ class SessionSelector {
     if (!this.session) return null
 
     this._saveUser(this.provider, this.user.username, this.user)
+    this._pushRecentSession(this.provider, this.user.username, this.session.name)
 
     return {
       user: this.user.username,
@@ -79,6 +83,89 @@ class SessionSelector {
       parsedFetch: this.user.parsedFetch || null,
       session: this.session,
       sessionName: this.session.name,
+    }
+  }
+
+  async _stepContinueRecentSession() {
+    const all = this._loadAll()
+    const recent = Array.isArray(all.recentSessions) ? all.recentSessions : []
+    if (recent.length === 0) return null
+
+    const resolved = []
+    for (const entry of recent) {
+      const providerUsers = all[entry.provider] || {}
+      const user = providerUsers[entry.username]
+      if (!user) continue
+      const session = (user.sessions || []).find((s) => s.name === entry.sessionName)
+      if (!session) continue
+      resolved.push({ entry, user, session })
+    }
+    if (resolved.length === 0) return null
+
+    const choices = resolved.map(({ entry, session }, i) => {
+      const tags = [
+        this._modelName(entry.provider, session.model),
+        session.toolCalling ? 'tools' : 'no tools',
+        session.vision ? 'vision' : 'no vision',
+        `last: ${this._formatTime(session.lastUsed)}`,
+      ]
+        .filter(Boolean)
+        .join('  ·  ')
+
+      return {
+        title: `${entry.username} · ${entry.provider} · ${entry.sessionName} `,
+        description: tags,
+        value: i,
+      }
+    })
+    choices.unshift({ title: 'No, Show Menu', value: -1 })
+
+    const { choice } = await prompts(
+      {
+        type: 'select',
+        name: 'choice',
+        message: 'Continue with a recent session?',
+        choices,
+      },
+      { onCancel: () => process.exit(0) },
+    )
+
+    if (choice === undefined || choice === -1) return null
+
+    const { entry, user, session } = resolved[choice]
+    this.provider = entry.provider
+    this.user = user
+    if (!this.user.sessions) this.user.sessions = []
+    this.session = session
+
+    this._saveUser(this.provider, this.user.username, this.user)
+    this._pushRecentSession(this.provider, this.user.username, this.session.name)
+
+    return {
+      user: this.user.username,
+      userData: this.user,
+      provider: this.provider,
+      parsedFetch: this.user.parsedFetch || null,
+      session: this.session,
+      sessionName: this.session.name,
+    }
+  }
+
+  _pushRecentSession(provider, username, sessionName) {
+    try {
+      const all = this._loadAll()
+      let recent = Array.isArray(all.recentSessions) ? all.recentSessions : []
+      recent = recent.filter(
+        (e) =>
+          !(e.provider === provider && e.username === username && e.sessionName === sessionName),
+      )
+      recent.unshift({ provider, username, sessionName })
+      all.recentSessions = recent.slice(0, 3)
+      const tmp = this._usersFile + '.tmp'
+      fs.writeFileSync(tmp, JSON.stringify(all, null, 2), 'utf8')
+      fs.renameSync(tmp, this._usersFile)
+    } catch (e) {
+      console.error('Save recentSessions error:', e.message)
     }
   }
 
@@ -287,8 +374,8 @@ class SessionSelector {
             name: 'invalidAction',
             message: '✖ Not a valid fetch() call — what would you like to do?',
             choices: [
-              { title: '↩  Try again', value: 'retry' },
-              { title: '✖  Cancel', value: 'cancel' },
+              { title: 'Try again', value: 'retry' },
+              { title: 'Cancel', value: 'cancel' },
             ],
           },
           { onCancel: () => process.exit(0) },
@@ -316,8 +403,8 @@ class SessionSelector {
             name: 'invalidAction',
             message: 'Make sure you copied the right request — what would you like to do?',
             choices: [
-              { title: '↩  Try again', value: 'retry' },
-              { title: '✖  Cancel', value: 'cancel' },
+              { title: 'Try again', value: 'retry' },
+              { title: 'Cancel', value: 'cancel' },
             ],
           },
           { onCancel: () => process.exit(0) },
@@ -340,8 +427,8 @@ class SessionSelector {
             name: 'invalidAction',
             message: 'Credentials rejected by provider — what would you like to do?',
             choices: [
-              { title: '↩  Try again', value: 'retry' },
-              { title: '✖  Cancel', value: 'cancel' },
+              { title: 'Try again', value: 'retry' },
+              { title: 'Cancel', value: 'cancel' },
             ],
           },
           { onCancel: () => process.exit(0) },
@@ -361,7 +448,7 @@ class SessionSelector {
 
     const choices = sessions.map((s, i) => {
       const tags = [
-        s.model || '',
+        this._modelName(this.provider, s.model),
         s.toolCalling ? 'tools' : 'no tools',
         s.vision ? 'vision' : 'no vision',
         `last: ${this._formatTime(s.lastUsed)}`,
@@ -371,9 +458,9 @@ class SessionSelector {
       return { title: s.name, description: tags, value: i }
     })
 
-    choices.push({ title: '＋ Create new session...', value: -1 })
+    choices.push({ title: 'Create new session...', value: -1 })
     if (sessions.length > 0) {
-      choices.push({ title: '🗑  Delete all sessions...', value: -2 })
+      choices.push({ title: 'Delete all sessions...', value: -2 })
     }
 
     const { result } = await prompts(
@@ -634,6 +721,12 @@ class SessionSelector {
     } catch {
       return 'unknown'
     }
+  }
+
+  _modelName(provider, modelKey) {
+    if (!modelKey) return ''
+    const meta = MODEL_HASH[provider]?.models?.[modelKey]
+    return meta ? meta.name : modelKey
   }
 }
 

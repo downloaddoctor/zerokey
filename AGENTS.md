@@ -11,7 +11,7 @@ pnpm-lock.yaml # pnpm lockfile
 config/ # constants, model definitions
  config/constants.js # CONFIG (PORT), MODEL_HASH (nested provider→model→meta with id/name/vision/created/context_length/max_output_length), MODELS registry (keyed by meta.id slug)
 core/ # session management, chat router, provider API clients
- core/session-selector.js # interactive CLI wizard: provider→user→session selection; users.json persistence; Claude "(limit reached)" suffix on user list; auto-switch to available users; deleteAllSessions with provider-side cleanup; session mode as list pick (Tools Mode / Raw Mode); _validateFetchHeaders checks required headers per provider; _validateLiveConnection verifies credentials with provider API; _openBrowser auto-opens provider login page for new users
+ core/session-selector.js # interactive CLI wizard: recent-session quick-pick→provider→user→session selection; users.json persistence; Claude "(limit reached)" suffix on user list; auto-switch to available users; deleteAllSessions with provider-side cleanup; session mode as list pick (Tools Mode / Raw Mode); _validateFetchHeaders checks required headers per provider; _validateLiveConnection verifies credentials with provider API; _openBrowser auto-opens provider login page for new users; _stepContinueRecentSession offers up to 3 recent sessions (with resolved model display name) plus "Show menu" fallback before the normal wizard; _pushRecentSession records/dedupes/caps recentSessions to 3, most-recent-first; _modelName resolves MODEL_HASH display name for a session's model key
  core/chat-router.js # builds Express router for selected provider, logs active session (no runtime hot-swap)
  core/deepseek/ # DeepSeek API client, POW solver, SSE stream handler
   core/deepseek/api.js → DeepSeekAPI — chat session CRUD (create/delete/deleteAll), POW challenge, file upload (uploadFile + _pollFile), cookie management, HTTP keep-alive, optional _log flag, getCurrentUser for live validation
@@ -183,7 +183,8 @@ users.json (temp/users.json):
        instructionsHash?: string,
        instructionsAppliedAt?: ISO8601,
      }
-   }
+   },
+   recentSessions?: array of { provider, username, sessionName }, max 3, most-recent-first, deduped by (provider+username+sessionName)
  }
 req.body (POST /v1/chat/completions):
  messages array of { role: system|user|assistant|tool, content: string | content parts array }
@@ -252,6 +253,7 @@ Stream buffer cap: 1MB (SSE reader)
 - server.js: unhandled route errors appended to temp/errors.txt (timestamp, method+url, status, message, stack, request body) best-effort, swallows its own write failures
 - zerokey.bat: fetch/pull/rev-parse use literal 'origin' remote instead of %BRANCH% (previous version aliased origin→main incorrectly)
 - temp/users.json written atomically via .tmp rename to prevent corruption
+- SessionSelector.select() offers up to 3 recentSessions as a quick-pick before the provider/user/session wizard; picking one resolves directly, skipping remaining wizard steps; "Show menu" or no valid recent entries falls through to the normal wizard¦</parameter>
 - Cookie jar shared per API client instance; cookies captured from all response headers, serialized into Cookie header for subsequent requests
  headers captured: Set-Cookie, x-oai-is, x-conduit-token (ChatGPT)
  session lastUsed updated on every successful response via sendFinalChunk
