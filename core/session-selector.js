@@ -118,7 +118,7 @@ class SessionSelector {
         value: i,
       }
     })
-    choices.unshift({ title: 'No, Show Menu', value: -1 })
+    choices.unshift({ title: text.cyan('No, Show Menu'), value: -1 })
 
     const { choice } = await prompts(
       {
@@ -207,7 +207,7 @@ class SessionSelector {
           description: limited ? '⚠ at usage limit' : undefined,
         }
       })
-      choices.push({ title: '+ Create new user...', value: '__new__' })
+      choices.push({ title: text.cyan('Create new user'), value: '__new__' })
 
       const { username } = await prompts(
         {
@@ -368,19 +368,8 @@ class SessionSelector {
       const fetchStr = await this._openEditor()
 
       if (!fetchStr || !fetchStr.includes('fetch(')) {
-        const { invalidAction } = await prompts(
-          {
-            type: 'select',
-            name: 'invalidAction',
-            message: '✖ Not a valid fetch() call — what would you like to do?',
-            choices: [
-              { title: 'Try again', value: 'retry' },
-              { title: 'Cancel', value: 'cancel' },
-            ],
-          },
-          { onCancel: () => process.exit(0) },
-        )
-        if (!invalidAction || invalidAction === 'cancel') return null
+        if (!(await this._retryOrCancel('✖ Not a valid fetch() call — what would you like to do?')))
+          return null
         continue
       }
 
@@ -397,19 +386,12 @@ class SessionSelector {
         console.error(
           `  ✖ Fetch is missing required headers:\n${missing.map((h) => `     • ${h}`).join('\n')}\n`,
         )
-        const { invalidAction } = await prompts(
-          {
-            type: 'select',
-            name: 'invalidAction',
-            message: 'Make sure you copied the right request — what would you like to do?',
-            choices: [
-              { title: 'Try again', value: 'retry' },
-              { title: 'Cancel', value: 'cancel' },
-            ],
-          },
-          { onCancel: () => process.exit(0) },
+        if (
+          !(await this._retryOrCancel(
+            'Make sure you copied the right request — what would you like to do?',
+          ))
         )
-        if (!invalidAction || invalidAction === 'cancel') return null
+          return null
         continue
       }
 
@@ -421,19 +403,12 @@ class SessionSelector {
       } catch (e) {
         process.stdout.write(' ✖\n\n')
         console.error(`  ✖ Live check failed: ${e.message}\n`)
-        const { invalidAction } = await prompts(
-          {
-            type: 'select',
-            name: 'invalidAction',
-            message: 'Credentials rejected by provider — what would you like to do?',
-            choices: [
-              { title: 'Try again', value: 'retry' },
-              { title: 'Cancel', value: 'cancel' },
-            ],
-          },
-          { onCancel: () => process.exit(0) },
+        if (
+          !(await this._retryOrCancel(
+            'Credentials rejected by provider — what would you like to do?',
+          ))
         )
-        if (!invalidAction || invalidAction === 'cancel') return null
+          return null
         continue
       }
 
@@ -441,6 +416,22 @@ class SessionSelector {
       this._saveUser(this.provider, username, user)
       return user
     }
+  }
+
+  async _retryOrCancel(message) {
+    const { invalidAction } = await prompts(
+      {
+        type: 'select',
+        name: 'invalidAction',
+        message,
+        choices: [
+          { title: text.cyan('Try again'), value: 'retry' },
+          { title: text.red('Cancel'), value: 'cancel' },
+        ],
+      },
+      { onCancel: () => process.exit(0) },
+    )
+    return invalidAction === 'retry'
   }
 
   async _stepSessionSelection() {
@@ -458,9 +449,9 @@ class SessionSelector {
       return { title: s.name, description: tags, value: i }
     })
 
-    choices.push({ title: 'Create new session...', value: -1 })
+    choices.push({ title: text.cyan('Create new session'), value: -1 })
     if (sessions.length > 0) {
-      choices.push({ title: 'Delete all sessions...', value: -2 })
+      choices.push({ title: text.red('Delete all sessions'), value: -2 })
     }
 
     const { result } = await prompts(
@@ -494,7 +485,7 @@ class SessionSelector {
         name: 'toolCalling',
         message: 'Session mode',
         choices: [
-          { title: 'Tools Mode', description: 'BPI agent — recommended', value: true },
+          { title: text.cyan('Tools Mode'), description: 'BPI agent — recommended', value: true },
           { title: 'Raw Mode', description: 'Plain chat, no tools', value: false },
         ],
       },
