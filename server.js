@@ -43,24 +43,20 @@ app.use((req, res, next) => {
 app.use('/', infoRouter)
 ;(async () => {
   const selector = new SessionSelector()
-  const preSelected = await selector.select()
+  const preSelected = await selector.select(true)
 
   if (!preSelected) {
     console.error('No session selected. Exiting.')
     process.exit(0)
   }
 
-  const _s = preSelected.session
   const _tags = [
     preSelected.user,
     preSelected.provider,
     preSelected.sessionName,
-    _s.model,
-    _s.toolCalling ? 'tools' : 'no tools',
-    _s.vision ? 'vision' : 'no vision',
+    preSelected.session.model,
   ].join(' · ')
-
-  console.info(`\n[Server] ${_tags}`)
+  console.info(`\n[Server] ${_tags}\n         ${preSelected.sessionTags}`)
 
   const port = await findPort(CONFIG.PORT)
 

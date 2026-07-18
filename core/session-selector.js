@@ -17,14 +17,16 @@ class SessionSelector {
     }
   }
 
-  async select() {
-    const continued = await this._stepContinueRecentSession()
-    if (continued) return continued
+  async select(showRecent, provider, username, sessionName) {
+    if (showRecent) {
+      const continued = await this._stepContinueRecentSession()
+      if (continued) return continued
+    }
 
-    this.provider = await this._stepProviderSelection()
+    this.provider = await this._stepProviderSelection(provider)
     if (!this.provider) return null
 
-    this.user = await this._stepUserLogin()
+    this.user = await this._stepUserLogin(username)
     if (!this.user) return null
 
     if (!this.user.sessions) this.user.sessions = []
@@ -62,7 +64,7 @@ class SessionSelector {
             `\n⚠ All Claude users are at their usage limit.\n` +
               `    Soonest reset: "${soonest.username}" at ${resetsAtSoonest} (~${minsLeft} min).\n`,
           )
-          return this.select()
+          return this.select(false)
         }
 
         this.user = await this._stepUserLogin()
@@ -70,11 +72,10 @@ class SessionSelector {
       }
     }
 
-    this.session = await this._stepSessionSelection()
+    this.session = await this._stepSessionSelection(sessionName)
     if (!this.session) return null
 
     this._saveUser(this.provider, this.user.username, this.user)
-    this._pushRecentSession(this.provider, this.user.username, this.session.name)
 
     return {
       user: this.user.username,
@@ -83,41 +84,43 @@ class SessionSelector {
       parsedFetch: this.user.parsedFetch || null,
       session: this.session,
       sessionName: this.session.name,
+      sessionTags: this.formatSessionTags(this.session)
     }
   }
 
   async _stepContinueRecentSession() {
     const all = this._loadAll()
-    const recent = Array.isArray(all.recentSessions) ? all.recentSessions : []
-    if (recent.length === 0) return null
-
     const resolved = []
-    for (const entry of recent) {
-      const providerUsers = all[entry.provider] || {}
-      const user = providerUsers[entry.username]
-      if (!user) continue
-      const session = (user.sessions || []).find((s) => s.name === entry.sessionName)
-      if (!session) continue
-      resolved.push({ entry, user, session })
+
+    for (const provider of Object.keys(all)) {
+      const users = all[provider] || {}
+      for (const username of Object.keys(users)) {
+        const user = users[username]
+        const sessions = user.sessions || []
+        for (const session of sessions) {
+          if (session.lastUsed) {
+            resolved.push({
+              ...session,
+              username: username,
+              provider: provider,
+              lastUsedEpoc: new Date(session.lastUsed).getTime(),
+            })
+          }
+        }
+      }
     }
+
     if (resolved.length === 0) return null
 
-    const choices = resolved.map(({ entry, session }, i) => {
-      const tags = [
-        this._modelName(entry.provider, session.model),
-        session.toolCalling ? 'tools' : 'no tools',
-        session.vision ? 'vision' : 'no vision',
-        `last: ${this._formatTime(session.lastUsed)}`,
-      ]
-        .filter(Boolean)
-        .join('  ·  ')
+    resolved.sort((a, b) => b.lastUsedEpoc - a.lastUsedEpoc)
+    resolved.length = Math.min(resolved.length, 3)
 
-      return {
-        title: `${entry.username} · ${entry.provider} · ${entry.sessionName} `,
-        description: tags,
-        value: i,
-      }
-    })
+    const choices = resolved.map((session, i) => ({
+      title: `${session.name} · ${session.provider} · ${session.username} `,
+      description: this.formatSessionTags(session, session.provider),
+      value: i,
+    }))
+
     choices.unshift({ title: text.cyan('No, Show Menu'), value: -1 })
 
     const { choice } = await prompts(
@@ -132,41 +135,9 @@ class SessionSelector {
 
     if (choice === undefined || choice === -1) return null
 
-    const { entry, user, session } = resolved[choice]
-    this.provider = entry.provider
-    this.user = user
-    if (!this.user.sessions) this.user.sessions = []
-    this.session = session
+    const session = resolved[choice]
 
-    this._saveUser(this.provider, this.user.username, this.user)
-    this._pushRecentSession(this.provider, this.user.username, this.session.name)
-
-    return {
-      user: this.user.username,
-      userData: this.user,
-      provider: this.provider,
-      parsedFetch: this.user.parsedFetch || null,
-      session: this.session,
-      sessionName: this.session.name,
-    }
-  }
-
-  _pushRecentSession(provider, username, sessionName) {
-    try {
-      const all = this._loadAll()
-      let recent = Array.isArray(all.recentSessions) ? all.recentSessions : []
-      recent = recent.filter(
-        (e) =>
-          !(e.provider === provider && e.username === username && e.sessionName === sessionName),
-      )
-      recent.unshift({ provider, username, sessionName })
-      all.recentSessions = recent.slice(0, 3)
-      const tmp = this._usersFile + '.tmp'
-      fs.writeFileSync(tmp, JSON.stringify(all, null, 2), 'utf8')
-      fs.renameSync(tmp, this._usersFile)
-    } catch (e) {
-      console.error('Save recentSessions error:', e.message)
-    }
+    return this.select(false, session.provider, session.username, session.name)
   }
 
   flush() {
@@ -175,7 +146,8 @@ class SessionSelector {
     }
   }
 
-  async _stepProviderSelection() {
+  async _stepProviderSelection(preset) {
+    if (preset) return preset
     const { provider } = await prompts(
       {
         type: 'select',
@@ -192,9 +164,10 @@ class SessionSelector {
     return provider
   }
 
-  async _stepUserLogin() {
+  async _stepUserLogin(preset) {
     const allProviders = this._loadAll()
     const providerUsers = allProviders[this.provider] || {}
+    if (preset && providerUsers[preset]) return providerUsers[preset]
     const savedUsers = Object.keys(providerUsers)
 
     if (savedUsers.length > 0) {
@@ -434,20 +407,18 @@ class SessionSelector {
     return invalidAction === 'retry'
   }
 
-  async _stepSessionSelection() {
+  async _stepSessionSelection(preset) {
     const sessions = this.user.sessions || []
+    if (preset) {
+      const found = sessions.find((s) => s.name === preset)
+      if (found) return found
+    }
 
-    const choices = sessions.map((s, i) => {
-      const tags = [
-        this._modelName(this.provider, s.model),
-        s.toolCalling ? 'tools' : 'no tools',
-        s.vision ? 'vision' : 'no vision',
-        `last: ${this._formatTime(s.lastUsed)}`,
-      ]
-        .filter(Boolean)
-        .join('  ·  ')
-      return { title: s.name, description: tags, value: i }
-    })
+    const choices = sessions.map((s, i) => ({
+      title: s.name,
+      description: this.formatSessionTags(s),
+      value: i,
+    }))
 
     choices.push({ title: text.cyan('Create new session'), value: -1 })
     if (sessions.length > 0) {
@@ -548,13 +519,15 @@ class SessionSelector {
       { onCancel: () => process.exit(0) },
     )
 
-    if (!confirmed) return this._stepSessionSelection()
+    if (confirmed) {
+      process.stdout.write(text.dim('  Deleting sessions...'))
+      await this._deleteProviderSessions()
+      process.stdout.write('\r  ' + text.green('√ Done.') + '                  \n\n')
 
-    process.stdout.write(text.dim('  Deleting sessions...'))
-    await this._deleteProviderSessions()
-    process.stdout.write('\r  ' + text.green('√ Done.') + '                  \n\n')
+      this.user.sessions = []
+      this._saveUser(this.provider, this.user.username, this.user)
+    }
 
-    this.user.sessions = []
     return this._stepSessionSelection()
   }
 
@@ -718,6 +691,18 @@ class SessionSelector {
     if (!modelKey) return ''
     const meta = MODEL_HASH[provider]?.models?.[modelKey]
     return meta ? meta.name : modelKey
+  }
+
+  formatSessionTags(session, provider) {
+    const p = provider || this.provider
+    return [
+      this._modelName(p, session.model),
+      session.toolCalling ? 'tools' : 'no tools',
+      session.vision ? 'vision' : 'no vision',
+      session.lastUsed ? `last: ${this._formatTime(session.lastUsed)}` : '',
+    ]
+      .filter(Boolean)
+      .join('  ·  ')
   }
 }
 
