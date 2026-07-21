@@ -96,14 +96,14 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
               [],
             )
 
-            parser.scan('```text\n')
+            parser.scan('\n\n---\n\n```text\n\n')
             await claudeStreamHandler(
               res,
               summaryStream,
               session,
               parser,
               (limitReached, sendFinalChunk) => {
-                parser.scan('\n```')
+                parser.scan('\n\n```')
                 sendLimitMessage(parser, resetTime, mins)
                 sendFinalChunk()
               },
