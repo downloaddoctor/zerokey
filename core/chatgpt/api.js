@@ -60,11 +60,100 @@ class ChatGPTAPI {
     this._ready = true
   }
 
+  /**
+   * Upload a file/image for a message attachment.
+   * Mirrors ClaudeAPI.uploadFile — returns an attachment descriptor
+   * to be pushed into the message's metadata.attachments[] array.
+   *
+   * @param {{ filename: string, data: Buffer, mimeType?: string }} file
+   * @returns {Promise<{ id: string, size: number, name: string, mime_type: string, source: string }>}
+   */
+  async uploadFile(file) {
+    const { filename, data, mimeType = 'application/octet-stream' } = file
+
+    // Step 1: request an upload URL
+    const prepRes = await this._fetch(
+      `${this.BASE_URL}/backend-api/files`,
+      {
+        method: 'POST',
+        headers: this._buildHeaders({ 'content-type': 'application/json' }, '/backend-api/files'),
+        body: JSON.stringify({
+          file_name: filename,
+          file_size: data.length,
+          mime_type: mimeType,
+          use_case: 'ace_upload',
+        }),
+      },
+      true,
+    )
+
+    const { upload_url: uploadUrl, file_id: fileId } = prepRes.data
+    if (!uploadUrl || !fileId) {
+      throw new Error(`ChatGPT file prepare failed: ${JSON.stringify(prepRes.data)}`)
+    }
+
+    // Step 2: PUT raw bytes to the Azure Blob SAS URL
+    const putRes = await nodeFetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'x-ms-blob-type': 'BlockBlob', 'content-type': mimeType },
+      body: data,
+      agent: this._httpAgent,
+    })
+    if (!putRes.ok) {
+      const text = await putRes.text().catch(() => '')
+      throw new Error(`ChatGPT blob upload failed: HTTP ${putRes.status}: ${text.slice(0, 200)}`)
+    }
+
+    // Step 3: trigger processing, wait for completion via SSE
+    const processRes = await this._fetch(
+      `${this.BASE_URL}/backend-api/files/process_upload_stream`,
+      {
+        method: 'POST',
+        headers: this._buildHeaders(
+          { accept: 'text/event-stream', 'content-type': 'application/json' },
+          '/backend-api/files/process_upload_stream',
+        ),
+        body: JSON.stringify({
+          file_id: fileId,
+          file_name: filename,
+          use_case: 'ace_upload',
+          index_for_retrieval: false,
+        }),
+      },
+      false,
+    )
+
+    if (!processRes.ok) {
+      const text = await processRes.text().catch(() => '')
+      throw new Error(
+        `ChatGPT file processing failed: HTTP ${processRes.status}: ${text.slice(0, 200)}`,
+      )
+    }
+
+    const bodyText = await processRes.text()
+    if (!bodyText.includes('file.processing.completed')) {
+      throw new Error(`ChatGPT file processing did not complete: ${bodyText.slice(0, 300)}`)
+    }
+
+    if (this._log) {
+      console.debug(`[ChatGPT] File uploaded: ${filename} (${data.length} bytes) → ${fileId}`)
+    }
+
+    return {
+      id: fileId,
+      size: data.length,
+      name: filename,
+      mime_type: mimeType,
+      source: 'local',
+    }
+  }
+
   async chatCompletion(
     prompt,
     chatSessionId,
     parentMessageId = 'client-created-root',
     model = 'auto',
+    attachments = [],
   ) {
     if (!this._ready) throw new Error('Not initialized')
 
@@ -79,7 +168,8 @@ class ChatGPTAPI {
 
     // Always prepare conversation before sending — matches browser HAR flow.
     // First turn: gets initial conduit_token. Follow-up turns: gets refreshed conduit_token.
-    await this._prepareConversation(chatSessionId, parentMessageId, partialQuery, model)
+    const mimeTypes = attachments.map((a) => a.mime_type).filter(Boolean)
+    await this._prepareConversation(chatSessionId, parentMessageId, partialQuery, model, mimeTypes)
 
     const now = Date.now() / 1000
 
@@ -90,6 +180,7 @@ class ChatGPTAPI {
         ...partialQuery,
         create_time: now,
         metadata: {
+          ...(attachments.length > 0 && { attachments }),
           selected_github_repos: [],
           selected_all_github_repos: false,
           serialization_metadata: { custom_symbol_offsets: [] },
@@ -149,7 +240,13 @@ class ChatGPTAPI {
   // First call sends "x-conduit-token: no-token". Subsequent calls
   // send the previously returned conduit_token.
 
-  async _prepareConversation(conversationId, parentMessageId, partialQuery, model = 'auto') {
+  async _prepareConversation(
+    conversationId,
+    parentMessageId,
+    partialQuery,
+    model = 'auto',
+    attachmentMimeTypes = [],
+  ) {
     const url = `${this.BASE_URL}/backend-api/f/conversation/prepare`
     const body = {
       action: 'next',
@@ -162,6 +259,7 @@ class ChatGPTAPI {
       timezone: 'America/Los_Angeles',
       conversation_mode: { kind: 'primary_assistant' },
       system_hints: [],
+      ...(attachmentMimeTypes.length > 0 && { attachment_mime_types: attachmentMimeTypes }),
       supports_buffering: true,
       supported_encodings: ['v1'],
       client_contextual_info: { app_name: 'chatgpt.com' },

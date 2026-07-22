@@ -32,12 +32,18 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
         )
     }
 
+    const attachments = []
+    const uploadFile = async (f) => {
+      const attachment = await chatgptApi.uploadFile(f)
+      attachments.push(attachment)
+      return attachment.id
+    }
     const compiler = new ToolCompiler(req.ide, 'chatgpt')
     const isNewSession = session.parentMessageId == null
 
     const { dynamicGrammar } = compiler.syncDynamicTools(req.body.tools || [], session)
 
-    let { prompt, skill } = await compiler.formatPrompt(messages, isNewSession, () => {})
+    let { prompt, skill } = await compiler.formatPrompt(messages, isNewSession, uploadFile)
 
     res.setHeader('Content-Type', 'text/event-stream')
     res.setHeader('Cache-Control', 'no-cache')
@@ -66,6 +72,7 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
         session.chatSessionId,
         session.parentMessageId,
         model,
+        attachments,
       )
 
       chatgptStreamHandler(res, stream, session, parser)

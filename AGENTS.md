@@ -22,7 +22,7 @@ core/ # session management, chat router, provider API clients
   core/claude/stream-handler.js → claudeStreamHandler(res, stream, session, parser, cb) — SSE parser, message_limit detection, delegates >=90% usage to cb callback
   core/claude/set-instructions.js → setClaudeInstructions — PUT account_profile with system prompt
  core/chatgpt/ # ChatGPT API client, POW solver, SSE stream handler, instructions setter
-  core/chatgpt/api.js → ChatGPTAPI — conversation prepare, sentinel refresh, POW, conduit token flow, session deletion (PATCH), cookie management, UA extraction from proof token, HTTP keep-alive, optional _log flag, getMe for live validation
+  core/chatgpt/api.js → ChatGPTAPI — conversation prepare, sentinel refresh, POW, conduit token flow, session deletion (PATCH), cookie management, UA extraction from proof token, HTTP keep-alive, optional _log flag, getMe for live validation, uploadFile (file/image upload: POST /backend-api/files → PUT raw bytes to Azure SAS blob URL → POST /backend-api/files/process_upload_stream, waits for file.processing.completed) → returns attachment descriptor pushed into chatCompletion's attachments param → injected into message.metadata.attachments + prepare call's attachment_mime_types
   core/chatgpt/pow.js → ChatGPTProofOfWork — SHA3-512 sentinel proof-of-work solver
   core/chatgpt/stream-handler.js → chatgptStreamHandler — SSE parser for ChatGPT response format
   core/chatgpt/set-instructions.js → setChatGPTInstructions — PATCH user_system_messages
@@ -54,7 +54,7 @@ utils/ # shared utilities
  utils/sse-reader.js → readSSE — generic SSE stream parser with 1MB buffer cap
  utils/stream-helpers.js → createSendFinalChunk, createOnError — shared SSE finalizers (flush tools, emit [DONE], update session.lastUsed; onError writes error JSON to SSE stream)
  utils/har-to-capture.js → harToCapture — convert HAR files to network-capture JSON format
- utils/extract-files.js → decodeContentParts(parts) — decode base64 data URIs from a single message's content array (image_url/file parts); no longer exports extractFiles/uploadExtractedFiles (file upload now driven by formatPrompt's uploadFile callback)
+- utils/extract-files.js → decodeContentParts(parts) — decode base64 data URIs from a single message's content array (image_url/file parts), returns { filename, data, size, mimeType } per file; no longer exports extractFiles/uploadExtractedFiles (file upload now driven by formatPrompt's uploadFile callback)
  utils/find-port.js → findPort(start, range=100) — scans ports via checkPort socket probe (resolves true when free) until an open one is found; isPortActive(p) — inverse of checkPort, resolves true when something is actively listening
  utils/sync-ide-config.js → async syncIdeConfig(preSelected?, port?) — syncs ZeroKey model entries into VS Code's chatLanguageModels.json; base is the existing target file's ZeroKey.models array; live-checks every existing model's port via isPortActive and drops any not currently listening; edits in place or appends the model with id ZK-{port}; non-fatal on failure
 temp/ # runtime data: users.json, errors.txt (server error log), scratch files (not committed)

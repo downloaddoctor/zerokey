@@ -22,16 +22,19 @@ function decodeContentParts(parts) {
           filename: `image_${Date.now()}_${files.length}.${ext}`,
           data,
           size: data.length,
+          mimeType: mime,
         })
       }
     } else if (part.type === 'file' && part.file?.file_data?.startsWith('data:')) {
       const match = part.file.file_data.match(/^data:([^;]*);base64,(.+)$/)
       if (match) {
+        const mime = match[1]
         const data = Buffer.from(match[2], 'base64')
         files.push({
           filename: part.file.filename || `file_${Date.now()}_${files.length}`,
           data,
           size: data.length,
+          mimeType: mime,
         })
       }
     }
