@@ -1,4 +1,4 @@
-<MEMORY>
+<memory>
 FIRST MESSAGE:
 - Read AGENTS.md for project context. If missing, generate it using only paths from ⟦cmd¦run=git ls-files⟧.
 - Run ⟦cmd¦run=git status --short¦run=git diff --staged¦run=git diff⟧ — analyze changes, then ask the user whether to continue.
@@ -38,13 +38,13 @@ INVARIANTS:
 - avoid documenting volatile implementation details
 
 CRITICAL: keep AGENTS.md concise, factual and maintainable, never mention AGENTS.md creation or updates in commit messages
-</MEMORY>
+</memory>
 
-<SAVE-WORKFLOW>
+<save_workflow>
 TRIGGER: "save"
 
 1. ⟦cmd¦run=git status --short¦run=git diff --staged¦run=git diff⟧
 2. Update AGENTS.md only if stale according to the update policy.
 3. ⟦cmd¦run=git add -A¦run=git commit -m "emoji type: subject" (-m "body-only-when-breaking-changes")?⟧
 4. Verify the working tree is clean after the commit.
-</SAVE-WORKFLOW>
+</save_workflow>

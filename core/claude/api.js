@@ -30,7 +30,8 @@ class ClaudeAPI {
 
   constructor(options = {}) {
     this._log = options.log !== false
-    this._headers = null
+    this._headers = {}
+    this._body = {}
     this._orgId = null
     this._cookies = new CookieJar()
     this._httpAgent = new https.Agent({
@@ -47,6 +48,7 @@ class ClaudeAPI {
    */
   async initializeFromJSON(parsedFetch) {
     this._headers = { ...parsedFetch.headers }
+    this._body = { ...parsedFetch.body }
 
     // Seed cookie jar from initial headers
     const initialCookie = this._headers.cookie || this._headers.Cookie || ''
@@ -145,20 +147,8 @@ class ClaudeAPI {
 
     const body = {
       prompt,
-      timezone: 'America/Los_Angeles',
-      personalized_styles: [
-        {
-          type: 'default',
-          key: 'Default',
-          name: 'Normal',
-          nameKey: 'normal_style_name',
-          prompt: 'Normal\n',
-          summary: 'Default responses from Claude',
-          summaryKey: 'normal_style_summary',
-          isDefault: true,
-        },
-      ],
-      locale: 'en-US',
+      timezone: this._body.timezone,
+      locale: this._body.locale,
       model,
       tools,
       turn_message_uuids: {
@@ -181,8 +171,9 @@ class ClaudeAPI {
         include_conversation_preferences: true,
         paprika_mode: null,
         compass_mode: null,
+        tool_search_mode: 'off',
         is_temporary: false,
-        enabled_imagine: true,
+        enabled_imagine: false,
       }
     }
 
