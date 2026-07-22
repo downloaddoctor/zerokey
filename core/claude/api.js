@@ -271,94 +271,52 @@ class ClaudeAPI {
     this._headers['cookie'] = this._cookies.toString()
   }
 
-  // ─── Headers builder (exact HAR order) ────────────────────────
+  // ─── Headers builder ───────────────────────────────────────────
 
   /**
-   * Build ordered headers matching browser HAR exactly.
-   * Cloudflare fingerprints header order — must match real browser.
+   * Build headers for a request.
    */
   _buildHeaders(overrides = {}, targetPath = '') {
     const src = this._headers
-    const h = []
-
-    // Block 1: Common prefix — exact HAR order from capture
-    h.push(['accept', overrides.accept || '*/*'])
-    h.push(['accept-encoding', 'gzip, deflate, br'])
-    h.push(['accept-language', src['accept-language'] || 'en-US,en;q=0.9'])
-
-    // Anthropic client headers
-    if (src['anthropic-anonymous-id']) {
-      h.push(['anthropic-anonymous-id', src['anthropic-anonymous-id']])
-    }
-    h.push(['anthropic-client-platform', src['anthropic-client-platform'] || 'web_claude_ai'])
-    if (src['anthropic-client-sha']) {
-      h.push(['anthropic-client-sha', src['anthropic-client-sha']])
-    }
-    if (src['anthropic-client-version']) {
-      h.push(['anthropic-client-version', src['anthropic-client-version']])
-    }
-    if (src['anthropic-device-id']) {
-      h.push(['anthropic-device-id', src['anthropic-device-id']])
-    }
-
-    // content-type
-    h.push(['content-type', overrides['content-type'] || 'application/json'])
-
-    // Cookies from jar (critical for Cloudflare)
     const cookieStr = this._cookies.toString()
-    if (cookieStr) {
-      h.push(['cookie', cookieStr])
-    }
 
-    // origin (only for POST)
-    if (overrides.accept === 'text/event-stream') {
-      h.push(['origin', 'https://claude.ai'])
-    }
-
-    // priority
-    h.push(['priority', 'u=1, i'])
-
-    // referer
-    h.push(['referer', src['referer'] || 'https://claude.ai/chat'])
-
-    // sec-ch-ua (browser fingerprint)
-    h.push([
-      'sec-ch-ua',
-      src['sec-ch-ua'] || '"Chromium";v="148", "Brave";v="148", "Not/A)Brand";v="99"',
-    ])
-    h.push(['sec-ch-ua-mobile', src['sec-ch-ua-mobile'] || '?0'])
-    h.push(['sec-ch-ua-platform', src['sec-ch-ua-platform'] || '"Windows"'])
-
-    // sec-fetch-*
-    h.push(['sec-fetch-dest', 'empty'])
-    h.push(['sec-fetch-mode', 'cors'])
-    h.push(['sec-fetch-site', 'same-origin'])
-
-    // user-agent
-    h.push([
-      'user-agent',
-      src['user-agent'] ||
+    const base = {
+      accept: overrides.accept || '*/*',
+      'accept-encoding': 'gzip, deflate, br',
+      'accept-language': src['accept-language'] || 'en-US,en;q=0.9',
+      ...(src['anthropic-anonymous-id'] && {
+        'anthropic-anonymous-id': src['anthropic-anonymous-id'],
+      }),
+      'anthropic-client-platform': src['anthropic-client-platform'] || 'web_claude_ai',
+      ...(src['anthropic-client-sha'] && { 'anthropic-client-sha': src['anthropic-client-sha'] }),
+      ...(src['anthropic-client-version'] && {
+        'anthropic-client-version': src['anthropic-client-version'],
+      }),
+      ...(src['anthropic-device-id'] && { 'anthropic-device-id': src['anthropic-device-id'] }),
+      'content-type': overrides['content-type'] || 'application/json',
+      ...(cookieStr && { cookie: cookieStr }),
+      ...(overrides.accept === 'text/event-stream' && { origin: 'https://claude.ai' }),
+      priority: 'u=1, i',
+      referer: src['referer'] || 'https://claude.ai/chat',
+      'sec-ch-ua': src['sec-ch-ua'] || '"Chromium";v="148", "Brave";v="148", "Not/A)Brand";v="99"',
+      'sec-ch-ua-mobile': src['sec-ch-ua-mobile'] || '?0',
+      'sec-ch-ua-platform': src['sec-ch-ua-platform'] || '"Windows"',
+      'sec-fetch-dest': 'empty',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-site': 'same-origin',
+      'user-agent':
+        src['user-agent'] ||
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
-    ])
-
-    // Activity session ID (present in GET requests in HAR)
-    if (src['x-activity-session-id']) {
-      h.push(['x-activity-session-id', src['x-activity-session-id']])
+      ...(src['x-activity-session-id'] && {
+        'x-activity-session-id': src['x-activity-session-id'],
+      }),
     }
 
-    // Convert ordered pairs to object (JS preserves insertion order)
-    const base = {}
-    for (const [k, v] of h) {
-      base[k] = v
-    }
-
-    // Apply remaining overrides
     const extra = { ...overrides }
     delete extra.accept
     delete extra['content-type']
-    Object.assign(base, extra)
 
-    return base
+    return { ...base, ...extra }
   }
 
   // ─── HTTP fetch ───────────────────────────────────────────────

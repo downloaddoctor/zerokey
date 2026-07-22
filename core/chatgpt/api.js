@@ -309,110 +309,66 @@ class ChatGPTAPI {
   }
 
   // ─── Headers ──────────────────────────────────────────────────
-  // Header order matches browser HAR exactly per endpoint.
-  // Cloudflare fingerprinting checks header order — must match real browser.
-
   _buildHeaders(overrides = {}, targetPath = '') {
     const src = this._headers
-    const isSentinel = targetPath?.includes('/sentinel/')
     const isPrepare = targetPath?.includes('/conversation/prepare')
     const isConversation = targetPath?.includes('/conversation') && !isPrepare
-
-    // Build ordered list of [name, value] pairs matching HAR line order
-    const h = []
-
-    // ── Block 1: Common prefix (all endpoints, exact HAR order) ──
-    h.push(['accept', overrides.accept || '*/*'])
-    h.push(['accept-encoding', 'gzip, deflate, br, zstd'])
-    h.push(['accept-language', src['accept-language'] || 'en-US,en;q=0.9'])
-    h.push(['authorization', src['authorization']])
-
-    h.push(['cache-control', 'no-cache'])
-    // content-length is set automatically by fetch()
-    h.push(['content-type', overrides['content-type'] || 'application/json'])
-
-    // ── Block 1.1: Cookies from jar (last before overrides) ──
     const cookieStr = this._cookies.toString()
-    if (cookieStr) {
-      h.push(['cookie', cookieStr])
+
+    const base = {
+      accept: overrides.accept || '*/*',
+      'accept-encoding': 'gzip, deflate, br, zstd',
+      'accept-language': src['accept-language'] || 'en-US,en;q=0.9',
+      authorization: src['authorization'],
+      'cache-control': 'no-cache',
+      'content-type': overrides['content-type'] || 'application/json',
+      ...(cookieStr && { cookie: cookieStr }),
+      'oai-client-build-number': src['oai-client-build-number'] || '',
+      'oai-client-version': src['oai-client-version'] || '',
+      'oai-device-id': src['oai-device-id'] || '',
+      ...(isConversation && { 'oai-echo-logs': src['oai-echo-logs'] || '' }),
+      'oai-language': src['oai-language'] || 'en-US',
+      'oai-session-id': src['oai-session-id'] || '',
+      ...(isConversation && {
+        'oai-telemetry': src['oai-telemetry'] || '',
+        ...(src['openai-sentinel-chat-requirements-prepare-token'] && {
+          'openai-sentinel-chat-requirements-prepare-token':
+            src['openai-sentinel-chat-requirements-prepare-token'],
+        }),
+        ...(src['openai-sentinel-proof-token'] && {
+          'openai-sentinel-proof-token': src['openai-sentinel-proof-token'],
+        }),
+        ...(src['openai-sentinel-turnstile-token'] && {
+          'openai-sentinel-turnstile-token': src['openai-sentinel-turnstile-token'],
+        }),
+      }),
+      origin: 'https://chatgpt.com',
+      pragma: 'no-cache',
+      priority: 'u=1, i',
+      referer: src['referer'] || 'https://chatgpt.com/',
+      'sec-ch-ua': src['sec-ch-ua'] || '',
+      'sec-ch-ua-mobile': src['sec-ch-ua-mobile'] || '?0',
+      'sec-ch-ua-platform': src['sec-ch-ua-platform'] || '',
+      'sec-fetch-dest': 'empty',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-site': 'same-origin',
+      'user-agent': src['user-agent'] || '',
+      ...(isPrepare && { 'x-conduit-token': src['x-conduit-token'] || 'no-token' }),
+      ...(src['x-oai-is'] && { 'x-oai-is': src['x-oai-is'] }),
+      ...((isPrepare || isConversation) && {
+        'x-oai-turn-trace-id': src['x-oai-turn-trace-id'] || '',
+      }),
+      ...(targetPath && {
+        'x-openai-target-path': targetPath,
+        'x-openai-target-route': targetPath,
+      }),
     }
 
-    h.push(['oai-client-build-number', src['oai-client-build-number'] || ''])
-    h.push(['oai-client-version', src['oai-client-version'] || ''])
-    h.push(['oai-device-id', src['oai-device-id'] || ''])
-
-    // ── Block 2: Conversation-only: echo-logs before language ──
-    if (isConversation) {
-      h.push(['oai-echo-logs', src['oai-echo-logs'] || ''])
-    }
-
-    h.push(['oai-language', src['oai-language'] || 'en-US'])
-    h.push(['oai-session-id', src['oai-session-id'] || ''])
-
-    // ── Block 3: Conversation-only: telemetry + sentinel tokens ──
-    if (isConversation) {
-      h.push(['oai-telemetry', src['oai-telemetry'] || ''])
-      if (src['openai-sentinel-chat-requirements-prepare-token']) {
-        h.push([
-          'openai-sentinel-chat-requirements-prepare-token',
-          src['openai-sentinel-chat-requirements-prepare-token'],
-        ])
-      }
-      if (src['openai-sentinel-proof-token']) {
-        h.push(['openai-sentinel-proof-token', src['openai-sentinel-proof-token']])
-      }
-      if (src['openai-sentinel-turnstile-token']) {
-        h.push(['openai-sentinel-turnstile-token', src['openai-sentinel-turnstile-token']])
-      }
-    }
-
-    // ── Block 4: Common continues ──
-    h.push(['origin', 'https://chatgpt.com'])
-    h.push(['pragma', 'no-cache'])
-    h.push(['priority', 'u=1, i'])
-    h.push(['referer', src['referer'] || 'https://chatgpt.com/'])
-    h.push(['sec-ch-ua', src['sec-ch-ua'] || ''])
-    h.push(['sec-ch-ua-mobile', src['sec-ch-ua-mobile'] || '?0'])
-    h.push(['sec-ch-ua-platform', src['sec-ch-ua-platform'] || ''])
-    h.push(['sec-fetch-dest', 'empty'])
-    h.push(['sec-fetch-mode', 'cors'])
-    h.push(['sec-fetch-site', 'same-origin'])
-    h.push(['user-agent', src['user-agent'] || ''])
-
-    // ── Block 5: Prepare-only: conduit before oai-is ──
-    if (isPrepare) {
-      h.push(['x-conduit-token', src['x-conduit-token'] || 'no-token'])
-    }
-
-    // ── Block 6: x-oai-is (all authenticated) ──
-    if (src['x-oai-is']) {
-      h.push(['x-oai-is', src['x-oai-is']])
-    }
-
-    // ── Block 7: trace-id (prepare + conversation, NOT sentinel) ──
-    if (isPrepare || isConversation) {
-      h.push(['x-oai-turn-trace-id', src['x-oai-turn-trace-id'] || ''])
-    }
-
-    // ── Block 8: Target path/route (all) ──
-    if (targetPath) {
-      h.push(['x-openai-target-path', targetPath])
-      h.push(['x-openai-target-route', targetPath])
-    }
-
-    // Convert ordered pairs to object (JS preserves insertion order)
-    const base = {}
-    for (const [k, v] of h) {
-      base[k] = v
-    }
-
-    // Apply remaining overrides (except those already consumed)
     const extra = { ...overrides }
     delete extra.accept
     delete extra['content-type']
-    Object.assign(base, extra)
 
-    return base
+    return { ...base, ...extra }
   }
 
   async _fetch(url, options = {}, parseJSON = false, timeoutMs = 300_000) {

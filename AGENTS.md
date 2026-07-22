@@ -235,7 +235,6 @@ Stream buffer cap: 1MB (SSE reader)
 - Session state (parentMessageId, chatSessionId, lastUsed, todos) mutated in-memory; persisted to users.json only on shutdown via selector.flush()
 - Claude rate-limit: when usage >= 90% across 5h/7d windows (compared as a 0-1 fraction, not a percentage), stream-handler delegates to route callback; route requests a conversation summary, emits an ask BPI with provider-switch options, sets waitUntil on userData, then process.exit(0). On exceeded (hard block), route emits ask BPI in SSE and exits. waitUntil/waitReason consulted at startup in SessionSelector.select() with auto-switch to available users; blocked users show "(limit reached)" suffix
 - DeepSeek retries on SSE error events exactly once (re-acquires rate slot before retry)
-- Header order matters for Cloudflare fingerprinting — Claude and ChatGPT build headers in exact HAR order per endpoint
 - POW required: DeepSeek uses WASM SHA3, ChatGPT uses SHA3-512 with real config from user's proof token
 - ChatGPT sentinel must be refreshed before every /f/conversation and /f/conversation/prepare call
 - Claude requires org ID extraction from URL on init; conversation UUID pre-generated client-side
