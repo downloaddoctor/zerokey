@@ -16,7 +16,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
   const router = express.Router()
 
   router.post('/', async (req, res) => {
-    const { messages = [] } = req.body
+    const { messages = [], reasoning_effort: reasoningEffort = null } = req.body
     const toolCalling = session.toolCalling ?? true
     const model = session.model
 
@@ -70,6 +70,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
         model,
         [],
         fileIds,
+        reasoningEffort,
       )
 
       if (chatSessionId && !session.chatSessionId) {

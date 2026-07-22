@@ -134,6 +134,7 @@ class ClaudeAPI {
     model = 'claude-sonnet-4-6',
     tools = [],
     fileIds = [],
+    reasoningEffort = null,
   ) {
     if (!this._orgId) throw new Error('Organization ID not set')
 
@@ -159,6 +160,13 @@ class ClaudeAPI {
       files: fileIds,
       sync_sources: [],
       rendering_mode: 'messages',
+    }
+
+    if (reasoningEffort) {
+      body.effort = reasoningEffort
+      body.thinking_mode = 'auto'
+    } else {
+      body.thinking_mode = 'off'
     }
 
     // For new conversations (no parentMessageId), include create_conversation_params

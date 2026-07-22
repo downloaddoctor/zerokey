@@ -103,9 +103,18 @@ async function syncIdeConfig(preSelected, port) {
         }
       }
 
+      const supportsReasoning = preSelected.provider === 'claude'
+
       const existingModel = zeroKeyEntry.models.find((m) => m.id === targetId)
       if (existingModel) {
         existingModel.name = modelName
+        if (supportsReasoning) {
+          existingModel.supportsReasoningEffort = ['low', 'medium', 'high', 'max']
+          existingModel.reasoningEffortFormat = 'chat-completions'
+        } else {
+          delete existingModel.supportsReasoningEffort
+          delete existingModel.reasoningEffortFormat
+        }
       } else {
         zeroKeyEntry.models.push({
           id: targetId,
@@ -116,6 +125,12 @@ async function syncIdeConfig(preSelected, port) {
           editTools: ['apply-patch', 'code-rewrite', 'find-replace', 'multi-find-replace'],
           toolCalling: true,
           vision: true,
+          ...(supportsReasoning
+            ? {
+                supportsReasoningEffort: ['low', 'medium', 'high', 'max'],
+                reasoningEffortFormat: 'chat-completions',
+              }
+            : {}),
         })
       }
     }
