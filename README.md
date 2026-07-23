@@ -58,7 +58,7 @@ On startup, the interactive wizard guides you through:
 2. **User** — paste a `fetch()` call from browser DevTools (captures headers + browser fingerprint)
 3. **Session** — pick or create a chat session
 
-The server auto-finds an available port starting from `8000` and prints the endpoint URLs.
+The server auto-finds an available port starting from `7250` and prints the endpoint URLs.
 
 ## Endpoints
 
@@ -128,14 +128,14 @@ The `Authorization: Bearer <ide>` header maps the request to the correct IDE's t
 ### Terax
 
 1. Settings → Models → Add Provider → OpenAI Compatible
-2. Base URL: `http://localhost:8000/v1`
+2. Base URL: `http://localhost:7250/v1`
 3. API key: `terax`
 4. Click Test — worked? Done.
 
 ### OpenCode
 
 1. Manage Models → Add Provider → Custom OpenAI-compatible
-2. Base URL: `http://localhost:8000/v1`
+2. Base URL: `http://localhost:7250/v1`
 3. API key: `opencode`
 4. Submit — worked? Done.
 

@@ -67,7 +67,7 @@ start.bat # Windows batch launcher
 zerokey.bat # one-click launcher: auto-clone, install deps, check updates, start server
 server.js # node server.js (npm start) interactive wizard → select provider → select/create user → select/create session
  builds provider-specific router via ChatRouter.mount() → mounts at /v1/chat/completions
- auto-finds available port starting from CONFIG.PORT (default 8000)
+ auto-finds available port starting from CONFIG.PORT (default 7250)
  SIGINT/SIGTERM → selector.flush() → server.close()
 
 #MODULES
@@ -200,7 +200,7 @@ IDE detection:
  Authorization: Bearer (vscode|terax|opencode) → req.ide (default: 'vscode')
 
 #ENV
-PORT # server port, default 8000
+PORT # server port, default 7250
 
 #DEPENDENCIES
 express ^5.2.1 # HTTP framework (pre-release)
@@ -219,7 +219,7 @@ POST /v1/chat/completions # OpenAI-compatible chat completions (SSE stream)
  Response: SSE stream with text deltas + tool_calls + finish_reason
 
 #CONFIG
-CONFIG.PORT # default 8000, auto-increment if occupied (up to +100)
+CONFIG.PORT # default 7250, auto-increment if occupied (up to +100)
 VS Code chatLanguageModels.json ZeroKey model entries: id ZK-{port}, maxInputTokens=200K, maxOutputTokens=64K, toolCalling=true, vision=true — synced dynamically by utils/sync-ide-config.js, not statically defined
 Rate limit: 5 requests per 15-second window (per provider label: 'DeepSeek', 'Claude', 'ChatGPT')
 Session timeout: 300s (5 min) for all provider HTTP requests

@@ -3,7 +3,7 @@
  */
 
 const CONFIG = {
-  PORT: process.env.PORT || 8000,
+  PORT: process.env.PORT || 7250,
 }
 
 const MODEL_HASH = {

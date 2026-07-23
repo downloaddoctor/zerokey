@@ -849,7 +849,7 @@
             </h3>
             <ol>
               <li>Settings → Models → Add Provider → OpenAI Compatible</li>
-              <li>Base URL: <code>http://localhost:8000/v1</code></li>
+              <li>Base URL: <code>http://localhost:7250/v1</code></li>
               <li>API key: <code>terax</code></li>
               <li>Click Test — worked? Done.</li>
             </ol>
@@ -864,7 +864,7 @@
             </h3>
             <ol>
               <li>Manage Models → Add Provider → Custom OpenAI-compatible</li>
-              <li>Base URL: <code>http://localhost:8000/v1</code></li>
+              <li>Base URL: <code>http://localhost:7250/v1</code></li>
               <li>API key: <code>opencode</code></li>
               <li>Submit — worked? Done.</li>
             </ol>
@@ -904,7 +904,7 @@
             <div class="step-num">3</div>
             <h3>Point. Shoot. Code.</h3>
             <p>
-              Aim your IDE at <code>http://localhost:8000/v1</code> and start coding. Full AI. Zero
+              Aim your IDE at <code>http://localhost:7250/v1</code> and start coding. Full AI. Zero
               cost. No one to bill you.
             </p>
           </div>
@@ -925,7 +925,7 @@
 <span class="c"># 2. interactive wizard — pick provider, paste fetch, choose session</span>
 <span class="blank"></span>
 <span class="c"># 3. call it like OpenAI</span>
-<span class="prompt">&gt;</span><span class="k">curl</span> http://localhost:8000/v1/chat/completions \
+<span class="prompt">&gt;</span><span class="k">curl</span> http://localhost:7250/v1/chat/completions \
     -H <span class="s">"Content-Type: application/json"</span> \
     -H <span class="s">"Authorization: Bearer vscode"</span> \
     -d <span class="s">'{"messages":[{"role":"user","content":"hello"}],"model":"deepseek"}'</span></pre>
