@@ -132,6 +132,13 @@ The `Authorization: Bearer <ide>` header maps the request to the correct IDE's t
 3. API key: `terax`
 4. Click Test — worked? Done.
 
+### OpenCode
+
+1. Manage Models → Add Provider → Custom OpenAI-compatible
+2. Base URL: `http://localhost:8000/v1`
+3. API key: `opencode`
+4. Submit — worked? Done.
+
 ## Session Storage
 
 Sessions and credentials are stored in `temp/users.json` (gitignored). Each user entry contains the captured browser headers and a list of named sessions with conversation IDs. Sessions are tracked in-memory during runtime and flushed to disk on graceful shutdown (`SIGINT`/`SIGTERM`). No per-request disk writes.
