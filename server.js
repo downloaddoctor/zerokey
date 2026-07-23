@@ -79,7 +79,7 @@ app.use('/', infoRouter)
     const openaiErr = toOpenAIError(err, preSelected.provider)
     const status = openaiErr.error?.status || err.statusCode || err.status || 500
     try {
-      const { tools, ...body } = req.body
+      const { ...body } = req.body
       const detail = [
         `[${new Date().toISOString()}]`,
         `${req.method} ${req.originalUrl}`,
