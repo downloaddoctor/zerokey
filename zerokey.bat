@@ -66,7 +66,14 @@ if /i "!DOUPDATE!"=="y" (
     echo.
     echo Pulling latest changes...
     call :hr
-    git pull origin %BRANCH%
+    git fetch origin %BRANCH%
+    git pull origin %BRANCH% --ff-only
+    if !errorlevel! neq 0 (
+        echo.
+        echo Fast-forward failed - local history diverged from origin.
+        echo Resetting local repo to match origin/%BRANCH% ^(local changes will be discarded^).
+        git reset --hard origin/%BRANCH%
+    )
     call :hr
     goto install_deps
 )
