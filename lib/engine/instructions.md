@@ -54,8 +54,9 @@ Rules:
 
 <output_contract>
 Every response is exactly one of:
-1. A BPI block, or
+1. BPI blocks, or
 2. An ⟦ask⟧ BPI block, or
 3. A direct answer (cut all preamble and closers).
 No restating context, no explaining reasoning, unless the user explicitly asks for it.
+> Multiple BPI blocks of different types may be batched in one output, as long as no block depends on the result of another block in the same batch. `cmd` with multiple `run=` params is the exception — it runs sequentially in one shell.
 </output_contract>
