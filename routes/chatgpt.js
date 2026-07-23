@@ -6,6 +6,8 @@ const { toOpenAIError } = require('../utils/errors')
 const ToolCompiler = require('../lib/engine')
 const { acquireSlot } = require('../utils/rate-limiter')
 const { setChatGPTInstructions } = require('../core/chatgpt/set-instructions')
+const { tryEmitTitle } = require('../utils/is-title-gen')
+const { setSSEHeaders } = require('../utils/stream-helpers')
 
 const chatgptApi = new ChatGPTAPI()
 
@@ -17,6 +19,9 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
 
   router.post('/', async (req, res) => {
     const { messages = [] } = req.body
+
+    if (tryEmitTitle(req, res, 'chatgpt', session)) return
+
     const toolCalling = session.toolCalling ?? true
     const model = session.model || 'auto'
     if (!messages || messages.length === 0) {
@@ -45,10 +50,7 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
 
     let { prompt, skill } = await compiler.formatPrompt(messages, isNewSession, uploadFile)
 
-    res.setHeader('Content-Type', 'text/event-stream')
-    res.setHeader('Cache-Control', 'no-cache')
-    res.setHeader('Connection', 'keep-alive')
-    res.setHeader('Access-Control-Allow-Origin', '*')
+    setSSEHeaders(res)
 
     const parser = new ToolCompiler.Stream(res, 'chatgpt', compiler, session)
 

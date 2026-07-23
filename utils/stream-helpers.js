@@ -38,4 +38,14 @@ function createOnError(res, parser, provider) {
   }
 }
 
-module.exports = { createSendFinalChunk, createOnError }
+/**
+ * Sets the standard SSE response headers used by all provider routes.
+ */
+function setSSEHeaders(res) {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+}
+
+module.exports = { createSendFinalChunk, createOnError, setSSEHeaders }

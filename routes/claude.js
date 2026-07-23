@@ -8,6 +8,8 @@ const { extractFiles, uploadFiles } = require('../utils/extract-files')
 
 const claudeApi = new ClaudeAPI()
 const { acquireSlot } = require('../utils/rate-limiter')
+const { setSSEHeaders } = require('../utils/stream-helpers')
+const { tryEmitTitle } = require('../utils/is-title-gen')
 
 async function buildClaudeRouter(parsedFetch, session, userData = null) {
   console.debug('[Claude] Initializing from parsed capture JSON')
@@ -17,6 +19,9 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
 
   router.post('/', async (req, res) => {
     const { messages = [], reasoning_effort: reasoningEffort = null } = req.body
+
+    if (tryEmitTitle(req, res, 'claude', session)) return
+
     const toolCalling = session.toolCalling ?? true
     const model = session.model
 
@@ -42,10 +47,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
 
     const { prompt, skill } = await compiler.formatPrompt(messages, isNewSession, uploadFile)
 
-    res.setHeader('Content-Type', 'text/event-stream')
-    res.setHeader('Cache-Control', 'no-cache')
-    res.setHeader('Connection', 'keep-alive')
-    res.setHeader('Access-Control-Allow-Origin', '*')
+    setSSEHeaders(res)
 
     const parser = new ToolCompiler.Stream(res, 'claude', compiler, session)
 
@@ -97,7 +99,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
               [],
             )
 
-            parser.scan('\n\n````text')
+            parser.scan('\n\n````text\n')
             await claudeStreamHandler(
               res,
               summaryStream,
@@ -105,7 +107,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
               parser,
               (limitReached, sendFinalChunk) => {
                 parser.scan('````')
-                sendLimitMessage(parser, resetTime, mins)
+                parser.scan(limitMessageText(resetTime, mins))
                 sendFinalChunk()
               },
             )
@@ -137,17 +139,9 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
           const mins = Math.max(1, Math.ceil((resetMs - Date.now()) / 60000))
           const resetTime = new Date(resetMs).toLocaleTimeString()
 
-          res.setHeader('Content-Type', 'text/event-stream')
-          res.setHeader('Cache-Control', 'no-cache')
-          res.setHeader('Connection', 'keep-alive')
-          res.setHeader('Access-Control-Allow-Origin', '*')
+          setSSEHeaders(res)
           const parser = new ToolCompiler.Stream(res, 'claude', compiler, session)
-          sendLimitMessage(res, parser, resetTime, mins)
-          parser.flush()
-          parser.emit({}, 'stop', {})
-
-          res.write('data: [DONE]\n\n')
-          res.end()
+          ToolCompiler.emitText(res, parser, limitMessageText(resetTime, mins))
 
           setImmediate(() => process.exit(0))
           return
@@ -162,10 +156,8 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
   return router
 }
 
-function sendLimitMessage(parser, resetTime, mins) {
-  parser.scan(
-    `⟦ask¦question=This Claude session has reached its usage limit. It resets at ${resetTime} (~${mins} min). What would you like to do?¦option=Switch to another Claude user¦default=true¦option=Switch to another provider⟧`,
-  )
+function limitMessageText(resetTime, mins) {
+  return `⟦ask¦question=This Claude session has reached its usage limit. It resets at ${resetTime} (~${mins} min). What would you like to do?¦option=Switch to another Claude user¦default=true¦option=Switch to another provider⟧`
 }
 
 module.exports = { buildClaudeRouter }

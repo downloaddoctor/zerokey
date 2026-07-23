@@ -5,6 +5,8 @@ const { DeepSeekAPI } = require('../core/deepseek/api')
 const { toOpenAIError } = require('../utils/errors')
 const { streamHandler } = require('../core/deepseek/stream-handler')
 const { acquireSlot } = require('../utils/rate-limiter')
+const { tryEmitTitle } = require('../utils/is-title-gen')
+const { setSSEHeaders } = require('../utils/stream-helpers')
 
 const deepseekApi = new DeepSeekAPI()
 
@@ -16,6 +18,9 @@ async function buildDeepSeekRouter(parsedFetch, session) {
 
   router.post('/', async (req, res) => {
     const { messages = [] } = req.body
+
+    if (tryEmitTitle(req, res, 'deepseek', session)) return
+
     const toolCalling = session.toolCalling ?? true
 
     if (!messages || messages.length === 0) {
@@ -47,10 +52,7 @@ async function buildDeepSeekRouter(parsedFetch, session) {
       prompt = toolCalling ? compiler.buildPrompt(prompt, dynamicGrammar) : prompt
     }
 
-    res.setHeader('Content-Type', 'text/event-stream')
-    res.setHeader('Cache-Control', 'no-cache')
-    res.setHeader('Connection', 'keep-alive')
-    res.setHeader('Access-Control-Allow-Origin', '*')
+    setSSEHeaders(res)
 
     try {
       const parser = new ToolCompiler.Stream(res, 'deepseek', compiler, session)
