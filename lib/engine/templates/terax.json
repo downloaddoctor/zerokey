@@ -159,7 +159,7 @@
     "type": "function",
     "function": {
       "name": "grep",
-      "description": "Search file contents in the workspace using a regular expression. Honors .gitignore. Returns up to `max_results` (default 50, max 500) `{path, line, text}` hits, with a `truncated` flag when more existed. Long match lines are clipped to 200 chars. Use this for code navigation — do NOT brute-force read_file across the tree.",
+      "description": "Search file contents in the workspace using a regular expression. Honors .gitignore. Returns up to `max_results` (default 30, max 500) `{path, line, text}` hits, with a `truncated` flag when more existed. Long match lines are clipped to 160 chars. Use this for code navigation — do NOT brute-force read_file across the tree. Narrow with `glob` when you can; raise `max_results` only if the first batch truly isn't enough.",
       "parameters": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -403,7 +403,7 @@
     "type": "function",
     "function": {
       "name": "open_preview",
-      "description": "Open a preview tab (in-app iframe) at the given URL. Use this after starting a dev server (e.g. `pnpm dev`, `npm run dev`) to surface the rendered page next to the terminal. Localhost URLs work best; arbitrary external sites may be blocked by X-Frame-Options.",
+      "description": "Open a preview tab (in-app iframe) at the given URL — restricted to localhost/loopback addresses for the local dev server. Use this after starting a dev server (e.g. `pnpm dev`, `npm run dev`) to surface the rendered page next to the terminal. To preview external sites, the user should paste the URL into the preview address bar themselves.",
       "parameters": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -411,7 +411,7 @@
           "url": {
             "type": "string",
             "format": "uri",
-            "description": "Full URL to load (e.g. http://localhost:5173). Must include scheme."
+            "description": "Full URL to load (e.g. http://localhost:5173). Must include scheme. Only http/https on loopback hosts are accepted."
           }
         },
         "required": ["url"],
@@ -456,6 +456,66 @@
           }
         },
         "required": ["todos"],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "spawn_coding_agent",
+      "description": "Spawn a Claude Code agent in a new terminal tab and give it the prompt. Use this when the user (via /claude-code) wants work delegated and no agent is active yet in this session. Craft a complete, self-contained prompt first; the user approves it before the agent starts. Do not call this if an agent is already active — use send_to_agent instead.",
+      "parameters": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The full, self-contained task prompt for the Claude Code agent."
+          }
+        },
+        "required": ["prompt"],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "send_to_agent",
+      "description": "Send a follow-up instruction to the active Claude Code agent in this session. Use after reviewing its output to request fixes or the next unit of work. The instruction is typed into the agent's prompt and submitted once the user approves. Read its latest output first so the follow-up is informed.",
+      "parameters": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "instruction": {
+            "type": "string",
+            "minLength": 1,
+            "description": "One clear, self-contained instruction for the agent. No control characters."
+          }
+        },
+        "required": ["instruction"],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "read_agent_output",
+      "description": "Inspect the Claude Code agent in this session: whether one is active, its status, and the tail of its terminal output. Call this first when handling a /claude-code request so you know whether to spawn a new agent or follow up with the existing one, and to see what it has done and reported.",
+      "parameters": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "lines": {
+            "description": "Trailing lines of the agent terminal to return. Default 120.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 400
+          }
+        },
         "additionalProperties": false
       }
     }
