@@ -89,7 +89,13 @@ if [ "$DOUPDATE" = "y" ] || [ "$DOUPDATE" = "Y" ]; then
     echo ""
     echo "Pulling latest changes..."
     hr
-    git pull origin "$BRANCH"
+    git fetch origin "$BRANCH"
+    if ! git pull origin "$BRANCH" --ff-only; then
+        echo ""
+        echo "Fast-forward failed - local history diverged from origin."
+        echo "Resetting local repo to match origin/$BRANCH (local changes will be discarded)."
+        git reset --hard "origin/$BRANCH"
+    fi
     hr
     install_deps
 fi

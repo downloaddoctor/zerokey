@@ -106,7 +106,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
               session,
               parser,
               (limitReached, sendFinalChunk) => {
-                parser.scan('````')
+                parser.scan('\n````')
                 parser.scan(limitMessageText(resetTime, mins))
                 sendFinalChunk()
               },
