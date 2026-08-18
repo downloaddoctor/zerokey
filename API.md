@@ -4,7 +4,7 @@
 
 ZeroKey is an OpenAI-compatible AI proxy server that routes chat completion requests to real browser sessions for **DeepSeek**, **Claude**, and **ChatGPT** — without requiring API keys. It presents an OpenAI-compatible `/v1/chat/completions` endpoint that IDE plugins (VS Code, Terax, Opencode) can use as a drop-in replacement.
 
-**Version:** 1.0.0
+**Version:** 0.2.0
 **Base URL:** `http://localhost:{PORT}` (default port: 7250, auto-increments if occupied)
 
 ---
@@ -51,7 +51,15 @@ Root endpoint — returns API metadata and available models.
     "chat_completions": "POST /v1/chat/completions",
     "health": "GET /health"
   },
-  "models": ["DeepSeek V4", "GPT-4o", "Claude Sonnet 4.6", "Claude Sonnet 5", "Claude Haiku 4.5"]
+  "models": [
+    "DeepSeek V4 - Expert",
+    "DeepSeek V4 - Instant",
+    "DeepSeek V4 - Vision",
+    "GPT-4o",
+    "Claude Sonnet 4.6",
+    "Claude Sonnet 5",
+    "Claude Haiku 4.5"
+  ]
 }
 ```
 
@@ -119,9 +127,9 @@ Get details for a specific model by ID.
 
 **Path Parameters:**
 
-| Name  | Type   | Required | Description                   |
-| ----- | ------ | -------- | ----------------------------- |
-| model | string | yes      | Model ID (e.g. `DeepSeek V4`) |
+| Name  | Type   | Required | Description              |
+| ----- | ------ | -------- | ------------------------ |
+| model | string | yes      | Model ID (e.g. `expert`) |
 
 **Response `200 OK`:** Single model object (same shape as items in the list).
 
@@ -133,7 +141,7 @@ Get details for a specific model by ID.
     "message": "Model 'unknown-model' not found",
     "type": "invalid_request_error",
     "code": "model_not_found",
-    "action": "Valid models: DeepSeek V4, GPT-4o, Claude Sonnet 4.6, Claude Sonnet 5, Claude Haiku 4.5",
+    "action": "Valid models: expert, default, vision, auto, claude-sonnet-4-6, claude-sonnet-5, claude-haiku-4-5-20251001",
     "category": "invalid_request",
     "status": 404
   }
@@ -729,13 +737,23 @@ Singleton that loads and caches system prompts:
 
 **Models:**
 
-| ID                | Owned By  | Context Length | Max Output |
-| ----------------- | --------- | -------------- | ---------- |
-| DeepSeek V4       | deepseek  | 1,000,000      | 384,000    |
-| GPT-4o            | openai    | 128,000        | 16,384     |
-| Claude Sonnet 4.6 | anthropic | 1,000,000      | 128,000    |
-| Claude Sonnet 5   | anthropic | 1,000,000      | 128,000    |
-| Claude Haiku 4.5  | anthropic | 200,000        | 64,000     |
+| ID                          | Display Name          | Owned By  | Vision | Context Length | Max Output |
+| --------------------------- | --------------------- | --------- | ------ | -------------- | ---------- |
+| `expert`                    | DeepSeek V4 - Expert  | deepseek  | no     | 1,000,000      | 384,000    |
+| `default`                   | DeepSeek V4 - Instant | deepseek  | yes    | 1,000,000      | 384,000    |
+| `vision`                    | DeepSeek V4 - Vision  | deepseek  | yes    | 1,000,000      | 384,000    |
+| `auto`                      | GPT-4o                | openai    | yes    | 128,000        | 16,384     |
+| `claude-sonnet-4-6`         | Claude Sonnet 4.6     | anthropic | yes    | 1,000,000      | 128,000    |
+| `claude-sonnet-5`           | Claude Sonnet 5       | anthropic | yes    | 1,000,000      | 128,000    |
+| `claude-haiku-4-5-20251001` | Claude Haiku 4.5      | anthropic | yes    | 200,000        | 64,000     |
+
+**Prompt Limits (`PROMPT_LIMITS`, per-provider max prompt/output chars):**
+
+| Provider | Limit   |
+| -------- | ------- |
+| claude   | 64,000  |
+| chatgpt  | 50,000  |
+| deepseek | 128,000 |
 
 ---
 

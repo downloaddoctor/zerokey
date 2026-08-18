@@ -1,12 +1,25 @@
+<p align="center">
+  <img alt="ZeroKey preview" src="https://github.com/user-attachments/assets/f401c888-2a86-4b0e-a0f1-2900f2824b91" width="979" height="512">
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#api-endpoints">API Docs</a> ·
+  <a href="docs/llms.txt">llms.txt</a> ·
+  <a href="https://downloaddoctor.github.io/zerokey/">Landing Page</a>
+</p>
+
+<video src="https://github.com/user-attachments/assets/688e1119-1455-4f3f-b9a4-f423aa1dde23" autoplay muted loop playsinline width="100%"></video>
+
+<p align="center">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Non--Commercial-blue"></a>
+  <a href="package.json"><img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-brightgreen"></a>
+  <a href="package.json"><img alt="pnpm" src="https://img.shields.io/badge/pnpm-10.13.1-orange"></a>
+  <a href="#quick-start"><img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-yes-8b7bff"></a>
+  <img alt="Telemetry" src="https://img.shields.io/badge/telemetry-none-8b7bff">
+</p>
+
 # ZeroKey
-
-![License](https://img.shields.io/badge/license-Non--Commercial-blue)
-![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)
-![pnpm](https://img.shields.io/badge/pnpm-10.13.1-orange)
-![Self--hosted](https://img.shields.io/badge/self--hosted-yes-8b7bff)
-![Telemetry](https://img.shields.io/badge/telemetry-none-8b7bff)
-
-<video src="https://github.com/user-attachments/assets/6c32c6f7-564f-4e63-bbc1-2e73b1566881" autoplay muted loop playsinline width="100%"></video>
 
 OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** — use your own browser sessions and your own credentials to connect your own accounts with VS Code (Chat), Terax, or OpenCode. Personal use only. Just paste a fetch() call from DevTools. ZeroKey does not provide shared accounts, API access, or commercial access to third-party services.
 
