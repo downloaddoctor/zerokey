@@ -6,6 +6,7 @@ const prompts = require('prompts')
 const { ClaudeAPI } = require('./claude/api')
 const { DeepSeekAPI } = require('./deepseek/api')
 const { ChatGPTAPI } = require('./chatgpt/api')
+const { GLMAPI } = require('./glm/api')
 const { MODEL_HASH } = require('../config/constants')
 const { text } = require('../utils/logger')
 
@@ -159,6 +160,7 @@ class SessionSelector {
           { title: 'DeepSeek', value: 'deepseek' },
           { title: 'Claude', value: 'claude' },
           { title: 'ChatGPT', value: 'chatgpt' },
+          { title: 'GLM', value: 'glm' },
         ],
       },
       { onCancel: () => process.exit(0) },
@@ -249,6 +251,12 @@ class SessionSelector {
         )
     }
 
+    if (this.provider === 'glm') {
+      if (!h['authorization']) errors.push('authorization — required (Bearer token)')
+      if (!url.includes('/backend-api/assistant/stream'))
+        errors.push('URL must be /backend-api/assistant/stream — wrong request copied')
+    }
+
     return errors
   }
 
@@ -269,6 +277,10 @@ class SessionSelector {
 
     if (this.provider === 'chatgpt') {
       await api.getMe()
+    }
+
+    if (this.provider === 'glm') {
+      await api.getCurrentUser()
     }
   }
 
@@ -298,10 +310,18 @@ class SessionSelector {
 
     if (!username) return null
 
+    if (this.provider === 'glm') {
+      console.debug('\n  GLM guest mode — auto-creating guest session...')
+      const user = { username, parsedFetch: { headers: {}, body: {}, url: '' }, sessions: [] }
+      this._saveUser(this.provider, username, user)
+      return user
+    }
+
     const PROVIDER_URLS = {
       deepseek: 'https://chat.deepseek.com',
       claude: 'https://claude.ai/new',
       chatgpt: 'https://chatgpt.com',
+      glm: 'https://chatglm.cn',
     }
 
     const providerUrl = PROVIDER_URLS[this.provider]
@@ -327,6 +347,12 @@ class SessionSelector {
         '  1. Open DevTools (F12) → Network tab',
         '  2. Send any message on chatgpt.com',
         `  3. Find a request to ${text.cyan('/backend-api/f/conversation')}`,
+        '  4. Right-click → Copy → Copy as fetch',
+      ],
+      glm: [
+        '  1. Open DevTools (F12) → Network tab',
+        '  2. Send any message on chatglm.cn',
+        `  3. Find a request to ${text.cyan('/backend-api/assistant/stream')}`,
         '  4. Right-click → Copy → Copy as fetch',
       ],
     }
@@ -468,9 +494,15 @@ class SessionSelector {
       claude: { 'claude-sonnet-4-6': 'recommended for tools' },
       chatgpt: { auto: text.red('often forgets tools in Tools Mode') },
       deepseek: { expert: 'recommended' },
+      glm: { 'glm-5.3-flash': 'recommended for tools' },
     }
 
-    if (this.provider === 'claude' || this.provider === 'chatgpt' || this.provider === 'deepseek') {
+    if (
+      this.provider === 'claude' ||
+      this.provider === 'chatgpt' ||
+      this.provider === 'deepseek' ||
+      this.provider === 'glm'
+    ) {
       const providerHash = MODEL_HASH[this.provider] || {}
       const label = providerHash.title || this.provider
       const descriptions = MODEL_DESCRIPTIONS[this.provider] || {}
@@ -492,6 +524,7 @@ class SessionSelector {
     const vision =
       this.provider === 'claude' ||
       this.provider === 'chatgpt' ||
+      this.provider === 'glm' ||
       (this.provider === 'deepseek' && answers.model !== 'expert')
 
     const newSession = {
@@ -548,6 +581,11 @@ class SessionSelector {
       chatgpt: {
         label: 'ChatGPT',
         factory: () => new ChatGPTAPI(options),
+        init: (api) => api.initializeFromJSON(parsedFetch || {}),
+      },
+      glm: {
+        label: 'GLM',
+        factory: () => new GLMAPI(options),
         init: (api) => api.initializeFromJSON(parsedFetch || {}),
       },
     }

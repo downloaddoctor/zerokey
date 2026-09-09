@@ -168,7 +168,11 @@ class ToolCompiler {
 
     if (parser.isNewSession && !parser.haveInstructionsAPI && parser.toolCalling) {
       const base = instructions.getFull()
-      finalPrompt = `${base}\n\n${userPrompt}`
+      const languageHint =
+        this.provider === 'glm' ? '\n\nIMPORTANT: Always respond in English.\n' : ''
+      finalPrompt = `${base}${languageHint}\n\n${userPrompt}`
+    } else if (parser.isNewSession && this.provider === 'glm') {
+      finalPrompt = `IMPORTANT: Always respond in English.\n\n${userPrompt}`
     }
 
     return this.limitPrompt(finalPrompt)

@@ -1,6 +1,3 @@
-const fs = require('fs')
-const path = require('path')
-
 const express = require('express')
 
 const infoRouter = require('./routes/info')
@@ -13,6 +10,9 @@ const { toOpenAIError } = require('./utils/errors')
 const { findPort } = require('./utils/find-port')
 const { syncIdeConfig } = require('./utils/sync-ide-config')
 const { sequentialQueue } = require('./utils/sequential-queue')
+const { LogSaver } = require('./utils/log-saver')
+
+const errorsLog = new LogSaver({ name: 'errors' })
 
 require('./utils/logger')
 
@@ -81,23 +81,16 @@ app.use('/', infoRouter)
     const status = openaiErr.error?.status || err.statusCode || err.status || 500
     try {
       const { tools: _, ...body } = req.body
-      const detail = [
-        `[${new Date().toISOString()}]`,
-        `${req.method} ${req.originalUrl}`,
-        `Status: ${status}`,
-        `Message: ${err.message || err}`,
-        err.stack || '',
-        `Body: ${JSON.stringify(body, null, 2)}`,
-      ].join('\n')
-
-      const errorsFile = path.join('temp', 'errors.txt')
-      const MAX = 1024 * 1024 // 1MB
-      if (fs.existsSync(errorsFile) && fs.statSync(errorsFile).size > MAX) {
-        const ts = new Date().toISOString().replace(/[:.]/g, '-')
-        fs.renameSync(errorsFile, path.join('temp', `errors.${ts}.txt`))
-      }
-
-      fs.appendFileSync(errorsFile, detail + '\n\n---\n\n')
+      errorsLog.log({
+        timestamp: new Date().toISOString(),
+        method: req.method,
+        url: req.originalUrl,
+        status,
+        message: err.message || String(err),
+        stack: err.stack || '',
+        openaiErr,
+        body,
+      })
     } catch {}
     if (!res.headersSent) res.status(status).json(openaiErr)
     else res.end()

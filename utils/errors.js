@@ -99,6 +99,7 @@ function getProviderURL(provider) {
     deepseek: 'chat.deepseek.com',
     chatgpt: 'chatgpt.com',
     claude: 'claude.ai',
+    glm: 'chatglm.cn',
   }
   return urls[provider?.toLowerCase()] || provider || 'the provider'
 }

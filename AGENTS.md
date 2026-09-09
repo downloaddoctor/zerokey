@@ -22,6 +22,9 @@
    api.js # ChatGPTAPI — sentinel refresh, conduit token, prepare flow, file upload (Azure blob)
    stream-handler.js # chatgptStreamHandler — SSE parsing, session-id tracking
    pow.js # ChatGPTProofOfWork — sentinel proof token decode/generate/solve
+  glm/
+   api.js # GLMAPI — signed requests, guest session respawn, refresh token flow, file upload
+   stream-handler.js # glmStreamHandler — SSE parsing, quota detection, guest respawn
   session-selector.js # session-selector.js
   engine/
    bpi.js # BpiRegistry — global BPI block registry for tool-call emission (compile/parse/emit)
@@ -44,6 +47,7 @@
   claude.js # POST /v1/chat/completions — Claude router: instructions, tools, limit handling
   deepseek.js # POST /v1/chat/completions — DeepSeek router: PoW, session creation, retry
   chatgpt.js # POST /v1/chat/completions — ChatGPT router: sentinel, prepare, instructions
+  glm.js # POST /v1/chat/completions — GLM router: signed requests, guest respawn
  utils/
   cookie-jar.js # CookieJar — shared cookie store, seed/capture/serialize
   errors.js # classifyError, toOpenAIError — provider error → OpenAI-compatible error
@@ -84,10 +88,10 @@
   → core/session-selector
   → utils/find-port, utils/sync-ide-config, utils/logger, utils/errors, utils/sequential-queue
  chat-router.js
-  → routes/claude, routes/chatgpt, routes/deepseek
+  → routes/claude, routes/chatgpt, routes/deepseek, routes/glm
  session-selector.js
   → prompts (TUI)
-  → core/claude/api, core/deepseek/api, core/chatgpt/api
+  → core/claude/api, core/deepseek/api, core/chatgpt/api, core/glm/api
   → config/constants
  claude.js
   → engine/pipeline (StreamPipeline, passes messages → pipeline.session/rawMode)
@@ -100,6 +104,10 @@
  chatgpt.js
   → engine/pipeline (StreamPipeline, passes messages → pipeline.session/rawMode)
   → core/chatgpt/api, core/chatgpt/stream-handler
+  → utils/rate-limiter, utils/route-helpers
+ glm.js
+  → engine/pipeline (StreamPipeline, passes messages → pipeline.session/rawMode)
+  → core/glm/api, core/glm/stream-handler
   → utils/rate-limiter, utils/route-helpers
  bpi.js
   → global registry for BPI blocks (compile/parse/emit)
@@ -160,7 +168,7 @@
 
  # users.json (temp/users.json)
  {
-   provider (deepseek|claude|chatgpt): {
+   provider (deepseek|claude|chatgpt|glm): {
      username: {
        username: string,
        parsedFetch: { headers: object, body: object, url: string },
@@ -189,6 +197,10 @@
 ## KNOWN-INVARIANTS
  MODELS keyed by meta.id (slug), not display name; MODEL_HASH: id = canonical slug, name = display label
  No API keys — all auth via browser session cookies captured from DevTools fetch()
+ GLM auth: signed requests (X-Sign/X-Timestamp/X-Nonce) + Bearer refresh_token from chatglm.cn; guest mode auto-respawns on quota exhaustion (您已多次体验过对话) while keeping conversation_id
+ GLM session continuity: conversation_id captured from SSE stream, set as both chatSessionId and parentMessageId (GLM has no separate message UUID like DeepSeek/Claude); guest quota is per-identity so respawn keeps context
+ GLM guest auto-create: _promptNewUser skips fetch() paste for glm provider, creates empty parsedFetch; GLMAPI.initializeFromJSON sets _isGuest=true when no refresh_token, fetches guest token on first _getAccessToken call
+ GLM SSE delta tracking: per-logic_id cumulative text/reasoning tracked via partTextSent/partReasoningSent Maps; only new characters emitted (GLM re-sends full accumulated text per event)
  SessionSelector._parseFetchDirect extracts URL + headers + body from browser "Copy as fetch" string
  ToolCompiler is a singleton per IDE×provider (cached in ToolCompiler.objects)
  Session state (chatSessionId, parentMessageId, lastUsed, todos) is mutated in-memory; persisted to users.json only on shutdown via selector.flush()
@@ -211,7 +223,7 @@
 
 ## EXTENSION-POINTS
  New IDE: add entry in IDES_PROMPT_OPTIMIZER (tool-defs.js), add IDE name to VALID_IDES (server.js)
- New provider: add BUILDERS entry (chat-router.js), add to SessionSelector provider list + PROVIDER_URLS/PROVIDER_STEPS, add MODEL_HASH entry (constants.js)
+ New provider: add BUILDERS entry (chat-router.js), add to SessionSelector provider list + PROVIDER_URLS/PROVIDER_STEPS, add MODEL_HASH entry (constants.js), add _getProvider entry, add _validateFetchHeaders case, add getProviderURL entry (errors.js)
  New tool: add entry to TOOLS object (tool-defs.js), add per-IDE mapping
  New skill: add entry to triggers array (triggers.js), with trigger word + bpi template
  Stream pipeline: StreamPipeline owns the SSE lifecycle; ToolCompiler is a stateless service created by StreamPipeline

@@ -81,12 +81,51 @@ const MODEL_HASH = {
       },
     },
   },
+  glm: {
+    title: 'GLM',
+    owned_by: 'zhipu',
+    models: {
+      'glm-5.3': {
+        id: 'glm-5.3',
+        name: 'GLM 5.3',
+        vision: true,
+        created: 1_780_000_000,
+        context_length: 128_000,
+        max_output_length: 32_000,
+      },
+      'glm-5.3-flash': {
+        id: 'glm-5.3-flash',
+        name: 'GLM 5.3 Flash',
+        vision: true,
+        created: 1_780_000_000,
+        context_length: 128_000,
+        max_output_length: 32_000,
+      },
+      'glm-5': {
+        id: 'glm-5',
+        name: 'GLM 5',
+        vision: true,
+        created: 1_770_000_000,
+        context_length: 128_000,
+        max_output_length: 32_000,
+      },
+      'glm-4.7': {
+        id: 'glm-4.7',
+        name: 'GLM 4.7',
+        vision: true,
+        created: 1_760_000_000,
+        context_length: 128_000,
+        max_output_length: 32_000,
+      },
+    },
+  },
 }
 
 const PROMPT_LIMITS = {
   claude: 64_000,
   chatgpt: 50_000,
   deepseek: 128_000,
+  glm: 64_000,
 }
 
 const MODELS = {}
