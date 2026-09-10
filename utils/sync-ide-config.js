@@ -104,13 +104,15 @@ async function syncIdeConfig(preSelected, port) {
         }
       }
 
-      const supportsReasoning = preSelected.provider === 'claude'
+      const supportsReasoning = ['claude', 'deepseek'].includes(preSelected.provider)
 
+      const reasoningEfforts =
+        preSelected.provider === 'deepseek' ? ['off', 'max'] : ['low', 'medium', 'high', 'max']
       const existingModel = zeroKeyEntry.models.find((m) => m.id === targetId)
       if (existingModel) {
         existingModel.name = modelName
         if (supportsReasoning) {
-          existingModel.supportsReasoningEffort = ['low', 'medium', 'high', 'max']
+          existingModel.supportsReasoningEffort = reasoningEfforts
           existingModel.reasoningEffortFormat = 'chat-completions'
         } else {
           delete existingModel.supportsReasoningEffort
@@ -128,7 +130,7 @@ async function syncIdeConfig(preSelected, port) {
           vision: true,
           ...(supportsReasoning
             ? {
-                supportsReasoningEffort: ['low', 'medium', 'high', 'max'],
+                supportsReasoningEffort: reasoningEfforts,
                 reasoningEffortFormat: 'chat-completions',
               }
             : {}),

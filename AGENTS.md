@@ -16,7 +16,7 @@
    set-instructions.js # setClaudeInstructions — project+system-instructions upsert
   deepseek/
    api.js # DeepSeekAPI — PoW challenge solver, session CRUD, file upload with polling
-   stream-handler.js # streamHandler — SSE parsing, auto-retry on stream close
+   stream-handler.js # streamHandler — SSE fragment parsing (THINK→reasoning_content, RESPONSE→scan), auto-retry on stream close
    pow.js # DeepSeekPOW — WASM-based proof-of-work solver
   qwen/
    api.js # QwenAPI — chat.qwen.ai client, session CRUD, bearer/cookie auth, file upload
@@ -111,6 +111,7 @@
   → core/qwen/api, core/qwen/stream-handler, core/qwen/set-instructions
   → utils/rate-limiter, utils/route-helpers
   new session (non-raw): setQwenInstructions → pipeline.haveInstructionsAPI = true (skips inlining in buildPrompt)
+ deepseek.js → reasoning_effort maps to DeepSeek thinking_enabled (only 'max' enables thinking; 'off'/null disable)
  bpi.js
   → global registry for BPI blocks (compile/parse/emit)
  pipeline.js
@@ -207,6 +208,8 @@
  Session state (chatSessionId, parentMessageId, lastUsed, todos) is mutated in-memory; persisted to users.json only on shutdown via selector.flush()
  CookieJar is shared per API client instance; cookies captured from response Set-Cookie headers
  DeepSeek uses a single unified model `default` (model_type: default) — thinking + search + vision; PoW challenge per request (WASM-based sha3); retries on SSE error exactly once
+ DeepSeek reasoning_effort: 'max' → thinking_enabled=true, anything else (incl. 'off') → false; only ['off','max'] advertised in VS Code sync (utils/sync-ide-config.js); Claude advertises ['low','medium','high','max']
+ DeepSeek stream fragments typed THINK/RESPONSE; THINK → reasoning_content deltas (mirrors Qwen), RESPONSE → parser.scan; currentFragmentType tracked from initial snapshot / fragments APPEND / content path events
  uploadAndFormatPrompt is async, signature (messages, pipeline); returns { prompt, skill }; uploadAndFormatPromptForRaw(messages, pipeline, upload) returns { prompt } only — both share the file-decode/upload loop via uploadAndGetMessages(messages, pipeline, upload)
  buildPrompt signature (userPrompt, pipeline); inlines instructions on new session unless pipeline.haveInstructionsAPI
  skill check happens before provider call; handled in pipeline.setup(), triggering message never reaches provider

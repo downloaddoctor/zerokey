@@ -22,7 +22,7 @@ async function buildDeepSeekRouter(parsedFetch, session) {
   const router = express.Router()
 
   router.post('/', async (req, res) => {
-    const { messages = [], tools } = req.body
+    const { messages = [], tools, reasoning_effort: reasoningEffort = null } = req.body
     if (!validateMessages(messages, res)) return
 
     StreamPipeline.setSSEHeaders(res)
@@ -32,6 +32,7 @@ async function buildDeepSeekRouter(parsedFetch, session) {
       activeSession.chatSessionId = await deepseekApi.createChatSession()
     }
     const modelType = pipeline.isNewSession ? activeSession.model || 'default' : null
+    const thinkingEnabled = reasoningEffort === 'max'
 
     const fileIds = []
     pipeline.bindUploader(deepseekApi, fileIds)
@@ -53,7 +54,7 @@ async function buildDeepSeekRouter(parsedFetch, session) {
         activeSession.chatSessionId,
         prompt,
         activeSession.parentMessageId,
-        false,
+        thinkingEnabled,
         true,
         modelType,
         fileIds,
@@ -65,7 +66,7 @@ async function buildDeepSeekRouter(parsedFetch, session) {
           activeSession.chatSessionId,
           prompt,
           activeSession.parentMessageId,
-          false,
+          thinkingEnabled,
           true,
           modelType,
           fileIds,
