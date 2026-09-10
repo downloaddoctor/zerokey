@@ -31,7 +31,7 @@ async function buildDeepSeekRouter(parsedFetch, session) {
     if (!activeSession.chatSessionId) {
       activeSession.chatSessionId = await deepseekApi.createChatSession()
     }
-    const modelType = pipeline.isNewSession ? activeSession.model || 'expert' : null
+    const modelType = pipeline.isNewSession ? activeSession.model || 'default' : null
 
     const fileIds = []
     pipeline.bindUploader(deepseekApi, fileIds)

@@ -45,21 +45,13 @@ Root endpoint — returns API metadata and available models.
 {
   "name": "ZeroKey API Server",
   "version": "1.0.0",
-  "description": "OpenAI-compatible AI proxy for DeepSeek, Claude & ChatGPT",
+  "description": "OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT & Qwen",
   "endpoints": {
     "models": "GET /v1/models",
     "chat_completions": "POST /v1/chat/completions",
     "health": "GET /health"
   },
-  "models": [
-    "DeepSeek V4 - Expert",
-    "DeepSeek V4 - Instant",
-    "DeepSeek V4 - Vision",
-    "GPT-4o",
-    "Claude Sonnet 4.6",
-    "Claude Sonnet 5",
-    "Claude Haiku 4.5"
-  ]
+  "models": ["DeepSeek V4", "GPT-4o", "Claude Sonnet 4.6", "Claude Sonnet 5", "Claude Haiku 4.5"]
 }
 ```
 
@@ -127,9 +119,9 @@ Get details for a specific model by ID.
 
 **Path Parameters:**
 
-| Name  | Type   | Required | Description              |
-| ----- | ------ | -------- | ------------------------ |
-| model | string | yes      | Model ID (e.g. `expert`) |
+| Name  | Type   | Required | Description               |
+| ----- | ------ | -------- | ------------------------- |
+| model | string | yes      | Model ID (e.g. `default`) |
 
 **Response `200 OK`:** Single model object (same shape as items in the list).
 
@@ -141,7 +133,7 @@ Get details for a specific model by ID.
     "message": "Model 'unknown-model' not found",
     "type": "invalid_request_error",
     "code": "model_not_found",
-    "action": "Valid models: expert, default, vision, auto, claude-sonnet-4-6, claude-sonnet-5, claude-haiku-4-5-20251001",
+    "action": "Valid models: default, auto, claude-sonnet-4-6, claude-sonnet-5, claude-haiku-4-5-20251001, qwen3.7-plus, qwen3.8-max, qwen3.7-max, qwen3.6-plus, qwen3.5-plus, qwen3.5-omni-plus",
     "category": "invalid_request",
     "status": 404
   }
@@ -318,7 +310,7 @@ without extractable file/image parts.
   "createdAt": "2026-07-06T10:30:00.000Z",
   "lastUsed": "2026-07-06T10:35:00.000Z",
   "disableTools": false,
-  "model": "expert",
+  "model": "default",
   "dynamicToolsHash": null,
   "todos": {}
 }
@@ -723,7 +715,7 @@ Singleton that loads and caches system prompts:
 **Session-specific fields:**
 
 - `disableTools` — boolean; when true, tools + instructions not prepended
-- `model` — provider-specific model string (e.g. "expert", "claude-sonnet-4-6", "auto")
+- `model` — provider-specific model string (e.g. "default", "claude-sonnet-4-6", "auto")
 - `dynamicToolsHash` — SHA-256 hash of req.body.tools[] for MCP cache invalidation
 - `todos` — persisted todo items from `todos_add`/`todos_set` tool calls
 
@@ -737,15 +729,13 @@ Singleton that loads and caches system prompts:
 
 **Models:**
 
-| ID                          | Display Name          | Owned By  | Vision | Context Length | Max Output |
-| --------------------------- | --------------------- | --------- | ------ | -------------- | ---------- |
-| `expert`                    | DeepSeek V4 - Expert  | deepseek  | no     | 1,000,000      | 384,000    |
-| `default`                   | DeepSeek V4 - Instant | deepseek  | yes    | 1,000,000      | 384,000    |
-| `vision`                    | DeepSeek V4 - Vision  | deepseek  | yes    | 1,000,000      | 384,000    |
-| `auto`                      | GPT-4o                | openai    | yes    | 128,000        | 16,384     |
-| `claude-sonnet-4-6`         | Claude Sonnet 4.6     | anthropic | yes    | 1,000,000      | 128,000    |
-| `claude-sonnet-5`           | Claude Sonnet 5       | anthropic | yes    | 1,000,000      | 128,000    |
-| `claude-haiku-4-5-20251001` | Claude Haiku 4.5      | anthropic | yes    | 200,000        | 64,000     |
+| ID                          | Display Name      | Owned By  | Vision | Context Length | Max Output |
+| --------------------------- | ----------------- | --------- | ------ | -------------- | ---------- |
+| `default`                   | DeepSeek V4       | deepseek  | yes    | 1,000,000      | 384,000    |
+| `auto`                      | GPT-4o            | openai    | yes    | 128,000        | 16,384     |
+| `claude-sonnet-4-6`         | Claude Sonnet 4.6 | anthropic | yes    | 1,000,000      | 128,000    |
+| `claude-sonnet-5`           | Claude Sonnet 5   | anthropic | yes    | 1,000,000      | 128,000    |
+| `claude-haiku-4-5-20251001` | Claude Haiku 4.5  | anthropic | yes    | 200,000        | 64,000     |
 
 **Prompt Limits (`PROMPT_LIMITS`, per-provider max prompt/output chars):**
 

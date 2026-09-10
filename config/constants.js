@@ -55,25 +55,9 @@ const MODEL_HASH = {
     title: 'DeepSeek',
     owned_by: 'deepseek',
     models: {
-      expert: {
-        id: 'expert',
-        name: 'DeepSeek V4 - Expert',
-        vision: false,
-        created: 1_784_736_000,
-        context_length: 1_000_000,
-        max_output_length: 384_000,
-      },
       default: {
         id: 'default',
-        name: 'DeepSeek V4 - Instant',
-        vision: true,
-        created: 1_784_736_000,
-        context_length: 1_000_000,
-        max_output_length: 384_000,
-      },
-      vision: {
-        id: 'vision',
-        name: 'DeepSeek V4 - Vision',
+        name: 'DeepSeek V4',
         vision: true,
         created: 1_784_736_000,
         context_length: 1_000_000,

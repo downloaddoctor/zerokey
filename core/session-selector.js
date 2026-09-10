@@ -496,7 +496,7 @@ class SessionSelector {
     const MODEL_DESCRIPTIONS = {
       claude: { 'claude-sonnet-4-6': 'recommended for tools' },
       chatgpt: { auto: text.red('often forgets tools in Tools Mode') },
-      deepseek: { expert: 'recommended' },
+      deepseek: { default: 'unified model (thinking + search + vision)' },
       qwen: { 'qwen3.7-plus': 'recommended for tools', 'qwen3.7-max': 'larger model' },
     }
 
@@ -523,11 +523,7 @@ class SessionSelector {
 
     // Derive vision from model metadata when available; fall back to per-provider defaults
     const modelMeta = providerHash?.models?.[answers.model]
-    const vision =
-      modelMeta?.vision ??
-      (this.provider === 'claude' ||
-        this.provider === 'chatgpt' ||
-        (this.provider === 'deepseek' && answers.model !== 'expert'))
+    const vision = modelMeta?.vision ?? (this.provider === 'claude' || this.provider === 'chatgpt')
 
     const newSession = {
       name: answers.name || defaultName,
