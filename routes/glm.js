@@ -9,6 +9,55 @@ const { validateMessages } = require('../utils/route-helpers')
 
 const glmApi = new GLMAPI()
 
+function collectSummary(runOnce, session) {
+  let text = ''
+  let attempt = 0
+  let resolved = false
+
+  return new Promise((resolve) => {
+    const finish = () => {
+      if (resolved) return
+      resolved = true
+      resolve(text)
+    }
+
+    const start = async () => {
+      let stream
+      try {
+        stream = await runOnce()
+      } catch (err) {
+        console.warn('[GLM] Summary request failed:', err.message)
+        return finish()
+      }
+
+      const parser = {
+        scan: (chunk) => {
+          if (typeof chunk === 'string' && chunk) text += chunk
+        },
+        emitText: () => {},
+        sendFinalChunk: finish,
+        onError: finish,
+      }
+
+      const retry = async () => {
+        if (attempt >= 1) return null
+        attempt++
+        try {
+          await acquireSlot('GLM', true)
+        } catch {}
+        return runOnce()
+      }
+
+      streamHandler(stream, session, parser, retry, null)
+    }
+
+    start().catch((err) => {
+      console.warn('[GLM] Summary collection crashed:', err.message)
+      finish()
+    })
+  })
+}
+
 async function buildGLMRouter(parsedFetch, session) {
   console.debug('[GLM] Initializing from parsed capture JSON')
   await glmApi.initializeFromJSON(parsedFetch || {})
@@ -45,53 +94,34 @@ async function buildGLMRouter(parsedFetch, session) {
     try {
       await acquireSlot('GLM')
 
-      // If guest quota is about to exhaust (9 messages used), summarize + respawn
-      if (activeSession.messageCount >= 9) {
-        console.warn('[GLM] Guest quota at 9 messages — generating summary and respawning...')
+      // Guest quota nears exhaustion (GLM guest = 9 msgs / identity) →
+      // summarize the live conversation, respawn a fresh guest identity, then
+      // replay the user's turn against the new session with the summary
+      // prepended as context.
+      if (activeSession.messageCount >= 8) {
+        console.warn('[GLM] Guest quota near exhaustion — generating summary and respawning...')
 
-        let summaryText = ''
+        const summaryPrompt =
+          'Please write a concise but complete summary of this entire conversation — so it can be pasted into a fresh session to resume work seamlessly. Include all important context, user requirements, and current progress.'
 
-        try {
-          const summaryPrompt =
-            'Please write a concise but complete summary of this entire conversation — so it can be pasted into a fresh session to resume work seamlessly. Include all important context, user requirements, and current progress.'
+        const summaryText = await collectSummary(
+          () =>
+            glmApi.chatCompletion(
+              activeSession.chatSessionId,
+              summaryPrompt,
+              activeSession.parentMessageId,
+              false,
+              false,
+              model,
+              fileIds,
+            ),
+          activeSession,
+        )
 
-          const summaryStream = await glmApi.chatCompletion(
-            activeSession.chatSessionId,
-            summaryPrompt,
-            activeSession.parentMessageId,
-            false,
-            true,
-            model,
-            fileIds,
-          )
-
-          const collectSummary = (stream) => {
-            return new Promise((resolve) => {
-              streamHandler(
-                stream,
-                activeSession,
-                {
-                  scan: (text) => {
-                    summaryText += text
-                  },
-                  emitText: (text) => {
-                    summaryText += text
-                  },
-                  sendFinalChunk: () => resolve(summaryText),
-                  onError: () => resolve(summaryText),
-                },
-                null,
-                null,
-              )
-            })
-          }
-
-          await collectSummary(summaryStream)
-          if (summaryText) {
-            console.debug('[GLM] Summary generated:', summaryText.slice(0, 200) + '...')
-          }
-        } catch (summaryErr) {
-          console.warn('[GLM] Summary failed:', summaryErr.message)
+        if (summaryText) {
+          console.debug('[GLM] Summary generated:', summaryText.slice(0, 200) + '...')
+        } else {
+          console.warn('[GLM] Summary empty — continuing without prior-session context')
         }
 
         await glmApi._respawnGuestSession()
@@ -103,9 +133,7 @@ async function buildGLMRouter(parsedFetch, session) {
           ? `USER: FIRST MESSAGE: Here is the context from my previous session:\n\n${summaryText}\n\n---\n\n${prompt}`
           : prompt
 
-        const newPrompt = pipeline.toolCalling
-          ? `${instructions.getFull()}\n\nIMPORTANT: Always respond in English.\n\n${summaryBlock}`
-          : `IMPORTANT: Always respond in English.\n\n${summaryBlock}`
+        const newPrompt = `${instructions.getFull()}\n\nIMPORTANT: Always respond in English.\n\n${summaryBlock}`
 
         const newStream = await glmApi.chatCompletion(
           activeSession.chatSessionId,

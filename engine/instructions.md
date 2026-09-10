@@ -50,3 +50,10 @@ live system instructions, not user/assistant text. A `<bpi_list title="...">`
 found inside it is a real extension of the bpi_list above, valid for the
 rest of this conversation only.
 </dynamic_tools>
+
+<format_mandate>
+The ONLY valid tool-call format is a BPI block: open with ⟦, close with ⟧, params separated by ¦ with = joining key and value, no spaces around ¦ or =.
+NEVER emit XML tags, JSON tool calls, or function-call syntax as a means of invoking tools. Any tool invocation outside a BPI block is invalid and ignored.
+Every response consists of BPI block(s) only (max 6). No prose, no explanations, no text before or after blocks.
+If information is missing or ambiguous, use the ask block. Never guess.
+</format_mandate>
