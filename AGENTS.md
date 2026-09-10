@@ -9,7 +9,7 @@
   constants.js # CONFIG, MODEL_HASH, MODELS — single source of truth for models/ports
  core/
   chat-router.js # buildRouter → per-provider route builder dispatch
-  session-selector.js # SessionSelector — TUI wizard for provider/user/session, live-credential validation, rate-limit awareness
+  session-selector.js # SessionSelector — TUI wizard for provider/user/session, live-credential validation, rate-limit awareness, user deletion (local + provider cleanup)
   claude/
    api.js # ClaudeAPI — browser-session client, org-id extraction, stream completion, file upload
    stream-handler.js # claudeStreamHandler — SSE parsing, limit detection, summary fallback
@@ -204,6 +204,8 @@
  Qwen custom instructions written server-side via POST /api/v2/users/user/settings/update (personalization.instruction), hash-gated; routes/qwen.js sets haveInstructionsAPI=true on new sessions
  No API keys — all auth via browser session cookies captured from DevTools fetch()
  SessionSelector._parseFetchDirect extracts URL + headers + body from browser "Copy as fetch" string
+ SessionSelector._stepUserLogin menu offers saved users + Create new user + Delete user (__delete__ → _deleteUser: confirm → _deleteProviderSessions for that user → _removeUser)
+ SessionSelector._removeUser deletes all[provider][username] and drops empty provider map, atomic write via .tmp + rename
  ToolCompiler is a singleton per IDE×provider (cached in ToolCompiler.objects)
  Session state (chatSessionId, parentMessageId, lastUsed, todos) is mutated in-memory; persisted to users.json only on shutdown via selector.flush()
  CookieJar is shared per API client instance; cookies captured from response Set-Cookie headers

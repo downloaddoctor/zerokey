@@ -186,6 +186,7 @@ class SessionSelector {
         }
       })
       choices.push({ title: text.cyan('Create new user'), value: '__new__' })
+      choices.push({ title: text.red('Delete user'), value: '__delete__' })
 
       const { username } = await prompts(
         {
@@ -198,6 +199,7 @@ class SessionSelector {
       )
 
       if (username === '__new__') return this._promptNewUser()
+      if (username === '__delete__') return this._deleteUser(savedUsers)
       return providerUsers[username]
     }
 
@@ -540,6 +542,62 @@ class SessionSelector {
     return newSession
   }
 
+  async _deleteUser(savedUsers) {
+    const { target } = await prompts(
+      {
+        type: 'select',
+        name: 'target',
+        message: `Delete which user (${this.provider})?`,
+        choices: [
+          ...savedUsers.map((u) => ({ title: text.red(u), value: u })),
+          { title: 'Back', value: '__back__' },
+        ],
+      },
+      { onCancel: () => process.exit(0) },
+    )
+
+    if (!target || target === '__back__') return this._stepUserLogin()
+
+    const allProviders = this._loadAll()
+    const user = (allProviders[this.provider] || {})[target]
+    if (!user) return this._stepUserLogin()
+
+    const sessionCount = (user.sessions || []).length
+    const { confirmed } = await prompts(
+      {
+        type: 'confirm',
+        name: 'confirmed',
+        message: `Delete user "${target}" and ${sessionCount} local session(s)? This also deletes all provider-side sessions.`,
+        initial: false,
+      },
+      { onCancel: () => process.exit(0) },
+    )
+
+    if (!confirmed) return this._stepUserLogin()
+
+    const savedUser = this.user
+    const savedProvider = this.provider
+
+    this.user = user
+    process.stdout.write(text.dim('  Deleting provider sessions...'))
+    try {
+      await this._deleteProviderSessions()
+    } catch (e) {
+      console.warn(`\n  ⚠ Provider cleanup failed: ${e.message}`)
+    }
+    process.stdout.write(
+      '\r  ' + text.green('√ Provider sessions cleaned.') + '                  \n',
+    )
+
+    this.user = savedUser
+    this.provider = savedProvider
+
+    this._removeUser(savedProvider, target)
+    console.info(`  ${text.green('√')} User "${target}" removed.\n`)
+
+    return this._stepUserLogin()
+  }
+
   async _deleteAllSessions() {
     const count = this.user.sessions.length
     const { confirmed } = await prompts(
@@ -696,6 +754,21 @@ class SessionSelector {
       console.error('Load users error:', e.message)
     }
     return {}
+  }
+
+  _removeUser(provider, username) {
+    try {
+      const all = this._loadAll()
+      if (all[provider]) {
+        delete all[provider][username]
+        if (Object.keys(all[provider]).length === 0) delete all[provider]
+      }
+      const tmp = this._usersFile + '.tmp'
+      fs.writeFileSync(tmp, JSON.stringify(all, null, 2), 'utf8')
+      fs.renameSync(tmp, this._usersFile)
+    } catch (e) {
+      console.error('Remove user error:', e.message)
+    }
   }
 
   _saveUser(provider, username, userData) {
