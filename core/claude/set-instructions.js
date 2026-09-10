@@ -6,7 +6,7 @@ async function setClaudeInstructions(claudeApi, userData, toolCalling = true) {
   const currentHash = instructions.getHash()
   if (userData.instructionsHash === currentHash) return false
 
-  const content = toolCalling ? instructions.getFull() : ''
+  const content = toolCalling ? instructions.getClaudeFull() : ''
   const payload = JSON.stringify({ conversation_preferences: content })
   const headers = claudeApi._buildHeaders(
     { accept: '*/*', origin: 'https://claude.ai' },
