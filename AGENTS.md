@@ -1,7 +1,7 @@
 # ZeroKey
 
 ## PROJECT
- OpenAI-compatible AI proxy for DeepSeek, Claude & ChatGPT — no API keys, real browser sessions
+ OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT & Qwen — no API keys, real browser sessions
  Node.js >= 18, Express 5, pnpm, SSE streaming
 
 ## DIRECTORY
@@ -18,6 +18,10 @@
    api.js # DeepSeekAPI — PoW challenge solver, session CRUD, file upload with polling
    stream-handler.js # streamHandler — SSE parsing, auto-retry on stream close
    pow.js # DeepSeekPOW — WASM-based proof-of-work solver
+  qwen/
+   api.js # QwenAPI — chat.qwen.ai client, session CRUD, bearer/cookie auth, file upload
+   stream-handler.js # streamHandler — Qwen SSE parsing (think / thinking_summary / answer phases), reasoning_content emission
+   set-instructions.js # setQwenInstructions — writes ZeroKey prompt to POST /api/v2/users/user/settings/update personalization.instruction (hash-gated)
   chatgpt/
    api.js # ChatGPTAPI — sentinel refresh, conduit token, prepare flow, file upload (Azure blob)
    stream-handler.js # chatgptStreamHandler — SSE parsing, session-id tracking
@@ -43,6 +47,7 @@
   models.js # GET /v1/models, GET /v1/models/:model — OpenAI-compatible model listing
   claude.js # POST /v1/chat/completions — Claude router: instructions, tools, limit handling
   deepseek.js # POST /v1/chat/completions — DeepSeek router: PoW, session creation, retry
+  qwen.js # POST /v1/chat/completions — Qwen router: chat session create/delete, instructions, reasoning passthrough
   chatgpt.js # POST /v1/chat/completions — ChatGPT router: sentinel, prepare, instructions
  utils/
   cookie-jar.js # CookieJar — shared cookie store, seed/capture/serialize
@@ -84,10 +89,10 @@
   → core/session-selector
   → utils/find-port, utils/sync-ide-config, utils/logger, utils/errors, utils/sequential-queue
  chat-router.js
-  → routes/claude, routes/chatgpt, routes/deepseek
+  → routes/claude, routes/chatgpt, routes/deepseek, routes/qwen
  session-selector.js
   → prompts (TUI)
-  → core/claude/api, core/deepseek/api, core/chatgpt/api
+  → core/claude/api, core/deepseek/api, core/chatgpt/api, core/qwen/api
   → config/constants
  claude.js
   → engine/pipeline (StreamPipeline, passes messages → pipeline.session/rawMode)
@@ -101,6 +106,11 @@
   → engine/pipeline (StreamPipeline, passes messages → pipeline.session/rawMode)
   → core/chatgpt/api, core/chatgpt/stream-handler
   → utils/rate-limiter, utils/route-helpers
+ qwen.js
+  → engine/pipeline (StreamPipeline, passes messages → pipeline.session/rawMode)
+  → core/qwen/api, core/qwen/stream-handler, core/qwen/set-instructions
+  → utils/rate-limiter, utils/route-helpers
+  new session (non-raw): setQwenInstructions → pipeline.haveInstructionsAPI = true (skips inlining in buildPrompt)
  bpi.js
   → global registry for BPI blocks (compile/parse/emit)
  pipeline.js
@@ -188,6 +198,9 @@
 
 ## KNOWN-INVARIANTS
  MODELS keyed by meta.id (slug), not display name; MODEL_HASH: id = canonical slug, name = display label
+ MODEL_HASH.qwen mirrors live chat.qwen.ai /api/v2/models list (6 models); vision flags taken from meta.capabilities.vision; max_output_length maps to meta.max_summary_generation_length (thinking length for qwen3.7-max which lacks summary)
+ Qwen auth via cookie `token=<jwt>` (authorization Bearer optional); session auth validated by throwaway chat create+delete in QwenAPI.getCurrentUser()
+ Qwen custom instructions written server-side via POST /api/v2/users/user/settings/update (personalization.instruction), hash-gated; routes/qwen.js sets haveInstructionsAPI=true on new sessions
  No API keys — all auth via browser session cookies captured from DevTools fetch()
  SessionSelector._parseFetchDirect extracts URL + headers + body from browser "Copy as fetch" string
  ToolCompiler is a singleton per IDE×provider (cached in ToolCompiler.objects)
@@ -206,8 +219,7 @@
  Error logs append to temp/errors.txt, rotated at 1MB
  VS Code model sync writes to %APPDATA%/Code/User/chatLanguageModels.json
  sequentialQueue (utils/sequential-queue.js) serializes every /v1/chat/completions request app-wide; no concurrent handling
- Ephemeral chat sessions are deleted provider-side via pipeline.onFinalChunk (set per-route when pipeline.ephemeralMode), fired from pipeline.sendFinalChunkflush(), emits immediately for vscode
- VS Code model sync writes to %APPDATA%/Code/User/chatLanguageModels.json
+ Ephemeral chat sessions are deleted provider-side via pipeline.onFinalChunk (set per-route when pipeline.ephemeralMode), fired from pipeline.sendFinalChunk
 
 ## EXTENSION-POINTS
  New IDE: add entry in IDES_PROMPT_OPTIMIZER (tool-defs.js), add IDE name to VALID_IDES (server.js)

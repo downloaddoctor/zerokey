@@ -1,11 +1,13 @@
 const fs = require('fs')
 const path = require('path')
+const { spawn } = require('child_process')
 
 const prompts = require('prompts')
 
 const { ClaudeAPI } = require('./claude/api')
 const { DeepSeekAPI } = require('./deepseek/api')
 const { ChatGPTAPI } = require('./chatgpt/api')
+const { QwenAPI } = require('./qwen/api')
 const { MODEL_HASH } = require('../config/constants')
 const { text } = require('../utils/logger')
 
@@ -159,6 +161,7 @@ class SessionSelector {
           { title: 'DeepSeek', value: 'deepseek' },
           { title: 'Claude', value: 'claude' },
           { title: 'ChatGPT', value: 'chatgpt' },
+          { title: 'Qwen', value: 'qwen' },
         ],
       },
       { onCancel: () => process.exit(0) },
@@ -249,6 +252,21 @@ class SessionSelector {
         )
     }
 
+    if (this.provider === 'qwen') {
+      if (!h['cookie']) errors.push('cookie — required for session auth')
+      // Qwen's JWT lives inside the cookie header as `token=<jwt>` on current
+      // builds; an authorization header is optional. Require at least one.
+      const cookieStr = h['cookie'] || ''
+      const hasTokenCookie = /(?:^|;\s*)token=[^;]+/.test(cookieStr)
+      if (!h['authorization'] && !hasTokenCookie) {
+        errors.push(
+          'token — cookie must contain a `token=<jwt>` value, or an authorization: Bearer header must be present',
+        )
+      }
+      if (!url.includes('/api/v2/chat/completions'))
+        errors.push('URL must contain /api/v2/chat/completions — wrong request copied')
+    }
+
     return errors
   }
 
@@ -269,11 +287,15 @@ class SessionSelector {
 
     if (this.provider === 'chatgpt') {
       await api.getMe()
+      return
+    }
+
+    if (this.provider === 'qwen') {
+      await api.getCurrentUser()
     }
   }
 
   _openBrowser(url) {
-    const { spawn } = require('child_process')
     const cmd =
       process.platform === 'win32'
         ? ['cmd', ['/c', 'start', '', url]]
@@ -302,6 +324,7 @@ class SessionSelector {
       deepseek: 'https://chat.deepseek.com',
       claude: 'https://claude.ai/new',
       chatgpt: 'https://chatgpt.com',
+      qwen: 'https://chat.qwen.ai',
     }
 
     const providerUrl = PROVIDER_URLS[this.provider]
@@ -327,6 +350,12 @@ class SessionSelector {
         '  1. Open DevTools (F12) → Network tab',
         '  2. Send any message on chatgpt.com',
         `  3. Find a request to ${text.cyan('/backend-api/f/conversation')}`,
+        '  4. Right-click → Copy → Copy as fetch',
+      ],
+      qwen: [
+        '  1. Open DevTools (F12) → Network tab',
+        '  2. Send any message on chat.qwen.ai',
+        `  3. Find a request to ${text.cyan('/api/v2/chat/completions')}`,
         '  4. Right-click → Copy → Copy as fetch',
       ],
     }
@@ -468,17 +497,20 @@ class SessionSelector {
       claude: { 'claude-sonnet-4-6': 'recommended for tools' },
       chatgpt: { auto: text.red('often forgets tools in Tools Mode') },
       deepseek: { expert: 'recommended' },
+      qwen: { 'qwen3.7-plus': 'recommended for tools', 'qwen3.7-max': 'larger model' },
     }
 
-    if (this.provider === 'claude' || this.provider === 'chatgpt' || this.provider === 'deepseek') {
-      const providerHash = MODEL_HASH[this.provider] || {}
+    const providerHash = MODEL_HASH[this.provider]
+    const modelEntries = Object.entries(providerHash?.models || {})
+
+    if (modelEntries.length > 0) {
       const label = providerHash.title || this.provider
       const descriptions = MODEL_DESCRIPTIONS[this.provider] || {}
       questions.push({
         type: 'select',
         name: 'model',
         message: `${label} model`,
-        choices: Object.entries(providerHash.models || {}).map(([value, meta]) => ({
+        choices: modelEntries.map(([value, meta]) => ({
           title: meta.name,
           value,
           description: descriptions[value],
@@ -489,10 +521,13 @@ class SessionSelector {
     const answers = await prompts(questions, { onCancel: () => process.exit(0) })
     if (!answers.name) return null
 
+    // Derive vision from model metadata when available; fall back to per-provider defaults
+    const modelMeta = providerHash?.models?.[answers.model]
     const vision =
-      this.provider === 'claude' ||
-      this.provider === 'chatgpt' ||
-      (this.provider === 'deepseek' && answers.model !== 'expert')
+      modelMeta?.vision ??
+      (this.provider === 'claude' ||
+        this.provider === 'chatgpt' ||
+        (this.provider === 'deepseek' && answers.model !== 'expert'))
 
     const newSession = {
       name: answers.name || defaultName,
@@ -535,6 +570,11 @@ class SessionSelector {
 
   _getProvider(parsedFetch, provider, options = {}) {
     const providers = {
+      qwen: {
+        label: 'Qwen',
+        factory: () => new QwenAPI(options),
+        init: (api) => api.initializeFromJSON(parsedFetch || {}),
+      },
       deepseek: {
         label: 'DeepSeek',
         factory: () => new DeepSeekAPI(options),

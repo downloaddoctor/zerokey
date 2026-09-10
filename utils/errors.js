@@ -21,6 +21,21 @@ function classifyError(error, provider) {
     }
   }
 
+  // ── Provider-stream inline error frame ─────────────────
+  // Emitted by stream handlers when the provider pushes an `error` payload
+  // mid-stream (bad model, quota, invalid param, etc.). Preserve the actual
+  // provider message rather than collapsing to the generic fallback.
+  if (msg.includes('stream error:')) {
+    const detail = (error?.message || '').split('stream error:')[1]?.trim()
+    return {
+      category: 'provider_error',
+      message: `${provider} returned a stream error: ${detail || 'unknown error'}`,
+      action:
+        'Check the model id / request parameters, or re-capture a fresh fetch() if it persists.',
+      status: statusCode >= 400 ? statusCode : 502,
+    }
+  }
+
   // ── Session expired / auth failures ────────────────────
   if (statusCode === 401 || statusCode === 403) {
     return {
@@ -99,6 +114,7 @@ function getProviderURL(provider) {
     deepseek: 'chat.deepseek.com',
     chatgpt: 'chatgpt.com',
     claude: 'claude.ai',
+    qwen: 'chat.qwen.ai',
   }
   return urls[provider?.toLowerCase()] || provider || 'the provider'
 }

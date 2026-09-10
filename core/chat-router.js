@@ -2,6 +2,7 @@ const BUILDERS = {
   chatgpt: require('../routes/chatgpt').buildChatGPTRouter,
   claude: require('../routes/claude').buildClaudeRouter,
   deepseek: require('../routes/deepseek').buildDeepSeekRouter,
+  qwen: require('../routes/qwen').buildQwenRouter,
 }
 
 async function buildRouter(selected) {
