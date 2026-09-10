@@ -37,6 +37,19 @@ function formatWindow(w, resetFormat = 'time') {
  */
 async function claudeStreamHandler(stream, session, parser, cb) {
   let limitReached = null
+  // Claude emits thinking blocks as content_block_start{type:"thinking"} then
+  // content_block_delta{delta:{type:"thinking_delta"}}. Mirror Qwen/DeepSeek:
+  // open the reasoning channel once, then stream reasoning_content deltas.
+  let hasSentReasoningRole = false
+
+  const emitReasoning = (delta) => {
+    if (!delta) return
+    if (!hasSentReasoningRole) {
+      parser.emit({ role: 'assistant', reasoning_content: '' })
+      hasSentReasoningRole = true
+    }
+    parser.emit({ reasoning_content: delta })
+  }
 
   await readSSE(stream, {
     onData: (parsed) => {
@@ -46,10 +59,19 @@ async function claudeStreamHandler(stream, session, parser, cb) {
           if (msg) session.parentMessageId = msg.uuid
           break
         }
+        case 'content_block_start': {
+          const block = parsed.content_block || {}
+          if (block.type === 'thinking' && block.thinking) {
+            emitReasoning(block.thinking)
+          }
+          break
+        }
         case 'content_block_delta': {
           const delta = parsed.delta || {}
           if (delta.type === 'text_delta' && delta.text) {
             parser.scan(delta.text)
+          } else if (delta.type === 'thinking_delta' && delta.thinking) {
+            emitReasoning(delta.thinking)
           }
           break
         }

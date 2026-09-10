@@ -121,6 +121,42 @@ const MODEL_HASH = {
   },
 }
 
+// Single source of truth for reasoning_effort labels.
+// `labels` are the exact strings VS Code is told to advertise
+// (utils/sync-ide-config.js) and the exact keys the routes/api look up.
+// Anything not listed disables thinking.
+const REASONING = {
+  deepseek: {
+    labels: ['Off', 'DeepThink'],
+    map: {
+      Off: false,
+      DeepThink: true,
+    },
+  },
+  claude: {
+    labels: [
+      'Low',
+      'Low Think',
+      'Medium',
+      'Medium Think',
+      'High',
+      'High Think',
+      'Max',
+      'Max Think',
+    ],
+    map: {
+      Low: { think: false, tier: 'low' },
+      'Low Think': { think: true, tier: 'low' },
+      Medium: { think: false, tier: 'medium' },
+      'Medium Think': { think: true, tier: 'medium' },
+      High: { think: false, tier: 'high' },
+      'High Think': { think: true, tier: 'high' },
+      Max: { think: false, tier: 'max' },
+      'Max Think': { think: true, tier: 'max' },
+    },
+  },
+}
+
 const PROMPT_LIMITS = {
   claude: 64_000,
   chatgpt: 50_000,
@@ -143,4 +179,4 @@ for (const provider of Object.values(MODEL_HASH)) {
   }
 }
 
-module.exports = { CONFIG, MODELS, MODEL_HASH, PROMPT_LIMITS }
+module.exports = { CONFIG, MODELS, MODEL_HASH, PROMPT_LIMITS, REASONING }

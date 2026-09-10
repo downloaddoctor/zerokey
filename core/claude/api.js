@@ -4,6 +4,12 @@ const crypto = require('crypto')
 const nodeFetch = require('node-fetch')
 
 const { CookieJar } = require('../../utils/cookie-jar')
+const { REASONING } = require('../../config/constants')
+
+// O(1) reasoning_effort → { think, tier } lookup.
+// Keys are the exact labels VS Code advertises (utils/sync-ide-config.js).
+// Anything not mapped disables thinking.
+const REASONING_MAP = REASONING.claude.map
 
 /**
  * Generate a UUID v4.
@@ -161,12 +167,19 @@ class ClaudeAPI {
       attachments: [],
       files: fileIds,
       sync_sources: [],
+      completion_request_id: generateUUID(),
       rendering_mode: 'messages',
     }
 
-    if (reasoningEffort) {
-      body.effort = reasoningEffort
-      body.thinking_mode = 'auto'
+    // Claude's `thinking_mode` gates extended thinking; `effort` is the
+    // reasoning-effort tier. VS Code forwards the label verbatim, so we map it
+    // directly: a "<Tier> Think" label enables thinking, a bare tier disables
+    // it. O(1) lookup keyed by the exact labels VS Code advertises
+    // (utils/sync-ide-config.js); anything not mapped disables thinking.
+    const effort = REASONING_MAP[reasoningEffort]
+    if (effort) {
+      body.thinking_mode = effort.think ? 'auto' : 'off'
+      if (effort.tier) body.effort = effort.tier
     } else {
       body.thinking_mode = 'off'
     }

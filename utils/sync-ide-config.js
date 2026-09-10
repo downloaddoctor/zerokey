@@ -5,7 +5,7 @@ const os = require('os')
 const fetch = require('node-fetch')
 
 const { isPortActive } = require('./find-port')
-const { MODEL_HASH } = require('../config/constants')
+const { MODEL_HASH, REASONING } = require('../config/constants')
 const { text } = require('./logger')
 
 async function _fetchHealth(p) {
@@ -105,12 +105,17 @@ async function syncIdeConfig(preSelected, port) {
       }
 
       const supportsReasoning = ['claude', 'deepseek'].includes(preSelected.provider)
+      const supportsThinking = preSelected.provider === 'claude'
 
-      const reasoningEfforts =
-        preSelected.provider === 'deepseek' ? ['off', 'max'] : ['low', 'medium', 'high', 'max']
+      const reasoningEfforts = REASONING[preSelected.provider]?.labels
       const existingModel = zeroKeyEntry.models.find((m) => m.id === targetId)
       if (existingModel) {
         existingModel.name = modelName
+        if (supportsThinking) {
+          existingModel.thinking = true
+        } else {
+          delete existingModel.thinking
+        }
         if (supportsReasoning) {
           existingModel.supportsReasoningEffort = reasoningEfforts
           existingModel.reasoningEffortFormat = 'chat-completions'
@@ -128,6 +133,7 @@ async function syncIdeConfig(preSelected, port) {
           editTools: ['apply-patch', 'code-rewrite', 'find-replace', 'multi-find-replace'],
           toolCalling: true,
           vision: true,
+          ...(supportsThinking ? { thinking: true } : {}),
           ...(supportsReasoning
             ? {
                 supportsReasoningEffort: reasoningEfforts,

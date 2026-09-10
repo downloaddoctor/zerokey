@@ -12,7 +12,7 @@
   session-selector.js # SessionSelector — TUI wizard for provider/user/session, live-credential validation, rate-limit awareness, user deletion (local + provider cleanup)
   claude/
    api.js # ClaudeAPI — browser-session client, org-id extraction, stream completion, file upload
-   stream-handler.js # claudeStreamHandler — SSE parsing, limit detection, summary fallback
+   stream-handler.js # claudeStreamHandler — SSE parsing, thinking→reasoning_content, limit detection, summary fallback
    set-instructions.js # setClaudeInstructions — project+system-instructions upsert
   deepseek/
    api.js # DeepSeekAPI — PoW challenge solver, session CRUD, file upload with polling
@@ -26,7 +26,6 @@
    api.js # ChatGPTAPI — sentinel refresh, conduit token, prepare flow, file upload (Azure blob)
    stream-handler.js # chatgptStreamHandler — SSE parsing, session-id tracking
    pow.js # ChatGPTProofOfWork — sentinel proof token decode/generate/solve
-  session-selector.js # session-selector.js
   engine/
    bpi.js # BpiRegistry — global BPI block registry for tool-call emission (compile/parse/emit)
    compiler.js # ToolCompiler — singleton per IDE×provider: uploadAndGetMessages, uploadAndFormatPrompt, uploadAndFormatPromptForRaw, buildPrompt, compile/parse/emit, matchSkill
@@ -70,7 +69,6 @@
 ## SKILLS
  Skill triggers (engine/triggers.js): $cwd, $save, $req, $browser, $mcp, $mcp-dump, $test, $tools
  $tools # re-emits the instructions.md — reminds LLM if forgotten mid-session
- server.js # Express app entry: session selection, IDE config sync, route mounting, graceful shutdown
 
 ## BUILD
  pnpm 10.13.1
@@ -110,10 +108,7 @@
   → engine/pipeline (StreamPipeline, passes messages → pipeline.session/rawMode)
   → core/qwen/api, core/qwen/stream-handler, core/qwen/set-instructions
   → utils/rate-limiter, utils/route-helpers
-  new session (non-raw): setQwenInstructions → pipeline.haveInstructionsAPI = true (skips inlining in buildPrompt)
- deepseek.js → reasoning_effort maps to DeepSeek thinking_enabled (only 'max' enables thinking; 'off'/null disable)
- bpi.js
-  → global registry for BPI blocks (compile/parse/emit)
+  new session (non-raw): setQwenInstructions → pipeline.haveInstructionsAPI = true (skips buildPrompt inlining)
  pipeline.js
   → engine/compiler (ToolCompiler)
   → engine/bpi (BpiRegistry)
@@ -154,7 +149,7 @@
     model: string,
     messages: [{ role: "system"|"user"|"assistant"|"tool", content: string|array }],
     tools?: [{ type: "function", function: { name, description, parameters } }],
-    reasoning_effort?: "low"|"medium"|"high"|"max"
+    reasoning_effort?: string  # per-provider labels — config/constants.js REASONING
   }
   content parts: { type: "image_url", image_url: { url: "data:mime;base64,..." } } | { type: "file", file: { file_data: "data:mime;base64,...", filename: "..." } }
   response: SSE stream of { id, object: "chat.completion.chunk", created, model, choices: [{ delta: {}, finish_reason }] }
@@ -196,6 +191,7 @@
   MODEL_HASH → per-provider model metadata (id, name, vision, context_length, max_output_length)
   MODELS → flattened model registry keyed by id
   PROMPT_LIMITS → per-provider prompt/output char limits (claude/chatgpt 64k, deepseek 128k)
+  REASONING → {provider:{labels,map}} for reasoning_effort (see KNOWN-INVARIANTS)
 
 ## KNOWN-INVARIANTS
  MODELS keyed by meta.id (slug), not display name; MODEL_HASH: id = canonical slug, name = display label
@@ -203,19 +199,21 @@
  Qwen auth via cookie `token=<jwt>` (authorization Bearer optional); session auth validated by throwaway chat create+delete in QwenAPI.getCurrentUser()
  Qwen custom instructions written server-side via POST /api/v2/users/user/settings/update (personalization.instruction), hash-gated; routes/qwen.js sets haveInstructionsAPI=true on new sessions
  No API keys — all auth via browser session cookies captured from DevTools fetch()
- SessionSelector._parseFetchDirect extracts URL + headers + body from browser "Copy as fetch" string
- SessionSelector._stepUserLogin menu offers saved users + Create new user + Delete user (__delete__ → _deleteUser: confirm → _deleteProviderSessions for that user → _removeUser)
- SessionSelector._removeUser deletes all[provider][username] and drops empty provider map, atomic write via .tmp + rename
+ SessionSelector parses browser "Copy as fetch" string; TUI menu: saved users + Create + Delete (__delete__ → confirm → provider session cleanup → _removeUser); users.json atomic write via .tmp + rename
  ToolCompiler is a singleton per IDE×provider (cached in ToolCompiler.objects)
  Session state (chatSessionId, parentMessageId, lastUsed, todos) is mutated in-memory; persisted to users.json only on shutdown via selector.flush()
  CookieJar is shared per API client instance; cookies captured from response Set-Cookie headers
  DeepSeek uses a single unified model `default` (model_type: default) — thinking + search + vision; PoW challenge per request (WASM-based sha3); retries on SSE error exactly once
- DeepSeek reasoning_effort: 'max' → thinking_enabled=true, anything else (incl. 'off') → false; only ['off','max'] advertised in VS Code sync (utils/sync-ide-config.js); Claude advertises ['low','medium','high','max']
- DeepSeek stream fragments typed THINK/RESPONSE; THINK → reasoning_content deltas (mirrors Qwen), RESPONSE → parser.scan; currentFragmentType tracked from initial snapshot / fragments APPEND / content path events
- uploadAndFormatPrompt is async, signature (messages, pipeline); returns { prompt, skill }; uploadAndFormatPromptForRaw(messages, pipeline, upload) returns { prompt } only — both share the file-decode/upload loop via uploadAndGetMessages(messages, pipeline, upload)
- buildPrompt signature (userPrompt, pipeline); inlines instructions on new session unless pipeline.haveInstructionsAPI
- skill check happens before provider call; handled in pipeline.setup(), triggering message never reaches provider
- session.mcpInjected populated by restoreMcpInjections from current reqTools; once injected, tags stay for session lifetime
+ REASONING is single source: sync-ide-config.js advertises labels; routes/deepseek.js + core/claude/api.js lookup O(1) and log resolved value
+  deepseek: {'Off':false,'DeepThink':true}; miss → false; labels ['Off','DeepThink']
+  claude: label → {think,tier}; think→thinking_mode:'auto'+effort=tier else 'off'; labels ['Low','Low Think','Medium','Medium Think','High','High Think','Max','Max Think']
+ Claude body: completion_request_id (UUID), effort+thinking_mode (not thinking_enabled); VS Code sync writes thinking:true, forwards only reasoning_effort
+ Claude stream: thinking blocks → reasoning_content deltas (mirrors DeepSeek/Qwen), text_delta → parser.scan
+ DeepSeek stream fragments typed THINK/RESPONSE; THINK → reasoning_content deltas, RESPONSE → parser.scan; currentFragmentType tracked from snapshot / fragments APPEND / content path events
+ uploadAndFormatPrompt (messages, pipeline) → { prompt, skill }; uploadAndFormatPromptForRaw(messages, pipeline, upload) → { prompt }; both share uploadAndGetMessages
+ buildPrompt (userPrompt, pipeline) inlines instructions on new session unless pipeline.haveInstructionsAPI
+ skill check happens in pipeline.setup(), before provider call; triggering message never reaches provider
+ session.mcpInjected populated by restoreMcpInjections from reqTools; once injected, tags stay for session lifetime
  pipeline.isNewSession, pipeline.toolCalling, pipeline.haveInstructionsAPI, pipeline.ephemeralMode set by StreamPipeline constructor; Claude sets haveInstructionsAPI=true
  Auto MCP registration: mcp_<server>_<tool> naming → $<server> tag, merged into MCP_ALIAS_MAPS
  StreamPipeline defers tool-call emission for terax/opencode (batched at flush), emits immediately for vscode
@@ -228,7 +226,7 @@
 
 ## EXTENSION-POINTS
  New IDE: add entry in IDES_PROMPT_OPTIMIZER (tool-defs.js), add IDE name to VALID_IDES (server.js)
- New provider: add BUILDERS entry (chat-router.js), add to SessionSelector provider list + PROVIDER_URLS/PROVIDER_STEPS, add MODEL_HASH entry (constants.js)
+ New provider: add BUILDERS entry (chat-router.js), add to SessionSelector provider list + PROVIDER_URLS/PROVIDER_STEPS, add MODEL_HASH + REASONING entries (constants.js)
  New tool: add entry to TOOLS object (tool-defs.js), add per-IDE mapping
  New skill: add entry to triggers array (triggers.js), with trigger word + bpi template
  Stream pipeline: StreamPipeline owns the SSE lifecycle; ToolCompiler is a stateless service created by StreamPipeline

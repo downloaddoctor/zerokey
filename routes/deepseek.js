@@ -5,8 +5,14 @@ const { DeepSeekAPI } = require('../core/deepseek/api')
 const { streamHandler } = require('../core/deepseek/stream-handler')
 const { acquireSlot } = require('../utils/rate-limiter')
 const { validateMessages } = require('../utils/route-helpers')
+const { REASONING } = require('../config/constants')
 
 const deepseekApi = new DeepSeekAPI()
+
+// O(1) reasoning_effort → thinking_enabled lookup.
+// Keys are the exact labels VS Code advertises (utils/sync-ide-config.js).
+// Anything not mapped disables thinking.
+const REASONING_MAP = REASONING.deepseek.map
 
 async function buildDeepSeekRouter(parsedFetch, session) {
   console.debug('[Deepseek] Initializing from parsed capture JSON')
@@ -32,7 +38,7 @@ async function buildDeepSeekRouter(parsedFetch, session) {
       activeSession.chatSessionId = await deepseekApi.createChatSession()
     }
     const modelType = pipeline.isNewSession ? activeSession.model || 'default' : null
-    const thinkingEnabled = reasoningEffort === 'max'
+    const thinkingEnabled = REASONING_MAP[reasoningEffort] ?? false
 
     const fileIds = []
     pipeline.bindUploader(deepseekApi, fileIds)
