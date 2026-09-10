@@ -103,7 +103,7 @@ app.use('/', infoRouter)
     else res.end()
   })
 
-  const server = app.listen(port, () => {
+  const server = app.listen(port, '127.0.0.1', () => {
     console.success(`\n√ ZeroKey running on http://localhost:${port}`)
     console.log('Endpoints:')
     console.log(`  GET  http://localhost:${port}/`)
