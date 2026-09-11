@@ -122,4 +122,33 @@ app.use('/', infoRouter)
   process.on('SIGTERM', () => shutdown('SIGTERM'))
   process.on('SIGHUP', () => shutdown('SIGHUP'))
   process.on('exit', () => selector.flush())
+
+  process.on('uncaughtException', (err) => {
+    try {
+      errorLog.log(
+        [
+          `[${new Date().toISOString()}] uncaughtException`,
+          `Message: ${err && (err.message || err)}`,
+          (err && err.stack) || '',
+        ].join('\n'),
+      )
+    } catch {}
+    console.error('[Server] uncaughtException:', (err && (err.stack || err.message)) || err)
+    selector.flush()
+    process.exit(1)
+  })
+
+  process.on('unhandledRejection', (reason) => {
+    const err = reason instanceof Error ? reason : new Error(String(reason))
+    try {
+      errorLog.log(
+        [
+          `[${new Date().toISOString()}] unhandledRejection`,
+          `Message: ${err.message}`,
+          err.stack || '',
+        ].join('\n'),
+      )
+    } catch {}
+    console.error('[Server] unhandledRejection:', err.stack || err.message)
+  })
 })()

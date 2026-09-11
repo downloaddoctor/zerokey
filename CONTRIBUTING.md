@@ -5,8 +5,8 @@ Thanks for your interest in contributing! ZeroKey is a personal-use self-hosted 
 ## Getting Started
 
 1. Fork the repo and clone locally
-2. Run `npm install`
-3. Start the server with `npm start` — the interactive wizard will guide you through setup
+2. Run `pnpm install`
+3. Start the server with `pnpm start` — the interactive wizard will guide you through setup
 4. Create a branch for your changes
 
 ## What We Welcome

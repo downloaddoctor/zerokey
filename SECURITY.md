@@ -31,11 +31,11 @@ ZeroKey stores browser session credentials (cookies, headers, tokens) in `temp/u
 
 ### Dependencies
 
-ZeroKey uses minimal dependencies (express, inquirer). Keep them updated:
+ZeroKey uses minimal dependencies (express, node-fetch, prompts). Keep them updated:
 
 ```bash
-npm audit
-npm update
+pnpm audit
+pnpm update
 ```
 
 Report any dependency vulnerabilities as described above.

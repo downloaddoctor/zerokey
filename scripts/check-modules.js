@@ -1,21 +1,28 @@
-const modules = [
-  './utils/errors',
-  './utils/route-helpers',
-  './utils/rate-limiter',
-  './utils/cookie-jar',
-  './utils/sse-reader',
-  './engine/compiler',
-]
-
+const fs = require('fs')
 const path = require('path')
 const root = path.join(__dirname, '..')
 
+const DIRS = ['core', 'engine', 'routes', 'utils']
+
+function walk(dir) {
+  const out = []
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) out.push(...walk(full))
+    else if (entry.isFile() && entry.name.endsWith('.js')) out.push(full)
+  }
+  return out
+}
+
+const modules = DIRS.flatMap((d) => walk(path.join(root, d)))
+
 let failed = 0
 for (const mod of modules) {
+  const rel = './' + path.relative(root, mod).split(path.sep).join('/')
   try {
-    require(path.join(root, mod))
+    require(mod)
   } catch (err) {
-    console.error(`FAIL: ${mod} — ${err.message}`)
+    console.error(`FAIL: ${rel} — ${err.message}`)
     failed++
   }
 }
