@@ -1,4 +1,6 @@
 * text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
 *.wasm binary
 *.js text eol=lf
 *.json text eol=lf

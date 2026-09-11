@@ -78,8 +78,8 @@
 ## ENTRY-POINTS
  server.js # main entry: node server.js / pnpm start
  start.bat # Windows launcher
- zerokey.bat # npm runner for Windows
- zerokey.sh # npm runner for Unix
+ zerokey.bat # Windows launcher: auto-installs git/node/pnpm into .zerokey-tools\, clone/update/run
+ zerokey.sh # Unix launcher: same flow via apt/dnf/yum/pacman/apk/brew, --prod installs
 
 ## MODULES
  server.js
