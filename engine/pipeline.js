@@ -73,6 +73,8 @@ function emitToolCalls(compiler, session, payloads, emit) {
   emit(delta)
 }
 
+const SAY = BPI.OPEN + 'say' + BPI.SEP + 'text='
+
 class StreamPipeline {
   static setSSEHeaders(res) {
     res.setHeader('Content-Type', 'text/event-stream')
@@ -117,6 +119,8 @@ class StreamPipeline {
     this.toolIndex = this.compiler.tools
     this.lastChar = ''
     this._maxToolLen = Math.max(...Object.keys(this.compiler.tools).map((k) => k.length)) + 3
+    this.isSaying = false
+    this.sayStripped = false
 
     const chunk = {
       id: `chatcmpl-${Date.now()}${Math.random().toString(36).slice(2, 8)}`,
@@ -255,13 +259,33 @@ class StreamPipeline {
     while (true) {
       if (this.inTool) {
         const closeIdx = this.buffer.indexOf(BPI.CLOSE)
-        if (closeIdx === -1) return
-        const payload = this.buffer.slice(1, closeIdx)
+        if (closeIdx === -1) {
+          if (this.isSaying) {
+            // Strip "text=" once (first time it appears), then stream raw text.
+            if (!this.sayStripped) {
+              const tIdx = this.buffer.indexOf(SAY)
+              if (tIdx === -1) return
+              this.buffer = this.buffer.slice(tIdx + 10)
+              this.sayStripped = true
+            }
+
+            this.emitText(this.buffer)
+            this.buffer = ''
+          }
+          return
+        }
+
+        const payload = this.buffer.slice(this.isSaying ? 0 : 1, closeIdx)
         this.buffer = this.buffer.slice(closeIdx + 1)
+
         this.inTool = false
         this.toolStartFound = false
 
-        this.toolBuffers.push(payload)
+        if (this.isSaying) this.emitText(payload.slice(this.sayStripped ? 0 : 10))
+        else this.toolBuffers.push(payload)
+
+        this.isSaying = false
+        this.sayStripped = false
         continue
       }
 
@@ -278,6 +302,14 @@ class StreamPipeline {
         const tool = this.buffer.slice(1, pipeIdx)
         if (this.toolIndex[tool]) {
           console.debug('[TOOL]', tool)
+          this.inTool = true
+          continue
+        }
+
+        if (tool === 'say') {
+          console.debug('[TOOL]', tool)
+          this.isSaying = true
+          this.sayStripped = false
           this.inTool = true
           continue
         }

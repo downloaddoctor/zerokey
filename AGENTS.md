@@ -31,7 +31,7 @@
    compiler.js # ToolCompiler — singleton per IDE×provider: uploadAndGetMessages, uploadAndFormatPrompt, uploadAndFormatPromptForRaw, buildPrompt, compile/parse/emit, matchSkill
    instructions.js # Instructions — lazy-loads instructions.md + skills-extra.md, hash for change detection
    instructions.md # Base system prompt (agent rules, BPI syntax, execution model, output contract)
-   pipeline.js # StreamPipeline — SSE stream head: scanning, emitting, MCP injection, skill handling, error formatting
+   pipeline.js # StreamPipeline — SSE stream head: scanning, emitting (incl. say-block prose), MCP injection, skill handling, error formatting
    skills-extra.md # Extra prompt appends (tool grammar, dynamic-tools listing)
    tool-defs.js # TOOLS — generic tool grammar + per-IDE mappings (vscode, terax, opencode), output shorteners
    triggers.js # Skills: $cwd, $save, $test, $browser, $mcp, $mcp-dump; MCP auto-registration, passthrough, restore
@@ -217,7 +217,7 @@
  session.mcpInjected populated by restoreMcpInjections from reqTools; once injected, tags stay for session lifetime
  pipeline.isNewSession, pipeline.toolCalling, pipeline.haveInstructionsAPI, pipeline.ephemeralMode set by StreamPipeline constructor; Claude sets haveInstructionsAPI=true
  Auto MCP registration: mcp_<server>_<tool> naming → $<server> tag, merged into MCP_ALIAS_MAPS
- StreamPipeline defers tool-call emission for terax/opencode (batched at flush), emits immediately for vscode
+ StreamPipeline defers tool-call emission for terax/opencode (batched at flush), emits immediately for vscode; say block streams as plain text (text= prefix stripped once, closer not emitted) instead of going to toolBuffers
  Rate limiter: 5 req/15s window per provider label; provider 429 → setProviderCooldown(label, ms) blocks all requests for that label until cooldown expires (default: time left until next UTC hour boundary, since ChatGPT's limit is hourly; overridable via body cooldown_ms/retry_after_ms or retry-after header)
  ChatGPT 403 with "unusual activity" body text → device/IP flagged by Cloudflare (not a stale session); triggers 10 min setProviderCooldown('ChatGPT', ...), classified separately in errors.js (category device_flagged) from generic 401/403 session_expired
  server.js unhandled-error handler and all 4 stream handlers write via LogSaver (utils/log-saver.js, mkdir-p temp, size-rotation, optional beforeSave)
