@@ -73,7 +73,7 @@ function emitToolCalls(compiler, session, payloads, emit) {
   emit(delta)
 }
 
-const SAY = BPI.OPEN + 'say' + BPI.SEP + 'text='
+const SAY = BPI.OPEN + 'say' + BPI.SEP + 'raw='
 
 class StreamPipeline {
   static setSSEHeaders(res) {
@@ -261,11 +261,11 @@ class StreamPipeline {
         const closeIdx = this.buffer.indexOf(BPI.CLOSE)
         if (closeIdx === -1) {
           if (this.isSaying) {
-            // Strip "text=" once (first time it appears), then stream raw text.
+            // Strip "raw=" once (first time it appears), then stream raw text.
             if (!this.sayStripped) {
               const tIdx = this.buffer.indexOf(SAY)
               if (tIdx === -1) return
-              this.buffer = this.buffer.slice(tIdx + 10)
+              this.buffer = this.buffer.slice(tIdx + SAY.length)
               this.sayStripped = true
             }
 
@@ -281,7 +281,7 @@ class StreamPipeline {
         this.inTool = false
         this.toolStartFound = false
 
-        if (this.isSaying) this.emitText(payload.slice(this.sayStripped ? 0 : 10))
+        if (this.isSaying) this.emitText(payload.slice(this.sayStripped ? 0 : SAY.length))
         else this.toolBuffers.push(payload)
 
         this.isSaying = false

@@ -130,6 +130,14 @@ function streamHandler(stream, session, parser, _retry) {
     }
 
     if (phase === 'answer' || phase === null) {
+      // Qwen emits role:"function" frames for its own internal tool-result
+      // messages ("Tool X does not exists.") and marks them status:"finished".
+      // A single stream contains MULTIPLE such answer rounds — a thinking
+      // round, a function round, then the real assistant answer. Treating the
+      // first status:"finished" as the end truncates the reply after the first
+      // round. Only assistant frames carry the real output; skip function ones.
+      if (delta.role === 'function') return
+
       if (content) {
         producedOutput = true
         parser.scan(content)

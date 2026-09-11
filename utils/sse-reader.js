@@ -8,9 +8,17 @@ const MAX_BUFFER_SIZE = 1024 * 1024 // 1MB cap on single-line buffer growth
  * @param {(parsed: object) => void} options.onData  - called with parsed JSON per data line
  * @param {() => void}               options.onDone  - called on [DONE] or stream end
  * @param {(err: Error) => void}     options.onError - called on read error
+ * @param {(n: number) => void}     [options.onBytes] - called with byte count per chunk
  */
-async function readSSE(stream, { onData, onDone, onError }) {
+async function readSSE(stream, { onData, onDone, onError, onBytes }) {
   let buffer = ''
+  let settled = false
+
+  const finishOnce = (fn) => {
+    if (settled) return
+    settled = true
+    fn()
+  }
 
   const processLine = (line) => {
     if (line.startsWith('event:')) return
@@ -39,6 +47,7 @@ async function readSSE(stream, { onData, onDone, onError }) {
   }
 
   const processChunk = (chunk) => {
+    if (onBytes && chunk.length) onBytes(chunk.length)
     buffer += chunk
     if (buffer.length > MAX_BUFFER_SIZE) {
       console.warn('[SSE] ⚠ Buffer exceeded 1MB — dropping line')
@@ -63,9 +72,9 @@ async function readSSE(stream, { onData, onDone, onError }) {
         if (done) break
         processChunk(decoder.decode(value, { stream: true }))
       }
-      onDone()
+      finishOnce(onDone)
     } catch (err) {
-      onError(err)
+      finishOnce(() => onError(err))
     }
   } else {
     await new Promise((resolve) => {
@@ -73,11 +82,11 @@ async function readSSE(stream, { onData, onDone, onError }) {
         processChunk(Buffer.isBuffer(chunk) ? decoder.decode(chunk, { stream: true }) : chunk)
       })
       stream.on('end', () => {
-        onDone()
+        finishOnce(onDone)
         resolve()
       })
       stream.on('error', (err) => {
-        onError(err)
+        finishOnce(() => onError(err))
         resolve()
       })
     })

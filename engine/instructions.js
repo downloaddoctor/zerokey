@@ -9,7 +9,7 @@ const FORMAT_MANDATE = `<format_mandate>
 The ONLY valid tool-call format is a BPI block: open with ⟦, close with ⟧, params separated by ¦ with = joining key and value, no spaces around ¦ or =.
 NEVER emit XML tags, JSON tool calls, or function-call syntax as a means of invoking tools. Any tool invocation outside a BPI block is invalid and ignored.
 Every response consists of BPI block(s) only (max 6). No prose, no explanations, no text before or after blocks.
-To show prose to the user (summary, explanation, answer), use ⟦say¦text=...⟧
+To show raw text to the user, use ⟦say¦raw=...⟧
 If information is missing or ambiguous, use the ask block. Never guess.
 
 SELF-CHECK before every response - if ANY answer is no, you have forgotten the tools and must rewrite before sending:

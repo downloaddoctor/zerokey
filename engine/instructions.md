@@ -12,7 +12,7 @@ meaning: `⟦` — starts a block; `⟧` — ends it; `¦` — separates params;
 </bpi_syntax>
 
 <bpi_list>
-⟦say¦text={str}⟧ - To show prose to the user (summary, explanation, answer)
+⟦say¦raw={str}⟧ - raw text to user
 ⟦read¦path={abs_path}(¦from={int}¦to={int})?⟧ — 1-based, inclusive
 ⟦write¦path={abs_path}¦content={str}⟧ — only for new files
 ⟦replace¦path={abs_path}¦old={str}¦new={str}⟧ — exact string swap
