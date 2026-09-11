@@ -1,27 +1,27 @@
 # ZeroKey
 
-> Self-hosted, personal-use OpenAI-compatible AI proxy for DeepSeek, Claude, and ChatGPT. Uses your own browser session — no API keys, no shared accounts, no relay servers.
+> Self-hosted, personal-use OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT, and Qwen. Uses your own browser session — no API keys, no shared accounts, no relay servers.
 
-ZeroKey turns a browser session you already have (DeepSeek, Claude, or ChatGPT, logged in normally) into a local `http://localhost:7250/v1` endpoint that any OpenAI-compatible client can call — including VS Code Chat, Terax, and OpenCode. It runs entirely on your machine. There is no hosted version, no shared account pool, and no telemetry.
+ZeroKey turns a browser session you already have (DeepSeek, Claude, ChatGPT, or Qwen, logged in normally) into a local `http://localhost:7250/v1` endpoint that any OpenAI-compatible client can call — including VS Code Chat, Terax, and OpenCode. It runs entirely on your machine. There is no hosted version, no shared account pool, and no telemetry.
 
 ## Is it safe?
 
 - ZeroKey does not ask for or store your password. You capture a `fetch()` request from your own browser's DevTools (Network tab) and paste it into the setup wizard — ZeroKey only ever sees the session cookie you choose to share.
 - Nothing is uploaded anywhere. Session data is written to `temp/users.json` on your own disk (gitignored) and never leaves your machine.
 - ZeroKey does not create access, bypass authentication, or provide shared/commercial access to any provider. You use only your own account.
-- You are responsible for complying with each provider's (DeepSeek, Claude, ChatGPT) Terms of Service — ZeroKey does not make that determination for you.
+- You are responsible for complying with each provider's (DeepSeek, Claude, ChatGPT, Qwen) Terms of Service — ZeroKey does not make that determination for you.
 - Source is open and inspectable: https://github.com/downloaddoctor/zerokey
 - License: ZeroKey Non-Commercial License — personal use only.
 
 ## How to start (under 2 minutes)
 
 1. Install: `git clone https://github.com/downloaddoctor/zerokey.git && cd zerokey && pnpm install && pnpm start` — or download a one-click launcher (`zerokey.bat` / `zerokey.sh`) from https://github.com/downloaddoctor/zerokey/releases/latest
-2. Run the interactive wizard: pick a **Provider** (DeepSeek, Claude, or ChatGPT), paste a `fetch()` copied from that provider's DevTools Network tab as your **User**, then pick or create a **Session**.
+2. Run the interactive wizard: pick a **Provider** (DeepSeek, Claude, ChatGPT, or Qwen), paste a `fetch()` copied from that provider's DevTools Network tab as your **User**, then pick or create a **Session**.
 3. Point your IDE at `http://localhost:7250/v1` with `Authorization: Bearer <vscode|terax|opencode>`.
 
 ## Key facts
 
-- 3 providers supported: DeepSeek, Claude, ChatGPT (pick one per server process — restart to switch)
+- 4 providers supported: DeepSeek, Claude, ChatGPT, Qwen (pick one per server process — restart to switch)
 - 3 IDEs supported: VS Code (built-in Chat), Terax, OpenCode — any OpenAI-compatible client works
 - OpenAI-compatible endpoints: `GET /v1/models`, `POST /v1/chat/completions` (SSE streaming)
 - Extensible: MCP tools named `mcp_<server>_<tool>` auto-register; custom skills are trigger-word + template entries in `engine/triggers.js`

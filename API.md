@@ -2,9 +2,9 @@
 
 ## Overview
 
-ZeroKey is an OpenAI-compatible AI proxy server that routes chat completion requests to real browser sessions for **DeepSeek**, **Claude**, and **ChatGPT** — without requiring API keys. It presents an OpenAI-compatible `/v1/chat/completions` endpoint that IDE plugins (VS Code, Terax, Opencode) can use as a drop-in replacement.
+ZeroKey is an OpenAI-compatible AI proxy server that routes chat completion requests to real browser sessions for **DeepSeek**, **Claude**, **ChatGPT**, and **Qwen** — without requiring API keys. It presents an OpenAI-compatible `/v1/chat/completions` endpoint that IDE plugins (VS Code, Terax, Opencode) can use as a drop-in replacement.
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 **Base URL:** `http://localhost:{PORT}` (default port: 7250, auto-increments if occupied)
 
 ---
@@ -23,7 +23,8 @@ IDE Client (Bearer <ide-name>)
 │       ├─ POST /v1/chat/completions  │
 │       │    ├─ DeepSeek route        │
 │       │    ├─ Claude route          │
-│       │    └─ ChatGPT route         │
+│       │    ├─ ChatGPT route         │
+│       │    └─ Qwen route            │
 │       ├─ GET /v1/models             │
 │       ├─ GET /v1/models/:model      │
 │       ├─ GET /                      │
@@ -51,7 +52,14 @@ Root endpoint — returns API metadata and available models.
     "chat_completions": "POST /v1/chat/completions",
     "health": "GET /health"
   },
-  "models": ["DeepSeek V4", "GPT-4o", "Claude Sonnet 4.6", "Claude Sonnet 5", "Claude Haiku 4.5"]
+  "models": [
+    "DeepSeek V4",
+    "GPT-4o",
+    "Claude Sonnet 4.6",
+    "Claude Sonnet 5",
+    "Claude Haiku 4.5",
+    "Qwen3.8-Max"
+  ]
 }
 ```
 
@@ -201,14 +209,14 @@ Get details for a specific model by ID.
 
 ## Providers
 
-The server supports three AI providers. One is selected at startup via an interactive wizard, and the server routes all `/v1/chat/completions` requests through that provider.
+The server supports four AI providers. One is selected at startup via an interactive wizard, and the server routes all `/v1/chat/completions` requests through that provider.
 
 ### Provider Selection Flow
 
 ```
 server start
   → SessionSelector.select()
-    → _stepProviderSelection()  → choose: deepseek | claude | chatgpt
+    → _stepProviderSelection()  → choose: deepseek | claude | chatgpt | qwen
     → _stepUserLogin()          → choose existing user or create new
     → _stepSessionSelection()   → choose existing session or create new
   → ChatRouter.mount(preSelected)
@@ -217,11 +225,12 @@ server start
 
 ### Provider Overview
 
-| Provider | Base URL                           | Auth Method                     | Session Model                                         | Auto-Switch                  |
-| -------- | ---------------------------------- | ------------------------------- | ----------------------------------------------------- | ---------------------------- |
-| DeepSeek | `https://chat.deepseek.com/api/v0` | Browser cookies + POW challenge | `chatSessionId` + `parentMessageId`                   | No                           |
-| Claude   | `https://claude.ai/api`            | Browser cookies + HAR headers   | `chatSessionId` (UUID) + `parentMessageId` (UUID)     | Yes (rate-limit → next user) |
-| ChatGPT  | `https://chatgpt.com/backend-api`  | Browser cookies + sentinel POW  | `chatSessionId` (conversation_id) + `parentMessageId` | No                           |
+| Provider | Base URL                           | Auth Method                                      | Session Model                                         | Auto-Switch                  |
+| -------- | ---------------------------------- | ------------------------------------------------ | ----------------------------------------------------- | ---------------------------- |
+| DeepSeek | `https://chat.deepseek.com/api/v0` | Browser cookies + POW challenge                  | `chatSessionId` + `parentMessageId`                   | No                           |
+| Claude   | `https://claude.ai/api`            | Browser cookies + HAR headers                    | `chatSessionId` (UUID) + `parentMessageId` (UUID)     | Yes (rate-limit → next user) |
+| ChatGPT  | `https://chatgpt.com/backend-api`  | Browser cookies + sentinel POW                   | `chatSessionId` (conversation_id) + `parentMessageId` | No                           |
+| Qwen     | `https://chat.qwen.ai/api/v2`      | Browser cookies (`token=` JWT) + optional Bearer | `chatSessionId` (chat id) + `parentMessageId`         | No                           |
 
 ---
 
@@ -315,6 +324,43 @@ without extractable file/image parts.
   "todos": {}
 }
 ```
+
+---
+
+## Qwen Provider
+
+### Object: `QwenAPI` (`core/qwen/api.js`)
+
+Manages HTTP requests to `chat.qwen.ai` using a captured browser session. Auth comes from a pasted DevTools `fetch()` capture: the `cookie` header's `token=<JWT>` value is the source of truth, with `authorization: Bearer <JWT>` used as a fallback if present. Anti-bot cookies (`cnaui`, `aui`, `sca`, `xlly_s`, `cna`, `ssxmod_itna*`) are seeded from the same capture and persisted via `CookieJar`.
+
+### Internal API Endpoints Used
+
+| Endpoint                               | Method | Purpose                                       |
+| -------------------------------------- | ------ | --------------------------------------------- |
+| `/api/v2/chats/new`                    | POST   | Create a new chat, returns chat id            |
+| `/api/v2/chat/completions?chat_id=...` | POST   | Send chat completion (SSE stream)             |
+| `/api/v2/chats/:chatId`                | DELETE | Delete a chat session server-side             |
+| `/api/v2/users/user/settings/update`   | POST   | Write ZeroKey instructions to personalization |
+
+### Dependencies
+
+- **`CookieJar`** (`utils/cookie-jar.js`): Cookie persistence across requests, captured from response headers each turn
+- **`nodeFetch`**: HTTP client with a 300s timeout via `AbortController`
+
+### Flow
+
+```
+1. initializeFromJSON(headers, body) → seed CookieJar, resolve bearer token
+   (fails fast if neither cookie token= nor authorization header present)
+2. createChatSession(modelId) → POST /api/v2/chats/new → returns chat id
+3. chatCompletion(chatSessionId, prompt, parentMessageId, { model }):
+   a. Builds payload with feature_config (thinking_enabled/auto_search default true — mirrors Qwen's "Auto" UI mode)
+   b. POST /api/v2/chat/completions?chat_id=... → SSE stream
+4. Stream parsed by core/qwen/stream-handler.js (mirrors DeepSeek/Claude reasoning_content pattern)
+5. deleteSession(chatSessionId) → DELETE /api/v2/chats/:chatId (used in ephemeral mode cleanup)
+```
+
+Qwen models: `qwen3.7-plus`, `qwen3.8-max`, `qwen3.7-max` (no vision), `qwen3.6-plus`, `qwen3.5-plus`, `qwen3.5-omni-plus` — see Configuration table below for context/output limits.
 
 ---
 
@@ -573,7 +619,7 @@ Manages HTTP requests to `chatgpt.com/backend-api` using browser-identical heade
 
 ### Rate Limiter (`utils/rate-limiter.js`)
 
-**Algorithm:** Sliding window — 5 requests per 15 seconds per label (`DeepSeek`, `Claude`, `ChatGPT`).
+**Algorithm:** Sliding window — 5 requests per 15 seconds per label (`DeepSeek`, `Claude`, `ChatGPT`, `Qwen`).
 
 **Function:** `acquireSlot(label, reset)`
 
@@ -736,6 +782,12 @@ Singleton that loads and caches system prompts:
 | `claude-sonnet-4-6`         | Claude Sonnet 4.6 | anthropic | yes    | 1,000,000      | 128,000    |
 | `claude-sonnet-5`           | Claude Sonnet 5   | anthropic | yes    | 1,000,000      | 128,000    |
 | `claude-haiku-4-5-20251001` | Claude Haiku 4.5  | anthropic | yes    | 200,000        | 64,000     |
+| `qwen3.7-plus`              | Qwen3.7-Plus      | alibaba   | yes    | 1,000,000      | 65,536     |
+| `qwen3.8-max`               | Qwen3.8-Max       | alibaba   | yes    | 1,000,000      | 131,072    |
+| `qwen3.7-max`               | Qwen3.7-Max       | alibaba   | no     | 1,000,000      | 81,920     |
+| `qwen3.6-plus`              | Qwen3.6-Plus      | alibaba   | yes    | 1,000,000      | 65,536     |
+| `qwen3.5-plus`              | Qwen3.5-Plus      | alibaba   | yes    | 1,000,000      | 65,536     |
+| `qwen3.5-omni-plus`         | Qwen3.5-Omni-Plus | alibaba   | yes    | 262,144        | 65,536     |
 
 **Prompt Limits (`PROMPT_LIMITS`, per-provider max prompt/output chars):**
 
@@ -744,6 +796,7 @@ Singleton that loads and caches system prompts:
 | claude   | 64,000  |
 | chatgpt  | 50,000  |
 | deepseek | 128,000 |
+| qwen     | 128,000 |
 
 ---
 

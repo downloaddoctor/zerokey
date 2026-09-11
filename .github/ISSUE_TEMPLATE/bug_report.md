@@ -12,7 +12,7 @@ A clear description of what went wrong.
 **To Reproduce**
 Steps to reproduce:
 
-1. Provider: [DeepSeek / Claude / ChatGPT]
+1. Provider: [DeepSeek / Claude / ChatGPT / Qwen]
 2. IDE: [VS Code / Terax]
 3. Action: [e.g. "Sent a message with tool calls"]
 4. Error seen: [paste logs or screenshot]

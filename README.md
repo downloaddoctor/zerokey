@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="ZeroKey preview" src="https://github.com/user-attachments/assets/f401c888-2a86-4b0e-a0f1-2900f2824b91" width="979" height="512">
+  <img alt="ZeroKey preview" src="https://github.com/user-attachments/assets/eea8d10c-a1e0-4373-9ee7-34a1e9165d94" width="979" height="512">
 </p>
 
 <p align="center">
@@ -21,7 +21,7 @@
 
 # ZeroKey
 
-OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** — use your own browser sessions and your own credentials to connect your own accounts with VS Code (Chat), Terax, or OpenCode. Personal use only. Just paste a fetch() call from DevTools. ZeroKey does not provide shared accounts, API access, or commercial access to third-party services.
+OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, **ChatGPT**, and **Qwen** — use your own browser sessions and your own credentials to connect your own accounts with VS Code (Chat), Terax, or OpenCode. Personal use only. Just paste a fetch() call from DevTools. ZeroKey does not provide shared accounts, API access, or commercial access to third-party services.
 
 > **Is it safe? How do I start?** See [llms.txt](docs/llms.txt) for a short, machine-readable summary, or the [landing page](https://downloaddoctor.github.io/zerokey/).
 
@@ -49,7 +49,7 @@ OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, and **ChatGPT** �
 ## Features
 
 - **OpenAI-compatible** — drop-in replacement for `/v1/models` and `/v1/chat/completions`
-- **Three providers** — DeepSeek, Claude, and ChatGPT — switch at startup
+- **Four providers** — DeepSeek, Claude, ChatGPT, and Qwen — switch at startup
 - **Streaming** — SSE response streaming for all providers
 - **Multi-IDE** — per-request IDE selection via `Authorization: Bearer <vscode|terax|opencode>`
 - **Session persistence** — in-memory session tracking; flushed to disk on graceful shutdown
@@ -88,7 +88,7 @@ start.bat
 
 On startup, the interactive wizard guides you through:
 
-1. **Provider** — DeepSeek, Claude, or ChatGPT
+1. **Provider** — DeepSeek, Claude, ChatGPT, or Qwen
 2. **User** — paste a `fetch()` call from browser DevTools (captures headers + browser fingerprint)
 3. **Session** — pick or create a chat session
 
@@ -124,6 +124,14 @@ Pick whichever provider you chose in the setup wizard:
 1. Open DevTools → Network tab
 2. Visit `claude.ai` and start a conversation
 3. Find a request to `/api/organizations/.../chat_conversations/.../completion`
+4. Right-click → Copy → Copy as fetch (Node.js)
+5. Paste into the startup wizard
+
+### Qwen
+
+1. Open DevTools → Network tab
+2. Visit `chat.qwen.ai` and start a conversation
+3. Find a request to `/api/v2/chat/completions`
 4. Right-click → Copy → Copy as fetch (Node.js)
 5. Paste into the startup wizard
 
