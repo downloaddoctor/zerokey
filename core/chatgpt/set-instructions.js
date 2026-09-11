@@ -3,10 +3,8 @@ const instructions = require('../../engine/instructions')
 async function setChatGPTInstructions(chatgptApi, userData) {
   if (!userData) return false
 
-  const currentHash = instructions.getHash()
-  if (userData.instructionsHash === currentHash) return false
-
-  const base = instructions.getBase()
+  const { content: base, hash } = instructions.getBase()
+  if (userData.instructionsHash === hash) return false
 
   const payload = JSON.stringify({
     about_user_message: '',
@@ -29,7 +27,7 @@ async function setChatGPTInstructions(chatgptApi, userData) {
     const data = await res.text()
 
     if (res.ok) {
-      userData.instructionsHash = currentHash
+      userData.instructionsHash = hash
       userData.instructionsAppliedAt = new Date().toISOString()
       console.success('[ChatGPT] Custom instructions set successfully')
       return true

@@ -13,15 +13,15 @@ const instructions = require('../../engine/instructions')
 async function setQwenInstructions(qwenApi, userData, toolCalling = true) {
   if (!userData) return false
 
-  const currentHash = instructions.getHash()
-  if (userData.instructionsHash === currentHash) return false
+  const { content, hash } = instructions.getFull()
+  if (userData.instructionsHash === hash) return false
 
-  const content = toolCalling ? instructions.getFull() : ''
+  const finalContent = toolCalling ? content : ''
   const payload = JSON.stringify({
     personalization: {
       name: '',
       description: '',
-      instruction: content,
+      instruction: finalContent,
     },
   })
 
@@ -39,7 +39,7 @@ async function setQwenInstructions(qwenApi, userData, toolCalling = true) {
     const data = await res.text()
 
     if (res.ok) {
-      userData.instructionsHash = currentHash
+      userData.instructionsHash = hash
       userData.instructionsAppliedAt = new Date().toISOString()
       console.success('[Qwen] Custom instructions set successfully')
       return true

@@ -3,11 +3,11 @@ const instructions = require('../../engine/instructions')
 async function setClaudeInstructions(claudeApi, userData, toolCalling = true) {
   if (!userData) return false
 
-  const currentHash = instructions.getHash()
-  if (userData.instructionsHash === currentHash) return false
+  const { content, hash } = instructions.getClaudeFull()
+  if (userData.instructionsHash === hash) return false
 
-  const content = toolCalling ? instructions.getClaudeFull() : ''
-  const payload = JSON.stringify({ conversation_preferences: content })
+  const finalContent = toolCalling ? content : ''
+  const payload = JSON.stringify({ conversation_preferences: finalContent })
   const headers = claudeApi._buildHeaders(
     { accept: '*/*', origin: 'https://claude.ai' },
     '/api/account_profile',
@@ -23,7 +23,7 @@ async function setClaudeInstructions(claudeApi, userData, toolCalling = true) {
     const data = await res.text()
 
     if (res.ok) {
-      userData.instructionsHash = currentHash
+      userData.instructionsHash = hash
       userData.instructionsAppliedAt = new Date().toISOString()
       console.success('[Claude] Custom instructions set successfully')
       return true

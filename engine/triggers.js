@@ -99,7 +99,7 @@ function makeCoreToolsPassthrough() {
   return ({ messages, index }) => {
     messages.splice(index, 1, {
       role: 'internal',
-      content: instructions.getBase(),
+      content: instructions.getBase().content,
     })
   }
 }

@@ -31,13 +31,16 @@ class Instructions {
   constructor() {
     this._base = null
     this._extra = null
-    this._hash = null
+    this._baseHash = null
+    this._fullContent = null
+    this._fullHash = null
+    this._claudeContent = null
+    this._claudeHash = null
   }
 
   _loadBase() {
     if (this._base) return
     this._base = fs.readFileSync(BASE_FILE, 'utf8')
-    this._hash = crypto.createHash('sha256').update(this._base).digest('hex')
   }
 
   _loadExtra() {
@@ -45,9 +48,19 @@ class Instructions {
     this._extra = fs.readFileSync(EXTRA_FILE, 'utf8')
   }
 
+  _sha(content) {
+    return crypto.createHash('sha256').update(content).digest('hex')
+  }
+
+  /**
+   * Returns { content, hash } for each payload variant.
+   * The hash is always of the exact content returned, so callers can
+   * safely compare userData.instructionsHash === hash before writing.
+   */
   getBase() {
     this._loadBase()
-    return this._base
+    if (!this._baseHash) this._baseHash = this._sha(this._base)
+    return { content: this._base, hash: this._baseHash }
   }
 
   getExtra() {
@@ -58,24 +71,31 @@ class Instructions {
   getFull() {
     this._loadBase()
     this._loadExtra()
-    return this._base + '\n' + FORMAT_MANDATE + '\n\n' + this._extra
+    if (!this._fullHash) {
+      this._fullContent = this._base + '\n' + FORMAT_MANDATE + '\n\n' + this._extra
+      this._fullHash = this._sha(this._fullContent)
+    }
+    return { content: this._fullContent, hash: this._fullHash }
   }
 
   getClaudeFull() {
     this._loadBase()
     this._loadExtra()
-    return this._base + '\n\n' + this._extra
-  }
-
-  getHash() {
-    this._loadBase()
-    return this._hash
+    if (!this._claudeHash) {
+      this._claudeContent = this._base + '\n\n' + this._extra
+      this._claudeHash = this._sha(this._claudeContent)
+    }
+    return { content: this._claudeContent, hash: this._claudeHash }
   }
 
   invalidate() {
     this._base = null
     this._extra = null
-    this._hash = null
+    this._baseHash = null
+    this._fullContent = null
+    this._fullHash = null
+    this._claudeContent = null
+    this._claudeHash = null
   }
 }
 

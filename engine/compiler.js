@@ -167,8 +167,8 @@ class ToolCompiler {
     let finalPrompt = userPrompt
 
     if (parser.isNewSession && !parser.haveInstructionsAPI && parser.toolCalling) {
-      const base = instructions.getFull()
-      finalPrompt = `${base}\n\n${userPrompt}`
+      const { content } = instructions.getFull()
+      finalPrompt = `${content}\n\n${userPrompt}`
     }
 
     return this.limitPrompt(finalPrompt)
