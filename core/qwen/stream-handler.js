@@ -1,4 +1,7 @@
 const { readSSE } = require('../../utils/sse-reader')
+const { LogSaver, serializeError } = require('../../utils/log-saver')
+
+const streamLog = new LogSaver({ name: 'qwen-error' })
 
 /**
  * Qwen AI (chat.qwen.ai) SSE Stream Handler
@@ -22,6 +25,23 @@ function streamHandler(stream, session, parser, _retry) {
   let hasSentReasoningRole = false
   let summaryText = ''
   let finished = false
+  let dataCount = 0
+  let producedOutput = false
+  let lastEventType = null
+
+  const logIssue = (reason, extra = {}) => {
+    streamLog.log({
+      ts: new Date().toISOString(),
+      reason,
+      chatSessionId: session.chatSessionId,
+      parentMessageId: session.parentMessageId,
+      lastEventType,
+      dataCount,
+      producedOutput,
+      finished,
+      ...extra,
+    })
+  }
 
   // The assistant response_id returned by Qwen is the parent for the next
   // turn. Persist it into session.parentMessageId so the next chatCompletion
@@ -45,6 +65,7 @@ function streamHandler(stream, session, parser, _retry) {
 
   const emitReasoning = (delta) => {
     if (!delta) return
+    producedOutput = true
     if (!hasSentReasoningRole) {
       emitChunk({ role: 'assistant', reasoning_content: '' })
       hasSentReasoningRole = true
@@ -59,12 +80,22 @@ function streamHandler(stream, session, parser, _retry) {
   }
 
   const onData = (data) => {
+    dataCount++
+    lastEventType = data['response.created']
+      ? 'response.created'
+      : data.choices?.[0]?.delta?.phase || 'other'
+
     if (data.error) {
+      finished = true
       const err = new Error(
         `Qwen stream error: ${data.error.message || data.error.type || JSON.stringify(data.error)}`,
       )
       err.status = data.error.code || 500
       err.statusCode = err.status
+      logIssue(`provider error — ${err.message}`, {
+        error: serializeError(err),
+        raw: data,
+      })
       throw err
     }
 
@@ -99,7 +130,10 @@ function streamHandler(stream, session, parser, _retry) {
     }
 
     if (phase === 'answer' || phase === null) {
-      if (content) parser.scan(content)
+      if (content) {
+        producedOutput = true
+        parser.scan(content)
+      }
 
       if (status === 'finished') {
         finish()
@@ -109,10 +143,20 @@ function streamHandler(stream, session, parser, _retry) {
 
   readSSE(stream, {
     onData,
-    onDone: finish,
+    onDone: () => {
+      if (!finished) {
+        logIssue(
+          producedOutput
+            ? 'stream closed without finished status (partial output)'
+            : 'stream closed without finished status (no output)',
+        )
+      }
+      finish()
+    },
     onError: (e) => {
       if (finished) return
       finished = true
+      logIssue(`read error — ${e?.message || e}`, { error: serializeError(e) })
       parser.onError(e)
     },
   })

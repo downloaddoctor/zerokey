@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ZeroKey — Self-hosted AI Proxy Using Your Own Browser Sessions</title>
+    <title>ZeroKey — Self-Hosted AI Proxy for DeepSeek, Claude, ChatGPT &amp; Qwen</title>
     <meta
       name="description"
-      content="ZeroKey is a self-hosted AI proxy for personal use. Connect your own browser sessions and credentials from DeepSeek, Claude, or ChatGPT to your IDE. No shared accounts or hosted access."
+      content="ZeroKey is a self-hosted AI proxy for personal use. Connect your own browser sessions and credentials from DeepSeek, Claude, ChatGPT, or Qwen to your IDE. No shared accounts or hosted access."
     />
     <meta name="theme-color" content="#0a0a0d" />
     <link rel="canonical" href="https://downloaddoctor.github.io/zerokey/" />
@@ -17,7 +17,7 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "ZeroKey",
-        "description": "Self-hosted, personal-use OpenAI-compatible AI proxy for DeepSeek, Claude, and ChatGPT using your own browser sessions. No API keys, no shared accounts, no telemetry.",
+        "description": "Self-hosted, personal-use OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT, and Qwen using your own browser sessions. No API keys, no shared accounts, no telemetry.",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Windows, macOS, Linux",
         "url": "https://downloaddoctor.github.io/zerokey/",
@@ -41,7 +41,7 @@
             "name": "Does ZeroKey cost anything?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "No. ZeroKey itself is free and open source. You still need your own DeepSeek, Claude, or ChatGPT account, but you don't pay for a separate API on top of it."
+              "text": "No. ZeroKey itself is free and open source. You still need your own DeepSeek, Claude, ChatGPT, or Qwen account, but you don't pay for a separate API on top of it."
             }
           },
           {
@@ -92,7 +92,7 @@
     <meta property="og:site_name" content="ZeroKey" />
     <meta
       property="og:title"
-      content="ZeroKey — Self-Hosted AI Proxy for DeepSeek, Claude &amp; ChatGPT Using Your Own Accounts."
+      content="ZeroKey — Self-Hosted AI Proxy for DeepSeek, Claude, ChatGPT &amp; Qwen Using Your Own Accounts."
     />
     <meta
       property="og:description"
@@ -104,14 +104,14 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="ZeroKey — paste a fetch, no API keys, real browser sessions for DeepSeek, Claude & ChatGPT."
+      content="ZeroKey — paste a fetch, no API keys, real browser sessions for DeepSeek, Claude, ChatGPT & Qwen."
     />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="ZeroKey — Self-Hosted AI Proxy for DeepSeek, Claude &amp; ChatGPT Using Your Own Accounts."
+      content="ZeroKey — Self-Hosted AI Proxy for DeepSeek, Claude, ChatGPT &amp; Qwen Using Your Own Accounts."
     />
     <meta
       name="twitter:description"
@@ -168,6 +168,12 @@
       body {
         line-height: 1.6;
         overflow-x: hidden;
+      }
+      p,
+      li,
+      .section-lead,
+      .hero-subtitle {
+        text-wrap: pretty;
       }
       body::before {
         content: '';
@@ -243,18 +249,19 @@
       .nav-links {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 2px;
       }
       .nav-links a {
         color: var(--ink-dim);
         text-decoration: none;
         font-family: var(--font-sans);
-        font-size: 13px;
+        font-size: 12.5px;
         font-weight: 500;
-        padding: 8px 14px;
+        padding: 7px 11px;
         border: 1px solid transparent;
         border-radius: var(--radius-sm);
         letter-spacing: 0;
+        white-space: nowrap;
         transition: all 0.15s;
       }
       .nav-links a:hover {
@@ -481,6 +488,14 @@
         box-shadow:
           0 2px 6px rgba(0, 0, 0, 0.25),
           0 0 18px -3px rgba(16, 163, 127, 0.65);
+      }
+      .card-icon--qwen {
+        box-shadow:
+          0 2px 6px rgba(0, 0, 0, 0.25),
+          0 0 18px -3px rgba(0, 82, 255, 0.7);
+      }
+      #providers .card-grid {
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
       }
       .ide-icon--vscode {
         box-shadow:
@@ -1035,9 +1050,9 @@
           <div class="hero-lower">
             <div>
               <p class="hero-subtitle">
-                You already have a DeepSeek, Claude, or ChatGPT tab open. ZeroKey turns that browser
-                session into a local OpenAI-compatible endpoint your IDE can call — no API keys, no
-                separate bill. Paste one
+                You already have a DeepSeek, Claude, ChatGPT, or Qwen tab open. ZeroKey turns that
+                browser session into a local OpenAI-compatible endpoint your IDE can call — no API
+                keys, no separate bill. Paste one
                 <code style="font-family: var(--font-mono); font-size: 15px; color: var(--accent)"
                   >fetch()</code
                 >, point your IDE at
@@ -1136,8 +1151,8 @@
         </p>
         <div class="stat-grid">
           <div class="stat-card">
-            <div class="stat-num">3</div>
-            <div class="stat-label">Providers supported — DeepSeek, Claude, ChatGPT</div>
+            <div class="stat-num">4</div>
+            <div class="stat-label">Providers supported — DeepSeek, Claude, ChatGPT, Qwen</div>
           </div>
           <div class="stat-card">
             <div class="stat-num">3</div>
@@ -1273,7 +1288,7 @@
     <div class="container">
       <section id="providers">
         <div class="section-eyebrow">/supported-providers</div>
-        <h2>One less bill. Same account you already use.</h2>
+        <h2>Four providers. Same accounts you already use.</h2>
         <p class="section-lead">
           Pick a provider at startup. ZeroKey routes through the account you're already signed into
           — it never creates access, shares credentials, or stores your password. Switch providers
@@ -1305,6 +1320,15 @@
             <p>
               <strong>Your ChatGPT plan, wired into your editor</strong> — sentinel tokens and
               conversation state are refreshed automatically.
+            </p>
+          </div>
+          <div class="card">
+            <div class="card-icon card-icon--qwen"><img src="logos/qwen.png" alt="" /></div>
+            <h3>Qwen</h3>
+            <div class="card-tagline">Qwen3.7-Plus</div>
+            <p>
+              <strong>Your Qwen account, wired into your editor</strong> — cookie-based auth with
+              live model sync from chat.qwen.ai, no separate bill.
             </p>
           </div>
         </div>
@@ -1388,7 +1412,7 @@
             <h3>Run the wizard (30 sec)</h3>
             <p>
               Pick a
-              <strong>Provider</strong> (DeepSeek, Claude, or ChatGPT), paste a
+              <strong>Provider</strong> (DeepSeek, Claude, ChatGPT, or Qwen), paste a
               <code style="font-family: var(--font-mono); font-size: 12px; color: var(--accent)"
                 >fetch()</code
               >
@@ -1438,7 +1462,7 @@
             <h3>Does this cost anything?</h3>
             <p>
               No. ZeroKey itself is free and open source. You still need your own DeepSeek, Claude,
-              or ChatGPT account, but you don't pay for a separate API on top of it.
+              ChatGPT, or Qwen account, but you don't pay for a separate API on top of it.
             </p>
           </div>
           <div class="card">
@@ -1539,6 +1563,7 @@
             <a href="#providers">DeepSeek</a>
             <a href="#providers">Claude</a>
             <a href="#providers">ChatGPT</a>
+            <a href="#providers">Qwen</a>
           </div>
           <div class="footer-col">
             <h4>IDEs</h4>

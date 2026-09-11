@@ -105,7 +105,7 @@ function makeCoreToolsPassthrough() {
 }
 
 /**
- * Fallback skill matcher for auto-registered MCP servers — called by¦new_replace_all=false
+ * Fallback skill matcher for auto-registered MCP servers — called by
  * ToolCompiler.matchSkill when the leading trigger word isn't a static
  * entry in the triggers array but matches a tag in MCP_ALIAS_MAPS.
  *

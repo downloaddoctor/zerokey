@@ -1,4 +1,7 @@
 const { readSSE } = require('../../utils/sse-reader')
+const { LogSaver, serializeError } = require('../../utils/log-saver')
+
+const streamLog = new LogSaver({ name: 'deepseek-error' })
 
 const RETRY_REASONS = {
   'Messages too frequent. Try again later.': true,
@@ -39,6 +42,12 @@ function streamHandler(stream, session, parser, retry) {
   let cancelled = false
   let finished = false
 
+  // Diagnostics — captured so a silent close can be logged with context.
+  let dataCount = 0
+  let producedOutput = false
+  let lastEventType = null
+  let lastError = null
+
   // Current fragment type: 'THINK' | 'RESPONSE' | null
   let currentFragmentType = null
   // Mirror Qwen: send an initial empty reasoning_content chunk once so
@@ -47,6 +56,7 @@ function streamHandler(stream, session, parser, retry) {
 
   const emitReasoning = (delta) => {
     if (!delta) return
+    producedOutput = true
     if (!hasSentReasoningRole) {
       parser.emit({ role: 'assistant', reasoning_content: '' })
       hasSentReasoningRole = true
@@ -56,6 +66,7 @@ function streamHandler(stream, session, parser, retry) {
 
   const routeDelta = (text) => {
     if (!text) return
+    producedOutput = true
     if (currentFragmentType === 'THINK') emitReasoning(text)
     else parser.scan(text)
   }
@@ -63,6 +74,19 @@ function streamHandler(stream, session, parser, retry) {
   const doRetry = (reason) => {
     cancelled = true
     console.error(`[DeepSeek] Stream error: ${reason}`)
+    streamLog.log({
+      ts: new Date().toISOString(),
+      reason,
+      chatSessionId: session.chatSessionId,
+      parentMessageId: session.parentMessageId,
+      currentFragmentType,
+      lastEventType,
+      dataCount,
+      producedOutput,
+      hasSentReasoningRole,
+      retryable: !!RETRY_REASONS[reason] && !!retry,
+      error: lastError,
+    })
     parser.emitText(`\n\n⚠ Stream error: ${reason}\n`)
 
     if (RETRY_REASONS[reason] && retry) {
@@ -77,6 +101,15 @@ function streamHandler(stream, session, parser, retry) {
         })
         .catch((err) => {
           console.error(`[DeepSeek] Retry failed: ${err.message}`)
+          streamLog.log({
+            ts: new Date().toISOString(),
+            reason: `retry failed — ${err?.message || err}`,
+            chatSessionId: session.chatSessionId,
+            parentMessageId: session.parentMessageId,
+            dataCount,
+            producedOutput,
+            error: serializeError(err),
+          })
           parser.sendFinalChunk()
         })
       return
@@ -86,8 +119,11 @@ function streamHandler(stream, session, parser, retry) {
 
   const onData = (data) => {
     if (cancelled) return
+    dataCount++
+    lastEventType = data.type || data.o || data.p || typeof data.v
 
     if (data.type === 'error') {
+      lastError = serializeError(data)
       doRetry(data.content)
       return
     }
@@ -156,10 +192,31 @@ function streamHandler(stream, session, parser, retry) {
   const onDone = () => {
     if (cancelled) return
     if (finished) return
-    doRetry('stream closed unexpectedly')
+    doRetry(
+      producedOutput
+        ? 'stream closed unexpectedly (partial output)'
+        : 'stream closed with no output',
+    )
   }
 
-  readSSE(stream, { onData, onDone, onError: (e) => parser.onError(e) })
+  readSSE(stream, {
+    onData,
+    onDone,
+    onError: (e) => {
+      streamLog.log({
+        ts: new Date().toISOString(),
+        reason: `read error — ${e?.message || e}`,
+        chatSessionId: session.chatSessionId,
+        parentMessageId: session.parentMessageId,
+        currentFragmentType,
+        lastEventType,
+        dataCount,
+        producedOutput,
+        error: serializeError(e),
+      })
+      parser.onError(e)
+    },
+  })
 }
 
 module.exports = { streamHandler }

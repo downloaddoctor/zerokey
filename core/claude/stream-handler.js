@@ -1,4 +1,7 @@
 const { readSSE } = require('../../utils/sse-reader')
+const { LogSaver, serializeError } = require('../../utils/log-saver')
+
+const streamLog = new LogSaver({ name: 'claude-error' })
 
 /**
  * @param {object} w - window object from Claude API { utilization, resets_at }
@@ -37,13 +40,33 @@ function formatWindow(w, resetFormat = 'time') {
  */
 async function claudeStreamHandler(stream, session, parser, cb) {
   let limitReached = null
+  let finished = false
+  let dataCount = 0
+  let producedOutput = false
+  let lastEventType = null
   // Claude emits thinking blocks as content_block_start{type:"thinking"} then
   // content_block_delta{delta:{type:"thinking_delta"}}. Mirror Qwen/DeepSeek:
   // open the reasoning channel once, then stream reasoning_content deltas.
   let hasSentReasoningRole = false
 
+  const logIssue = (reason, extra = {}) => {
+    streamLog.log({
+      ts: new Date().toISOString(),
+      reason,
+      chatSessionId: session.chatSessionId,
+      parentMessageId: session.parentMessageId,
+      lastEventType,
+      dataCount,
+      producedOutput,
+      hasSentReasoningRole,
+      finished,
+      ...extra,
+    })
+  }
+
   const emitReasoning = (delta) => {
     if (!delta) return
+    producedOutput = true
     if (!hasSentReasoningRole) {
       parser.emit({ role: 'assistant', reasoning_content: '' })
       hasSentReasoningRole = true
@@ -53,6 +76,8 @@ async function claudeStreamHandler(stream, session, parser, cb) {
 
   await readSSE(stream, {
     onData: (parsed) => {
+      dataCount++
+      lastEventType = parsed.type || typeof parsed
       switch (parsed.type) {
         case 'message_start': {
           const msg = parsed.message
@@ -69,10 +94,15 @@ async function claudeStreamHandler(stream, session, parser, cb) {
         case 'content_block_delta': {
           const delta = parsed.delta || {}
           if (delta.type === 'text_delta' && delta.text) {
+            producedOutput = true
             parser.scan(delta.text)
           } else if (delta.type === 'thinking_delta' && delta.thinking) {
             emitReasoning(delta.thinking)
           }
+          break
+        }
+        case 'message_stop': {
+          finished = true
           break
         }
         case 'message_limit': {
@@ -100,13 +130,30 @@ async function claudeStreamHandler(stream, session, parser, cb) {
         }
         case 'error': {
           const err = parsed.error || {}
+          finished = true
+          logIssue(`provider error — ${err.message || err.type || 'unknown'}`, {
+            error: serializeError(err),
+            raw: parsed,
+          })
           parser.onError({ message: err.message, type: err.type })
           break
         }
       }
     },
-    onDone: () => {},
-    onError: (e) => parser.onError(e),
+    onDone: () => {
+      if (finished) return
+      logIssue(
+        producedOutput
+          ? 'stream closed without message_stop (partial output)'
+          : 'stream closed without message_stop (no output)',
+      )
+    },
+    onError: (e) => {
+      if (finished) return
+      finished = true
+      logIssue(`read error — ${e?.message || e}`, { error: serializeError(e) })
+      parser.onError(e)
+    },
   })
 
   if (limitReached && cb) {

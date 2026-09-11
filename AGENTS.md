@@ -59,6 +59,7 @@
   sequential-queue.js # sequentialQueue — Express middleware serializing all requests through one app instance, one in flight at a time
   session-classifier.js # isRealChatSession — per-IDE fingerprinted system-prompt prefix match; default-deny classifies non-matching system-first calls as ephemeral
   logger.js # console color wrappers (debug, info, success, warn, error)
+  log-saver.js # LogSaver — rotating file logger (temp/<name>.log, size-based rotation, optional beforeSave); serializeError flattens Error → JSON (name/message/stack/status/statusCode/code/type/cause/cooldownMs + own props)
   rate-limiter.js # acquireSlot — per-provider rate limiting (5 req / 15s window)
   route-helpers.js # validateMessages — shared route middleware
   sse-reader.js # readSSE — generic SSE stream reader for both Web and Node streams
@@ -219,7 +220,10 @@
  StreamPipeline defers tool-call emission for terax/opencode (batched at flush), emits immediately for vscode
  Rate limiter: 5 req/15s window per provider label; provider 429 → setProviderCooldown(label, ms) blocks all requests for that label until cooldown expires (default: time left until next UTC hour boundary, since ChatGPT's limit is hourly; overridable via body cooldown_ms/retry_after_ms or retry-after header)
  ChatGPT 403 with "unusual activity" body text → device/IP flagged by Cloudflare (not a stale session); triggers 10 min setProviderCooldown('ChatGPT', ...), classified separately in errors.js (category device_flagged) from generic 401/403 session_expired
- Error logs append to temp/errors.txt, rotated at 1MB
+ server.js unhandled-error handler and all 4 stream handlers write via LogSaver (utils/log-saver.js, mkdir-p temp, size-rotation, optional beforeSave)
+ Error log: temp/errors.log (1MB rotation); per-provider stream logs: temp/{deepseek,claude,chatgpt,qwen}-error.log (100KB rotation); stream entries carry reason, chatSessionId, parentMessageId, lastEventType, dataCount, producedOutput, finished, error:serializeError(e) — real thrown error's full field set, not a synthesized string
+ DeepSeek stream-close reason distinguishes partial vs no output (producedOutput flag); ChatGPT [DONE] onDone is normal, not an error path
+ Provider-error frames logged with raw payload alongside serialized error (Claude case 'error', Qwen data.error, DeepSeek data.type==='error')
  VS Code model sync writes to %APPDATA%/Code/User/chatLanguageModels.json
  sequentialQueue (utils/sequential-queue.js) serializes every /v1/chat/completions request app-wide; no concurrent handling
  Ephemeral chat sessions are deleted provider-side via pipeline.onFinalChunk (set per-route when pipeline.ephemeralMode), fired from pipeline.sendFinalChunk
