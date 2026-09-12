@@ -52,11 +52,47 @@ class DeepSeekAPI {
       )
 
       const body = resp.data
-      const id = body.data.biz_data.id || body.data.biz_data.chat_session.id
+
+      // Top-level failure: code !== 0 means auth error, quota, etc.
+      if (body?.code !== 0) {
+        const err = new Error(
+          `DeepSeek session create failed: ${body?.msg || `code ${body?.code}`}`,
+        )
+        err.code = 'session_create_failed'
+        err.statusCode = body?.code
+        throw err
+      }
+
+      // Inner biz layer: code 0 but biz_code indicates business-level error
+      const bizCode = body.data?.biz_code
+      const bizData = body.data?.biz_data
+
+      if (bizCode === 5) {
+        const muteUntil = bizData?.mute_until ?? null
+        const err = new Error(
+          muteUntil
+            ? `DeepSeek account suspended until ${new Date(muteUntil * 1000).toLocaleString()}`
+            : 'DeepSeek account suspended',
+        )
+        err.code = 'account_suspended'
+        err.muteUntil = muteUntil
+        throw err
+      }
+
+      if (!bizData) {
+        const err = new Error(
+          `DeepSeek session create failed: biz_code=${bizCode} biz_msg=${body.data?.biz_msg}`,
+        )
+        err.code = 'session_create_failed'
+        throw err
+      }
+
+      const id = bizData.id || bizData.chat_session?.id
 
       // if (this._log) console.debug(`[DeepSeek] New session: ${id}`)
       return id
     } catch (error) {
+      if (error.code === 'account_suspended' || error.code === 'session_create_failed') throw error
       throw new Error('Failed to create chat session: ' + error.message)
     }
   }
@@ -108,6 +144,28 @@ class DeepSeekAPI {
     if (!res.ok) {
       const errText = await res.text()
       const err = new Error(`DeepSeek HTTP ${res.status}: ${errText.slice(0, 300)}`)
+      err.status = res.status
+      err.statusCode = res.status
+      throw err
+    }
+
+    // Detect JSON responses (account suspended, etc.) instead of expected SSE stream
+    const contentType = res.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      const json = await res.json()
+      if (json?.data?.biz_code === 5) {
+        const muteUntil = json.data.biz_data?.mute_until ?? null
+        const err = new Error(
+          muteUntil
+            ? `DeepSeek account suspended until ${new Date(muteUntil * 1000).toLocaleString()}`
+            : 'DeepSeek account suspended',
+        )
+        err.code = 'account_suspended'
+        err.muteUntil = muteUntil
+        throw err
+      }
+      const errText = JSON.stringify(json)
+      const err = new Error(`DeepSeek unexpected response: ${errText.slice(0, 300)}`)
       err.status = res.status
       err.statusCode = res.status
       throw err

@@ -5,6 +5,37 @@ function classifyError(error, provider) {
   const msg = (error?.message || String(error) || '').toLowerCase()
   const statusCode = error?.code || error?.statusCode || error?.status || 0
 
+  // ── DeepSeek session create failures ──────────────────────────
+  if (error?.code === 'session_create_failed') {
+    const isAuth = error?.statusCode === 40001 || error?.statusCode === 40003
+    if (isAuth) {
+      return {
+        category: 'session_expired',
+        message: `Your ${provider} browser session has expired or is invalid (${error.statusCode}).`,
+        action: `Re-capture a fresh fetch() from chat.deepseek.com DevTools and restart the server.`,
+        status: 401,
+      }
+    }
+    return {
+      category: 'provider_error',
+      message: `${provider} refused to create a session: ${error.message}`,
+      action: 'Re-capture a fresh fetch() from your browser and restart the server.',
+      status: 502,
+    }
+  }
+
+  // ── Account suspended / muted ──────────────────────────────────
+  if (error?.code === 'account_suspended') {
+    const muteUntil = error?.muteUntil ? new Date(error.muteUntil * 1000).toLocaleString() : null
+    return {
+      category: 'account_suspended',
+      message: `Your ${provider} account has been suspended${muteUntil ? ` until ${muteUntil}` : ''}.`,
+      action:
+        'This account is temporarily muted by the provider. Switch to a different account in the startup wizard, or wait until the suspension lifts.',
+      status: 403,
+    }
+  }
+
   // ── Device/IP flagged (Cloudflare bot-behavior detection) ──
   // Distinct from a stale session: re-capturing a fetch() from the same
   // flagged device/IP will not fix this — it needs time (and/or a different

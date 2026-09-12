@@ -14,15 +14,22 @@ const deepseekApi = new DeepSeekAPI()
 // Anything not mapped disables thinking.
 const REASONING_MAP = REASONING.deepseek.map
 
-async function buildDeepSeekRouter(parsedFetch, session) {
+async function buildDeepSeekRouter(parsedFetch, session, userData) {
   console.debug('[Deepseek] Initializing from parsed capture JSON')
   await deepseekApi.initializeFromJSON(parsedFetch)
 
   if (!session) throw new Error('No session provided')
 
   if (!session.chatSessionId) {
-    const chatSessionId = await deepseekApi.createChatSession()
-    session.chatSessionId = chatSessionId
+    try {
+      session.chatSessionId = await deepseekApi.createChatSession()
+    } catch (error) {
+      if (error.code === 'account_suspended' && error.muteUntil != null && userData) {
+        userData.waitUntil = Math.ceil(error.muteUntil * 1000)
+        userData.waitReason = 'account_suspended'
+      }
+      throw error
+    }
   }
 
   const router = express.Router()
@@ -35,7 +42,15 @@ async function buildDeepSeekRouter(parsedFetch, session) {
     const pipeline = new StreamPipeline(res, session, 'deepseek', req.ide, messages)
     const activeSession = pipeline.session
     if (!activeSession.chatSessionId) {
-      activeSession.chatSessionId = await deepseekApi.createChatSession()
+      try {
+        activeSession.chatSessionId = await deepseekApi.createChatSession()
+      } catch (error) {
+        if (error.code === 'account_suspended' && error.muteUntil && userData) {
+          userData.waitUntil = Math.ceil(error.muteUntil * 1000)
+          userData.waitReason = 'account_suspended'
+        }
+        return pipeline.onError(error)
+      }
     }
     const modelType = pipeline.isNewSession ? activeSession.model || 'default' : null
     const thinkingEnabled = REASONING_MAP[reasoningEffort] ?? false
@@ -81,6 +96,10 @@ async function buildDeepSeekRouter(parsedFetch, session) {
 
       streamHandler(deepseekStream, activeSession, pipeline, retry)
     } catch (error) {
+      if (error.code === 'account_suspended' && error.muteUntil && userData) {
+        userData.waitUntil = Math.ceil(error.muteUntil * 1000)
+        userData.waitReason = 'account_suspended'
+      }
       return pipeline.onError(error)
     }
   })

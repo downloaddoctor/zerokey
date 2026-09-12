@@ -35,10 +35,10 @@ class SessionSelector {
 
     if (!this.user.sessions) this.user.sessions = []
 
-    if (this.provider === 'claude') {
-      const allProviders = this._loadAll()
-      const providerUsers = allProviders[this.provider] || {}
+    const allProviders = this._loadAll()
+    const providerUsers = allProviders[this.provider] || {}
 
+    if (this.provider === 'claude') {
       for (const u of Object.values(providerUsers)) {
         if (u.waitUntil && u.waitUntil <= Date.now()) {
           delete u.waitUntil
@@ -74,6 +74,39 @@ class SessionSelector {
         this.user = await this._stepUserLogin()
         if (!this.user) return null
       }
+    }
+
+    while (
+      this.provider === 'deepseek' &&
+      this.user.waitUntil &&
+      this.user.waitUntil > Date.now()
+    ) {
+      const resetsAt = new Date(this.user.waitUntil).toLocaleTimeString()
+      const mins = Math.ceil((this.user.waitUntil - Date.now()) / 60000)
+      console.warn(
+        `\n⚠  Account "${this.user.username}" is suspended until ${resetsAt} (~${mins} min).\n`,
+      )
+
+      const availableUsers = Object.values(providerUsers).filter(
+        (u) => u.username !== this.user.username && (!u.waitUntil || u.waitUntil <= Date.now()),
+      )
+
+      if (availableUsers.length === 0) {
+        const soonest = Object.values(providerUsers)
+          .map((u) => ({ username: u.username, ts: u.waitUntil }))
+          .filter((u) => u.ts)
+          .sort((a, b) => a.ts - b.ts)[0]
+        const minsLeft = Math.ceil((soonest.ts - Date.now()) / 60000)
+        const resetsAtSoonest = new Date(soonest.ts).toLocaleTimeString()
+        console.error(
+          `\n⚠ All DeepSeek accounts are suspended.\n` +
+            `    Soonest reset: "${soonest.username}" at ${resetsAtSoonest} (~${minsLeft} min).\n`,
+        )
+        return this.select(false)
+      }
+
+      this.user = await this._stepUserLogin()
+      if (!this.user) return null
     }
 
     this.session = await this._stepSessionSelection(sessionName)
@@ -178,7 +211,10 @@ class SessionSelector {
     if (savedUsers.length > 0) {
       const choices = savedUsers.map((username) => {
         const user = providerUsers[username]
-        const limited = this.provider === 'claude' && user.waitUntil && user.waitUntil > Date.now()
+        const limited =
+          (this.provider === 'claude' || this.provider === 'deepseek') &&
+          user.waitUntil &&
+          user.waitUntil > Date.now()
         return {
           title: username,
           value: username,
