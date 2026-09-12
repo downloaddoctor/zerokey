@@ -1,15 +1,5 @@
 const instructions = require('../../engine/instructions')
 
-/**
- * Write ZeroKey's system instructions into the Qwen account's
- * personalization settings so they persist server-side across chats.
- *
- * Endpoint: POST /api/v2/users/user/settings/update
- * Body:     { personalization: { name, description, instruction } }
- *
- * Mirrors setClaudeInstructions — hashes instructions to skip redundant
- * writes, returns true when the profile was updated.
- */
 async function setQwenInstructions(qwenApi, userData, toolCalling = true) {
   if (!userData) return false
 

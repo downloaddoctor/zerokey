@@ -1,5 +1,5 @@
 const express = require('express')
-const { MODELS } = require('../config/constants')
+const registry = require('../providers/registry')
 
 const router = express.Router()
 
@@ -14,7 +14,7 @@ router.get('/', (req, res) => {
       models: 'GET /v1/models',
       chat_completions: 'POST /v1/chat/completions',
     },
-    models: Object.keys(MODELS),
+    models: Object.keys(registry.getModels()),
   })
 })
 

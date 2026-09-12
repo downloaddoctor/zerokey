@@ -73,7 +73,7 @@ function emitToolCalls(compiler, session, payloads, emit) {
   emit(delta)
 }
 
-const SAY = SYNTAX.OPEN + 'say' + SYNTAX.SEP + 'raw='
+const SAY = SYNTAX.OPEN + 'say' + SYNTAX.SEP + 'md='
 
 class StreamPipeline {
   static setSSEHeaders(res) {
@@ -261,7 +261,7 @@ class StreamPipeline {
         const closeIdx = this.buffer.indexOf(SYNTAX.CLOSE)
         if (closeIdx === -1) {
           if (this.isSaying) {
-            // Strip "raw=" once (first time it appears), then stream raw text.
+            // Strip "md=" once (first time it appears), then stream raw text.
             if (!this.sayStripped) {
               const tIdx = this.buffer.indexOf(SAY)
               if (tIdx === -1) return

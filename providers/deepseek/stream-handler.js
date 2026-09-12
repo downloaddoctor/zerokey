@@ -6,7 +6,6 @@ const streamLog = new LogSaver({ name: 'deepseek-error' })
 const RETRY_REASONS = {
   'Messages too frequent. Try again later.': true,
   'Server busy, please try again later.': true,
-  'Server is busy. Try again later, or use Instant Mode.': true,
   'A message is being generated, please try again later.': true,
 }
 
@@ -50,7 +49,6 @@ function streamHandler(stream, session, parser, retry) {
 
   // Current fragment type: 'THINK' | 'RESPONSE' | null
   let currentFragmentType = null
-  // Mirror Qwen: send an initial empty reasoning_content chunk once so
   // OpenAI-compatible clients open the reasoning channel.
   let hasSentReasoningRole = false
 
@@ -163,7 +161,6 @@ function streamHandler(stream, session, parser, retry) {
     }
 
     // Fragment APPEND — new fragment created; adopt its type and content.
-    // Shape: {"p":"response/fragments","o":"APPEND","v":[{type,content,...}]}
     if (data.p === 'response/fragments' && data.o === 'APPEND' && Array.isArray(data.v)) {
       const frag = data.v[0]
       if (frag) {
@@ -174,10 +171,6 @@ function streamHandler(stream, session, parser, retry) {
     }
 
     // Path-targeted content write to the current (last) fragment.
-    // APPEND → incremental delta. SET → replace/seed the fragment's content.
-    // Shapes:
-    //   {"p":"response/fragments/-1/content","o":"APPEND","v":"text"}
-    //   {"p":"response/fragments/-1/content","o":"SET","v":"text"}
     if (data.p === 'response/fragments/-1/content') {
       if (typeof data.v === 'string') routeDelta(data.v)
       return

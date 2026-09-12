@@ -4,6 +4,7 @@ const crypto = require('crypto')
 const nodeFetch = require('node-fetch')
 
 const { CookieJar } = require('../../utils/cookie-jar')
+const { humanDelay } = require('../../utils/human-delay')
 
 const QWEN_AI_BASE = 'https://chat.qwen.ai'
 
@@ -19,18 +20,6 @@ function uuid() {
   }
 }
 
-/**
- * Qwen AI (chat.qwen.ai) API Client
- *
- * Auth comes from a pasted DevTools fetch() capture:
- *   - `cookie` header — includes `token=<JWT>` (source of truth), plus
- *     cnaui / aui / sca / xlly_s / cna / ssxmod_itna* anti-bot cookies
- *   - `authorization: Bearer <JWT>` — sent on some Qwen builds; not
- *     present in all captures, so we do not require it
- *
- * Chats are created explicitly via POST /api/v2/chats/new before each first
- * completion; the returned id is reused across turns for multi-turn context.
- */
 class QwenAPI {
   static BASE_URL = QWEN_AI_BASE
 
@@ -68,11 +57,6 @@ class QwenAPI {
     if (this._log) console.debug('[Qwen] Initialized from capture JSON')
   }
 
-  /**
-   * Resolve the Qwen JWT. Prefer the authorization header if present; fall
-   * back to the `token=` value inside the captured cookie header (this is
-   * the primary auth surface on current Qwen builds).
-   */
   _getBearer() {
     const h = this._headers
     const raw = h.authorization || h.Authorization || ''
@@ -93,10 +77,8 @@ class QwenAPI {
     return ''
   }
 
-  /**
-   * Create a fresh Qwen chat. Returns the chat id.
-   */
   async createChatSession(modelId) {
+    await humanDelay()
     const res = await this._fetch(
       `${QWEN_AI_BASE}/api/v2/chats/new`,
       {
@@ -123,10 +105,8 @@ class QwenAPI {
     return id
   }
 
-  /**
-   * Send a chat completion request. Returns a Web/Node ReadableStream of SSE.
-   */
   async chatCompletion(chatSessionId, prompt, parentMessageId = null, options = {}) {
+    await humanDelay()
     const modelId = options.model || 'qwen3.7-plus'
 
     if (this._log) {
@@ -143,9 +123,6 @@ class QwenAPI {
     const ts = Math.floor(Date.now() / 1000)
 
     const modelLower = String(modelId).toLowerCase()
-    // Qwen UI is "Auto" by default: thinking + auto_search default to true.
-    // Explicit options can override; a "-fast" model suffix or similar can
-    // disable it once we know the exact naming convention (none in capture yet).
     const enableThinking = options.enableThinking ?? true
     const enableSearch = options.enableSearch ?? true
     void modelLower
@@ -165,8 +142,6 @@ class QwenAPI {
       version: '2.1',
       incremental_output: true,
       chatId: chatSessionId,
-      // On continuation turns, both casing variants carry the SAME parent
-      // message UUID (per live capture). On the first turn they are '' / null.
       parentId: parentMessageId || '',
       chat_id: chatSessionId,
       chat_mode: 'normal',
@@ -221,9 +196,6 @@ class QwenAPI {
     return res.body
   }
 
-  /**
-   * Delete a Qwen chat server-side.
-   */
   async deleteSession(chatSessionId) {
     if (!chatSessionId) return
     const res = await this._fetch(
@@ -241,28 +213,42 @@ class QwenAPI {
     }
   }
 
-  /**
-   * Validity probe — creates and deletes a throwaway chat.
-   */
   async getCurrentUser() {
-    const id = await this.createChatSession('qwen3.7-plus')
-    try {
-      await this.deleteSession(id)
-    } catch {
-      // ignore cleanup failures
+    const res = await this._fetch(
+      `${QWEN_AI_BASE}/api/v1/auths/`,
+      {
+        method: 'GET',
+        headers: this._buildHeaders({ accept: 'application/json, text/plain, */*' }),
+      },
+      true,
+    )
+
+    if (!res.ok || !res.data) {
+      throw new Error(`[Qwen] getCurrentUser: HTTP ${res.status}`)
     }
-    return { ok: true, chatId: id }
+
+    // Auths response carries a refreshed JWT — keep it in-memory for this
+    // process so later requests use a fresh token (never persisted).
+    if (res.data.token) {
+      this._setToken(res.data.token)
+    }
+
+    return res.data
   }
 
-  // ─── Response header capture ─────────────────────────────────
+  _setToken(jwt) {
+    if (!jwt) return
+    this._cookies.seedFromHeader(`token=${jwt}`)
+    const cookieStr = this._cookies.toString()
+    if (cookieStr) this._headers.cookie = cookieStr
+    this._headers.authorization = `Bearer ${jwt}`
+  }
 
   _captureResponseHeaders(res) {
     this._cookies.captureFromFetchHeaders(res.headers, ' Qwen')
     const cookieStr = this._cookies.toString()
     if (cookieStr) this._headers.cookie = cookieStr
   }
-
-  // ─── Headers builder ─────────────────────────────────────────
 
   _buildHeaders(overrides = {}) {
     const src = this._headers
@@ -299,8 +285,6 @@ class QwenAPI {
 
     return { ...base, ...overrides }
   }
-
-  // ─── HTTP fetch ──────────────────────────────────────────────
 
   async _fetch(url, options = {}, parseJSON = false, timeoutMs = 300_000) {
     const controller = new AbortController()

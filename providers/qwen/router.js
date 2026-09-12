@@ -1,11 +1,11 @@
 const express = require('express')
 
-const { StreamPipeline } = require('../engine/pipeline')
-const { QwenAPI } = require('../core/qwen/api')
-const { streamHandler } = require('../core/qwen/stream-handler')
-const { setQwenInstructions } = require('../core/qwen/set-instructions')
-const { acquireSlot } = require('../utils/rate-limiter')
-const { validateMessages } = require('../utils/route-helpers')
+const { StreamPipeline } = require('../../engine/pipeline')
+const { QwenAPI } = require('./api')
+const { streamHandler } = require('./stream-handler')
+const { setQwenInstructions } = require('./set-instructions')
+const { acquireSlot } = require('../../utils/rate-limiter')
+const { validateMessages } = require('../../utils/route-helpers')
 
 const qwenApi = new QwenAPI()
 

@@ -1,7 +1,7 @@
 const instructions = require('./instructions')
 const SYNTAX = require('./syntax')
 const { getIDEMapper } = require('./tool-defs')
-const { PROMPT_LIMITS } = require('../config/constants')
+const registry = require('../providers/registry')
 const { matchMcpTrigger } = require('./triggers')
 const { decodeContentParts } = require('../utils/extract-files')
 
@@ -31,7 +31,7 @@ class ToolCompiler {
       return reverseMap[name] || name
     }
 
-    this._promptLimit = (PROMPT_LIMITS[provider] ?? 64_000) - 64
+    this._promptLimit = (registry.get(provider)?.promptLimit ?? 64_000) - 64
 
     this.tools = tools
     this._handlers = {

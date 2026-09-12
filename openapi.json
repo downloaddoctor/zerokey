@@ -1,0 +1,536 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ZeroKey API Server",
+    "version": "0.3.0",
+    "description": "OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT & Qwen — no API keys, real browser sessions. Base URL uses the port chosen at startup (default 7250, auto-increments if occupied).",
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:7250",
+      "description": "Default (PORT env or 7250)"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Info",
+      "description": "Server metadata and health"
+    },
+    {
+      "name": "Models",
+      "description": "OpenAI-compatible model listing"
+    },
+    {
+      "name": "Chat",
+      "description": "Chat completions (SSE streaming)"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "tags": ["Info"],
+        "summary": "API metadata and available models",
+        "operationId": "getRoot",
+        "responses": {
+          "200": {
+            "description": "Server info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RootInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["Info"],
+        "summary": "Health check",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Server health",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "tags": ["Models"],
+        "summary": "List all supported models",
+        "operationId": "listModels",
+        "responses": {
+          "200": {
+            "description": "Model list (OpenAI-compatible)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/models/{model}": {
+      "get": {
+        "tags": ["Models"],
+        "summary": "Get a specific model by ID",
+        "operationId": "getModel",
+        "parameters": [
+          {
+            "name": "model",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "default"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Model object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Model"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Model not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/chat/completions": {
+      "post": {
+        "tags": ["Chat"],
+        "summary": "OpenAI-compatible chat completions (SSE streaming)",
+        "operationId": "createChatCompletion",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "description": "Bearer <ide-name> — valid values: vscode, terax, opencode. Defaults to vscode.",
+            "schema": {
+              "type": "string",
+              "enum": ["Bearer vscode", "Bearer terax", "Bearer opencode"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatCompletionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSE stream of OpenAI-compatible chunks (content, tool_calls, finish_reason, [DONE])",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "textDelta": {
+                    "value": "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hello\"},\"finish_reason\":null}]}\n\n"
+                  },
+                  "toolCallBatch": {
+                    "value": "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"read\",\"arguments\":\"{}\"}}]},\"finish_reason\":null}]}\n\n"
+                  },
+                  "stop": {
+                    "value": "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/ClientError"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "RootInfo": {
+        "type": "object",
+        "required": ["name", "version", "description", "endpoints", "models"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "ZeroKey API Server"
+          },
+          "version": {
+            "type": "string",
+            "example": "1.0.0"
+          },
+          "description": {
+            "type": "string"
+          },
+          "endpoints": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Health": {
+        "type": "object",
+        "required": ["status", "uptime", "timestamp"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["healthy"]
+          },
+          "uptime": {
+            "type": "number",
+            "description": "process.uptime() in seconds"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "username": {
+            "type": ["string", "null"]
+          },
+          "provider": {
+            "type": ["string", "null"]
+          },
+          "model": {
+            "type": ["string", "null"]
+          }
+        }
+      },
+      "Model": {
+        "type": "object",
+        "required": ["id", "object", "created", "owned_by"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Canonical model slug"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display label"
+          },
+          "object": {
+            "type": "string",
+            "enum": ["model"]
+          },
+          "created": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "owned_by": {
+            "type": "string"
+          },
+          "context_length": {
+            "type": "integer"
+          },
+          "max_output_length": {
+            "type": "integer"
+          }
+        }
+      },
+      "ModelList": {
+        "type": "object",
+        "required": ["object", "data"],
+        "properties": {
+          "object": {
+            "type": "string",
+            "enum": ["list"]
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Model"
+            }
+          },
+          "activeModel": {
+            "$ref": "#/components/schemas/Model"
+          }
+        }
+      },
+      "ChatMessage": {
+        "type": "object",
+        "required": ["role", "content"],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": ["system", "user", "assistant", "tool"]
+          },
+          "content": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TextPart"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ImagePart"
+                    },
+                    {
+                      "$ref": "#/components/schemas/FilePart"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "TextPart": {
+        "type": "object",
+        "required": ["type", "text"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["text"]
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "ImagePart": {
+        "type": "object",
+        "required": ["type", "image_url"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["image_url"]
+          },
+          "image_url": {
+            "type": "object",
+            "required": ["url"],
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "data:<mime>;base64,..."
+              }
+            }
+          }
+        }
+      },
+      "FilePart": {
+        "type": "object",
+        "required": ["type", "file"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["file"]
+          },
+          "file": {
+            "type": "object",
+            "required": ["file_data"],
+            "properties": {
+              "file_data": {
+                "type": "string",
+                "description": "data:<mime>;base64,..."
+              },
+              "filename": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "ChatTool": {
+        "type": "object",
+        "required": ["type", "function"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["function"]
+          },
+          "function": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      },
+      "ChatCompletionRequest": {
+        "type": "object",
+        "required": ["messages"],
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            }
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatTool"
+            }
+          },
+          "stream": {
+            "type": "boolean",
+            "default": true,
+            "description": "Only streaming mode is supported"
+          },
+          "reasoning_effort": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/OpenAIError"
+          }
+        }
+      },
+      "OpenAIError": {
+        "type": "object",
+        "required": ["message", "type", "code"],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "category": {
+            "$ref": "#/components/schemas/ErrorCategory"
+          },
+          "status": {
+            "type": "integer"
+          }
+        }
+      },
+      "ErrorCategory": {
+        "type": "string",
+        "enum": [
+          "overloaded",
+          "session_expired",
+          "rate_limited",
+          "cloudflare_block",
+          "device_flagged",
+          "network",
+          "invalid_request",
+          "provider_error",
+          "internal"
+        ]
+      }
+    },
+    "responses": {
+      "ClientError": {
+        "description": "Client error (OpenAI-compatible error envelope)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Server/provider error (OpenAI-compatible error envelope)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-ide-support": {
+    "header": "Authorization",
+    "format": "Bearer <ide>",
+    "values": ["vscode", "terax", "opencode"],
+    "default": "vscode"
+  },
+  "x-reasoning-labels": {
+    "deepseek": ["Off", "DeepThink"],
+    "claude": [
+      "Low",
+      "Low Think",
+      "Medium",
+      "Medium Think",
+      "High",
+      "High Think",
+      "Max",
+      "Max Think"
+    ]
+  },
+  "x-prompt-limits": {
+    "claude": 64000,
+    "chatgpt": 50000,
+    "deepseek": 128000,
+    "qwen": 128000
+  }
+}

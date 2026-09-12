@@ -6,48 +6,56 @@
 
 ## DIRECTORY
  config/
-  constants.js # CONFIG, MODEL_HASH, MODELS — single source of truth for models/ports
- core/
-  chat-router.js # buildRouter → per-provider route builder dispatch
-  session-selector.js # SessionSelector — TUI wizard for provider/user/session, live-credential validation, rate-limit awareness, user deletion (local + provider cleanup)
-  claude/
-   api.js # ClaudeAPI — browser-session client, org-id extraction, stream completion, file upload
-   stream-handler.js # claudeStreamHandler — SSE parsing, thinking→reasoning_content, limit detection, summary fallback
-   set-instructions.js # setClaudeInstructions — project+system-instructions upsert
+  constants.js # CONFIG only (PORT) — model/reasoning/prompt-limit data lives in providers/<name>/config.js
+ providers/
+  registry.js # ProviderRegistry — auto-discovers providers/<name>/index.js, exposes get/getAll/getNames/getModels (flattened {id:model} map, same shape as legacy MODELS)
+  base/
+   BaseAPI.js # BaseAPI — shared provider API base class
+   BaseRouter.js # BaseRouter — shared route-builder base class
+   BaseStreamHandler.js # BaseStreamHandler — shared SSE stream-handler base class
   deepseek/
-   api.js # DeepSeekAPI — PoW challenge solver, session CRUD, file upload with polling
-   stream-handler.js # streamHandler — SSE fragment parsing (THINK→reasoning_content, RESPONSE→scan), auto-retry on stream close
-   pow.js # DeepSeekPOW — WASM-based proof-of-work solver
-  qwen/
-   api.js # QwenAPI — chat.qwen.ai client, session CRUD, bearer/cookie auth, file upload
-   stream-handler.js # streamHandler — Qwen SSE parsing (think / thinking_summary / answer phases), reasoning_content emission; tool-phase (web_search/web_extractor) status lines so client sees activity during tool rounds; auto-retries once on quota_limit inline error or on a zero-data-frame stream close; stop-reason logged to temp/qwen-stream-debug.log (100KB→5MB rotation)
-   set-instructions.js # setQwenInstructions — writes ZeroKey prompt to POST /api/v2/users/user/settings/update personalization.instruction (hash-gated)
+   index.js # provider def: {name,displayName,models,reasoning,promptLimit,setupSteps,createAPI,validateCredentials,buildRouter}
+   router.js # buildDeepSeekRouter
+   config.js # models, reasoning, promptLimit, setupSteps
+   api.md # internal reference: upstream endpoints, POW flow, SSE event table, session shape
+  claude/
+   index.js # provider def (same shape as deepseek/index.js)
+   router.js # buildClaudeRouter
+   config.js # models, reasoning, promptLimit, setupSteps
+   api.md # internal reference: HAR header order, usage-limit handling, SSE format, session shape
   chatgpt/
-   api.js # ChatGPTAPI — sentinel refresh, conduit token, prepare flow, file upload (Azure blob)
-   stream-handler.js # chatgptStreamHandler — SSE parsing, session-id tracking
-   pow.js # ChatGPTProofOfWork — sentinel proof token decode/generate/solve
-  engine/
-   syntax.js # MhiRegistry — global MHI block registry for tool-call emission (compile/parse/emit)
-   compiler.js # ToolCompiler — singleton per IDE×provider: uploadAndGetMessages, uploadAndFormatPrompt, uploadAndFormatPromptForRaw, buildPrompt, compile/parse/emit, matchSkill
-   instructions.js # Instructions — lazy-loads instructions.md + skills-extra.md, hash for change detection
-   instructions.md # Base system prompt (agent rules, MHI syntax, execution model, output contract)
-   pipeline.js # StreamPipeline — SSE stream head: scanning, emitting (incl. say-block prose), MCP injection, skill handling, error formatting
-   skills-extra.md # Extra prompt appends (tool grammar, dynamic-tools listing)
-   tool-defs.js # TOOLS — generic tool grammar + per-IDE mappings (vscode, terax, opencode), output shorteners
-   triggers.js # Skills: $cwd, $save, $test, $browser, $mcp, $mcp-dump; MCP auto-registration, passthrough, restore
-  mcp/
-   browser.js # BROWSER_MCP — built-in browser MCP alias map
-   inject.js # injectMcpAliases — registers MCP tools into compiler.tools
-   auto.js # buildAutoAliasMaps, hashTools — auto-registration from mcp_<server>_<tool> naming
-   playwright.js # playwrightMCP — Playwright MCP alias map
+   index.js # provider def
+   router.js # buildChatGPTRouter
+   config.js # models, reasoning, promptLimit, setupSteps
+   api.md # internal reference: sentinel POW flow, HAR header order, SSE format, session shape
+  qwen/
+   index.js # provider def
+   router.js # buildQwenRouter
+   config.js # models, reasoning, promptLimit, setupSteps
+   api.md # internal reference: auth (cookie token=JWT), upstream endpoints, flow, session shape
+ core/
+  chat-router.js # buildRouter(selected) → registry.get(selected.provider).buildRouter(...)
+  session-selector.js # SessionSelector — TUI wizard for provider/user/session, live-credential validation, rate-limit awareness, user deletion (local + provider cleanup); pulls setupSteps/models/reasoning via registry.get(this.provider)
+ engine/
+  syntax.js # MhiRegistry — global MHI block registry for tool-call emission (compile/parse/emit)
+  compiler.js # ToolCompiler — singleton per IDE×provider: uploadAndGetMessages, uploadAndFormatPrompt, uploadAndFormatPromptForRaw, buildPrompt, compile/parse/emit, matchSkill
+  instructions.js # Instructions — lazy-loads instructions.md + skills-extra.md, hash for change detection
+  instructions.md # Base system prompt (agent rules, MHI syntax, execution model, output contract)
+  pipeline.js # StreamPipeline — SSE stream head: scanning, emitting (incl. say-block prose), MCP injection, skill handling, error formatting
+  skills-extra.md # Extra prompt appends (tool grammar, dynamic-tools listing)
+  tool-defs.js # TOOLS — generic tool grammar + per-IDE mappings (vscode, terax, opencode), output shorteners
+  triggers.js # Skills: $cwd, $save, $test, $browser, $mcp, $mcp-dump; MCP auto-registration, passthrough, restore
+ mcp/
+  browser.js # BROWSER_MCP — built-in browser MCP alias map
+  inject.js # injectMcpAliases — registers MCP tools into compiler.tools
+  auto.js # buildAutoAliasMaps, hashTools — auto-registration from mcp_<server>_<tool> naming
+  playwright.js # playwrightMCP — Playwright MCP alias map
  routes/
-  info.js # GET / — API info
+  docs.js # GET /openapi.json (serves repo-root openapi.json), GET /docs (Swagger UI via unpkg CDN)
+  info.js # GET / — API info, models: Object.keys(registry.getModels())
   health.js # GET /health — uptime, user, provider, model
-  models.js # GET /v1/models, GET /v1/models/:model — OpenAI-compatible model listing
-  claude.js # POST /v1/chat/completions — Claude router: instructions, tools, limit handling
-  deepseek.js # POST /v1/chat/completions — DeepSeek router: PoW, session creation, retry
-  qwen.js # POST /v1/chat/completions — Qwen router: chat session create/delete, instructions, reasoning passthrough
-  chatgpt.js # POST /v1/chat/completions — ChatGPT router: sentinel, prepare, instructions
+  models.js # GET /v1/models, GET /v1/models/:model — OpenAI-compatible model listing, sourced from registry.getModels()
+ openapi.json # OpenAPI 3.1 spec — public contract for /, /health, /v1/models, /v1/models/:model, /v1/chat/completions; x-ide-support/x-reasoning-labels/x-prompt-limits extensions
  utils/
   cookie-jar.js # CookieJar — shared cookie store, seed/capture/serialize
   errors.js # classifyError, toOpenAIError — provider error → OpenAI-compatible error
@@ -57,11 +65,11 @@
   capture-request.js # captureRequest — dumps req.body to temp/captures/*.json ($req skill)
   ephemeral-session.js # ephemeralSession — clones session with chatSessionId/parentMessageId nulled, for ephemeral/utility calls
   sequential-queue.js # sequentialQueue — Express middleware serializing all requests through one app instance, one in flight at a time
-  human-delay.js # humanDelay — randomized delay (default 3-9s) used before DeepSeek session-create/chatCompletion calls
+  human-delay.js # humanDelay — randomized delay (default 3-9s) used before DeepSeek session-create/chatCompletion calls; → utils/logger (tickWait)
   session-classifier.js # isRealChatSession — per-IDE fingerprinted system-prompt prefix match; default-deny classifies non-matching system-first calls as ephemeral
-  logger.js # console color wrappers (debug, info, success, warn, error)
+  logger.js # console color wrappers (debug, info, success, warn, error); tickWait(label,ms) — shared \r countdown display, returns stop fn
   log-saver.js # LogSaver — rotating file logger (temp/<name>.log, size-based rotation, optional beforeSave); serializeError flattens Error → JSON (name/message/stack/status/statusCode/code/type/cause/cooldownMs + own props)
-  rate-limiter.js # acquireSlot — per-provider rate limiting (5 req / 15s window)
+  rate-limiter.js # acquireSlot — per-provider rate limiting (15 req / 60s window); → utils/logger (tickWait)
   route-helpers.js # validateMessages — shared route middleware
   sse-reader.js # readSSE — generic SSE stream reader for both Web and Node streams
   sync-ide-config.js # syncIdeConfig — writes ZeroKey model entry into VS Code chatLanguageModels.json
@@ -69,7 +77,7 @@
   check-modules.js # Dependency integrity check
 
 ## SKILLS
- Skill triggers (engine/triggers.js): $cwd, $save, $req, $browser, $mcp, $mcp-dump, $test, $tools
+ Skill triggers (engine/triggers.js): $cwd, $save, $req, $browser, $mcp, $mcp-dump, $test, $tools, $summary
  $tools # re-emits the instructions.md — reminds LLM if forgotten mid-session
 
 ## BUILD
@@ -85,32 +93,21 @@
 ## MODULES
  server.js
   → express
-  → routes/info, routes/health, routes/models, core/chat-router
+  → routes/docs, routes/info, routes/health, routes/models, core/chat-router
   → core/session-selector
   → utils/find-port, utils/sync-ide-config, utils/logger, utils/errors, utils/sequential-queue
  chat-router.js
   → routes/claude, routes/chatgpt, routes/deepseek, routes/qwen
  session-selector.js
   → prompts (TUI)
-  → core/claude/api, core/deepseek/api, core/chatgpt/api, core/qwen/api
-  → config/constants
- claude.js
+  → providers/registry (registry.get(provider).createAPI/validateCredentials/setupSteps/models/reasoning)
+ registry.js
+  → providers/<name>/index.js (auto-discovered, each exports {name,models,reasoning,promptLimit,setupSteps,createAPI,validateCredentials,buildRouter})
+ providers/<name>/router.js (e.g. deepseek/router.js)
   → engine/pipeline (StreamPipeline, passes messages → pipeline.session/rawMode)
-  → core/claude/api, core/claude/stream-handler, core/claude/set-instructions
+  → providers/<name>/api, providers/<name>/stream-handler, providers/<name>/set-instructions (claude/qwen only)
   → utils/rate-limiter, utils/route-helpers
- deepseek.js
-  → engine/pipeline (StreamPipeline, passes messages → pipeline.session/rawMode)
-  → core/deepseek/api, core/deepseek/stream-handler
-  → utils/rate-limiter, utils/route-helpers
- chatgpt.js
-  → engine/pipeline (StreamPipeline, passes messages → pipeline.session/rawMode)
-  → core/chatgpt/api, core/chatgpt/stream-handler
-  → utils/rate-limiter, utils/route-helpers
- qwen.js
-  → engine/pipeline (StreamPipeline, passes messages → pipeline.session/rawMode)
-  → core/qwen/api, core/qwen/stream-handler, core/qwen/set-instructions
-  → utils/rate-limiter, utils/route-helpers
-  new session (non-raw): setQwenInstructions → pipeline.haveInstructionsAPI = true (skips buildPrompt inlining)
+  qwen only: new session (non-raw): setQwenInstructions → pipeline.haveInstructionsAPI = true (skips buildPrompt inlining)
  pipeline.js
   → engine/compiler (ToolCompiler)
   → engine/syntax (MhiRegistry)
@@ -126,7 +123,7 @@
  startup:
   server.js → findPort → SessionSelector.select (TUI wizard)
   → syncIdeConfig (writes VS Code chatLanguageModels.json)
-  → buildRouter(selected) → per-provider route mounted at /v1/chat/completions
+  → buildRouter(selected) → registry.get(selected.provider).buildRouter(...) mounted at /v1/chat/completions
  per-request (POST /v1/chat/completions):
   sequentialQueue middleware serializes all requests through the mounted router (one in flight at a time, promise-chained)
   route handler → new StreamPipeline(res, session, provider, ide, messages)
@@ -145,13 +142,18 @@
   → pipeline.sendFinalChunk → activeSession.lastUsed updated (ephemeral clone never persisted to user.sessions) → pipeline.onFinalChunk fires if set
 
 ## SCHEMA
+ # Machine contract: openapi.json (OpenAPI 3.1) — served at GET /openapi.json, rendered at GET /docs
+ # Regenerate spec: node scripts/gen-openapi.js
+ # Root API.md: overview + shared infra (rate limiter, errors, SSE reader, compiler, pipeline) + users.json schema
+ # Per-provider internal reference: providers/<name>/api.md (upstream endpoints, POW flow, HAR header order, SSE tables, session shapes)
+
  # OpenAI-compatible chat completions (subset)
  POST /v1/chat/completions
   body: {
     model: string,
     messages: [{ role: "system"|"user"|"assistant"|"tool", content: string|array }],
     tools?: [{ type: "function", function: { name, description, parameters } }],
-    reasoning_effort?: string  # per-provider labels — config/constants.js REASONING
+    reasoning_effort?: string  # per-provider labels — providers/<name>/config.js reasoning.labels
   }
   content parts: { type: "image_url", image_url: { url: "data:mime;base64,..." } } | { type: "file", file: { file_data: "data:mime;base64,...", filename: "..." } }
   response: SSE stream of { id, object: "chat.completion.chunk", created, model, choices: [{ delta: {}, finish_reason }] }
@@ -188,16 +190,17 @@
  prompts ^2.4.2
 
 ## CONFIG
- config/constants.js:
-  CONFIG.PORT → env PORT or 7250
-  MODEL_HASH → per-provider model metadata (id, name, vision, context_length, max_output_length)
-  MODELS → flattened model registry keyed by id
-  PROMPT_LIMITS → per-provider prompt/output char limits (claude/chatgpt 64k, deepseek 128k)
-  REASONING → {provider:{labels,map}} for reasoning_effort (see KNOWN-INVARIANTS)
+ config/constants.js: CONFIG.PORT → env PORT or 7250 (only global config left here)
+ providers/<name>/config.js (single source of truth per provider):
+  models → { title, owned_by, models: { id: { id, name, vision, created, context_length, max_output_length } } }
+  reasoning → { labels, map } for reasoning_effort (see KNOWN-INVARIANTS)
+  promptLimit → prompt/output char limit (claude/chatgpt 64k, deepseek/qwen 128k)
+  setupSteps → { url, requestFilter, instructions } for SessionSelector TUI
+ providers/registry.js: getModels() flattens all providers' models into { id: Model } (same shape as legacy MODELS)
 
 ## KNOWN-INVARIANTS
- MODELS keyed by meta.id (slug), not display name; MODEL_HASH: id = canonical slug, name = display label
- MODEL_HASH.qwen mirrors live chat.qwen.ai /api/v2/models list (6 models); vision flags taken from meta.capabilities.vision; max_output_length maps to meta.max_summary_generation_length (thinking length for qwen3.7-max which lacks summary)
+ registry.getModels() keyed by meta.id (slug), not display name; provider config.models: id = canonical slug, name = display label
+ qwen/config.js models mirrors live chat.qwen.ai /api/v2/models list (6 models); vision flags taken from meta.capabilities.vision; max_output_length maps to meta.max_summary_generation_length (thinking length for qwen3.7-max which lacks summary)
  Qwen auth via cookie `token=<jwt>` (authorization Bearer optional); session auth validated by throwaway chat create+delete in QwenAPI.getCurrentUser()
  Qwen custom instructions written server-side via POST /api/v2/users/user/settings/update (personalization.instruction), hash-gated; routes/qwen.js sets haveInstructionsAPI=true on new sessions
  No API keys — all auth via browser session cookies captured from DevTools fetch()
@@ -206,7 +209,7 @@
  Session state (chatSessionId, parentMessageId, lastUsed, todos) is mutated in-memory; persisted to users.json only on shutdown via selector.flush()
  CookieJar is shared per API client instance; cookies captured from response Set-Cookie headers
  DeepSeek uses a single unified model `default` (model_type: default) — thinking + search + vision; PoW challenge per request (WASM-based sha3); retries on SSE error exactly once
- REASONING is single source: sync-ide-config.js advertises labels; routes/deepseek.js + core/claude/api.js lookup O(1) and log resolved value
+ reasoning labels are single source per provider (providers/<name>/config.js); sync-ide-config.js reads via registry.get(provider).reasoning.labels; each provider's api.js looks up its own reasoning.map O(1) and logs resolved value
   deepseek: {'Off':false,'DeepThink':true}; miss → false; labels ['Off','DeepThink']
   claude: label → {think,tier}; think→thinking_mode:'auto'+effort=tier else 'off'; labels ['Low','Low Think','Medium','Medium Think','High','High Think','Max','Max Think']
  Claude body: completion_request_id (UUID), effort+thinking_mode (not thinking_enabled); VS Code sync writes thinking:true, forwards only reasoning_effort
@@ -218,13 +221,14 @@
  session.mcpInjected populated by restoreMcpInjections from reqTools; once injected, tags stay for session lifetime
  pipeline.isNewSession, pipeline.toolCalling, pipeline.haveInstructionsAPI, pipeline.ephemeralMode set by StreamPipeline constructor; Claude sets haveInstructionsAPI=true
  Auto MCP registration: mcp_<server>_<tool> naming → $<server> tag, merged into MCP_ALIAS_MAPS
- StreamPipeline defers tool-call emission for terax/opencode (batched at flush), emits immediately for vscode; say block streams as plain text (raw= prefix stripped once, closer not emitted) instead of going to toolBuffers
+ SessionSelector is provider-agnostic: no provider-name string comparisons; delegates validateFetch/validateCredentials/waitPolicy/defaultVision to registry.get(provider); the two former claude/deepseek wait loops are one generic waitPolicy-gated loop
+ StreamPipeline defers tool-call emission for terax/opencode (batched at flush), emits immediately for vscode; say block streams as plain text (md= prefix stripped once, closer not emitted) instead of going to toolBuffers
  Rate limiter: 15 req/60s window per provider label; provider 429 → setProviderCooldown(label, ms) blocks all requests for that label until cooldown expires (default: time left until next UTC hour boundary, since ChatGPT's limit is hourly; overridable via body cooldown_ms/retry_after_ms or retry-after header)
  ChatGPT 403 with "unusual activity" body text → device/IP flagged by Cloudflare (not a stale session); triggers 10 min setProviderCooldown('ChatGPT', ...), classified separately in errors.js (category device_flagged) from generic 401/403 session_expired
  server.js unhandled-error handler and all 4 stream handlers write via LogSaver (utils/log-saver.js, mkdir-p temp, size-rotation, optional beforeSave)
  Error log: temp/errors.log (1MB rotation); per-provider stream logs: temp/{deepseek,claude,chatgpt,qwen}-error.log (100KB rotation); stream entries carry reason, chatSessionId, parentMessageId, lastEventType, dataCount, producedOutput, finished, error:serializeError(e) — real thrown error's full field set, not a synthesized string
  Qwen additionally logs to temp/qwen-stream-debug.log (5MB rotation): stop-reason only (per-frame raw dump currently disabled in code)
- Qwen stream-handler accepts optional retry callback (routes/qwen.js supplies one): auto-retries once on RETRY_CODES inline error (quota_limit) or on a stream close with zero data frames; utils/errors.js classifies quota_limit as category provider_overloaded (status 503)
+ Qwen stream-handler accepts optional retry callback (providers/qwen/router.js supplies one): auto-retries once on RETRY_CODES inline error (quota_limit) or on a stream close with zero data frames; utils/errors.js classifies quota_limit as category provider_overloaded (status 503)
  DeepSeek createChatSession/chatCompletion await utils/human-delay.js humanDelay() before firing, to randomize request timing
  DeepSeek stream-close reason distinguishes partial vs no output (producedOutput flag); ChatGPT [DONE] onDone is normal, not an error path
  Provider-error frames logged with raw payload alongside serialized error (Claude case 'error', Qwen data.error, DeepSeek data.type==='error')
@@ -234,7 +238,8 @@
 
 ## EXTENSION-POINTS
  New IDE: add entry in IDES_PROMPT_OPTIMIZER (tool-defs.js), add IDE name to VALID_IDES (server.js)
- New provider: add BUILDERS entry (chat-router.js), add to SessionSelector provider list + PROVIDER_URLS/PROVIDER_STEPS, add MODEL_HASH + REASONING entries (constants.js)
+ New provider: create providers/<name>/{index.js,api.js,router.js,stream-handler.js,config.js} (extend providers/base/* classes); index.js must export {name,displayName,models,reasoning,promptLimit,setupSteps,createAPI,validateCredentials,validateFetch,buildRouter}; optional: defaultVision (bool, vision fallback), waitPolicy ({label,userMessage,allMessage} — rate-limit/suspension TUI loop, presence signals waitUntil support); registry.js auto-discovers it, no other file needs editing
+ Model config: mark recommendedForTools:true on models to badge them in the session TUI (replaces hardcoded slug list)
  New tool: add entry to TOOLS object (tool-defs.js), add per-IDE mapping
  New skill: add entry to triggers array (triggers.js), with trigger word + mhi template
  Stream pipeline: StreamPipeline owns the SSE lifecycle; ToolCompiler is a stateless service created by StreamPipeline

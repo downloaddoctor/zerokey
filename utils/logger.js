@@ -60,4 +60,26 @@ console.info = function (...args) {
   _log(...args.map((a) => (typeof a === 'string' ? text.blue(a) : a)))
 }
 
-module.exports = { text }
+/**
+ * Live `\r`-updating countdown, e.g. "[label] WAIT 4200ms".
+ * Call the returned stop function once the wait completes to clear the line.
+ *
+ * @param {string} label
+ * @param {number} ms - total duration to count down from
+ * @returns {() => void} stop - clears the interval and the line
+ */
+function tickWait(label, ms) {
+  const start = Date.now()
+  const tick = () => {
+    const remaining = Math.max(0, ms - (Date.now() - start))
+    process.stdout.write(`\r[${label}] WAIT ${remaining}ms   `)
+  }
+  tick()
+  const interval = setInterval(tick, 1000)
+  return () => {
+    clearInterval(interval)
+    process.stdout.write('\r' + ' '.repeat(30) + '\r')
+  }
+}
+
+module.exports = { text, tickWait }

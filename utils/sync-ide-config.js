@@ -5,7 +5,7 @@ const os = require('os')
 const fetch = require('node-fetch')
 
 const { isPortActive } = require('./find-port')
-const { MODEL_HASH, REASONING } = require('../config/constants')
+const registry = require('../providers/registry')
 const { text } = require('./logger')
 
 async function _fetchHealth(p) {
@@ -82,7 +82,8 @@ async function syncIdeConfig(preSelected, port) {
       )
       zeroKeyEntry.models = zeroKeyEntry.models.filter((_, i) => liveFlags[i])
 
-      modelName = MODEL_HASH[preSelected.provider]?.models?.[preSelected.session.model]?.name
+      modelName = registry.get(preSelected.provider)?.models?.models?.[preSelected.session.model]
+        ?.name
 
       const activePorts = zeroKeyEntry.models
         .filter((m) => m.id !== targetId)
@@ -95,7 +96,7 @@ async function syncIdeConfig(preSelected, port) {
             const data = await _fetchHealth(p)
 
             if (!data || !data.provider || !data.model) return null
-            return MODEL_HASH[data.provider]?.models?.[data.model]?.name || null
+            return registry.get(data.provider)?.models?.models?.[data.model]?.name || null
           }),
         )
 
@@ -107,7 +108,7 @@ async function syncIdeConfig(preSelected, port) {
       const supportsReasoning = ['claude', 'deepseek'].includes(preSelected.provider)
       const supportsThinking = preSelected.provider === 'claude'
 
-      const reasoningEfforts = REASONING[preSelected.provider]?.labels
+      const reasoningEfforts = registry.get(preSelected.provider)?.reasoning?.labels
       const existingModel = zeroKeyEntry.models.find((m) => m.id === targetId)
       if (existingModel) {
         existingModel.name = modelName

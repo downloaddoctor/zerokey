@@ -433,7 +433,7 @@ class ChatGPTAPI {
    * Used to verify session credentials are valid.
    * Returns user profile data on success, throws on failure.
    */
-  async getMe() {
+  async getCurrentUser() {
     const res = await this._fetch(
       `${this.BASE_URL}/backend-api/me`,
       {

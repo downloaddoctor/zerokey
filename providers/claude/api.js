@@ -1,15 +1,12 @@
-const https = require('https')
 const crypto = require('crypto')
 
-const nodeFetch = require('node-fetch')
-
-const { CookieJar } = require('../../utils/cookie-jar')
-const { REASONING } = require('../../config/constants')
+const { BaseAPI } = require('../base/BaseAPI')
+const { reasoning } = require('./config')
 
 // O(1) reasoning_effort → { think, tier } lookup.
 // Keys are the exact labels VS Code advertises (utils/sync-ide-config.js).
 // Anything not mapped disables thinking.
-const REASONING_MAP = REASONING.claude.map
+const REASONING_MAP = reasoning.map
 
 /**
  * Generate a UUID v4.
@@ -33,21 +30,13 @@ function generateUUID() {
  * We extract headers + body, reuse all real values in exact HAR order.
  * Header order matters — Cloudflare fingerprints based on it.
  */
-class ClaudeAPI {
+class ClaudeAPI extends BaseAPI {
   static BASE_URL = 'https://claude.ai/api'
 
   constructor(options = {}) {
-    this._log = options.log !== false
-    this._headers = {}
+    super(options)
     this._body = {}
     this._orgId = null
-    this._cookies = new CookieJar()
-    this._httpAgent = new https.Agent({
-      keepAlive: true,
-      maxSockets: 50,
-      maxFreeSockets: 10,
-      timeout: 300000,
-    })
   }
 
   /**
@@ -55,15 +44,12 @@ class ClaudeAPI {
    * Stores all headers as-is for later reconstruction in exact HAR order.
    */
   async initializeFromJSON(parsedFetch) {
-    this._headers = { ...parsedFetch.headers }
+    await super.initializeFromJSON(parsedFetch)
     this._body = { ...parsedFetch.body }
 
     // Seed cookie jar from initial headers
     const initialCookie = this._headers.cookie || this._headers.Cookie || ''
-    if (initialCookie) {
-      const count = this._cookies.seedFromHeader(initialCookie)
-      if (this._log) console.debug(`[Claude] Seeded cookie jar with ${count} initial cookies`)
-    } else if (this._log) {
+    if (!initialCookie && this._log) {
       console.warn('[Claude] WARNING: No cookies in headers! Cloudflare will block.')
     }
 
@@ -80,15 +66,6 @@ class ClaudeAPI {
     if (this._log) console.debug('[Claude] Initialized from capture JSON')
   }
 
-  /**
-   * Send a chat completion request. Returns a ReadableStream (Web Streams).
-   *
-   * @param {string} prompt - User's message text
-   * @param {string|null} chatSessionId - Existing conversation UUID (null for new)
-   * @param {string|null} parentMessageId - UUID of message to reply to
-   * @param {string} model - Model identifier (default: claude-sonnet-4-6)
-   * @param {Array} tools - Tool definitions array
-   */
   async uploadFile(file) {
     if (!this._orgId) throw new Error('Organization ID not set')
 
@@ -233,7 +210,6 @@ class ClaudeAPI {
     }
   }
 
-  // ─── Response header capture ─────────────────────────────────
   /**
    * Delete a single chat conversation server-side.
    * @param {string} chatSessionId - the conversation UUID to delete
@@ -259,7 +235,7 @@ class ClaudeAPI {
    * Used to verify session credentials are valid.
    * Returns account profile data on success, throws on failure.
    */
-  async getAccountProfile() {
+  async getCurrentUser() {
     const headers = this._buildHeaders()
     delete headers['accept-encoding']
 
@@ -332,48 +308,6 @@ class ClaudeAPI {
     delete extra['content-type']
 
     return { ...base, ...extra }
-  }
-
-  // ─── HTTP fetch ───────────────────────────────────────────────
-
-  async _fetch(url, options = {}, parseJSON = false, timeoutMs = 300_000) {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), timeoutMs)
-
-    let res
-    try {
-      res = await nodeFetch(url, {
-        ...options,
-        redirect: 'follow',
-        signal: controller.signal,
-        agent: this._httpAgent,
-      })
-    } catch (err) {
-      clearTimeout(timer)
-      if (err.name === 'AbortError') {
-        const errorObj = {
-          error: {
-            type: 'request_timeout',
-            message: `Request timed out after ${timeoutMs / 1000}s`,
-          },
-        }
-
-        const te = new Error(JSON.stringify(errorObj))
-        te.status = 504
-        te.statusCode = 504
-        throw te
-      }
-      throw err
-    }
-    clearTimeout(timer)
-
-    if (parseJSON && res.ok) {
-      this._captureResponseHeaders(res)
-      const json = await res.json()
-      return { ok: true, status: res.status, data: json }
-    }
-
-    return res
   }
 }
 

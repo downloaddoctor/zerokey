@@ -3,7 +3,7 @@ const instructions = require('../../engine/instructions')
 async function setClaudeInstructions(claudeApi, userData, toolCalling = true) {
   if (!userData) return false
 
-  const { content, hash } = instructions.getClaudeFull()
+  const { content, hash } = instructions.getFull()
   if (userData.instructionsHash === hash) return false
 
   const finalContent = toolCalling ? content : ''

@@ -1,24 +1,26 @@
 const express = require('express')
-const { MODELS, MODEL_HASH } = require('../config/constants')
+const registry = require('../providers/registry')
 const { toOpenAIError } = require('../utils/errors')
 
 function buildModelsRouter(preSelected) {
   const router = express.Router()
 
-  const activeModel = MODEL_HASH[preSelected?.provider]?.models?.[preSelected?.session?.model]
+  const activeModel = registry.get(preSelected?.provider)?.models?.models?.[
+    preSelected?.session?.model
+  ]
 
   // GET /v1/models - List all supported models, with the active one flagged
   router.get('/', (req, res) => {
     res.json({
       object: 'list',
-      data: Object.values(MODELS),
+      data: Object.values(registry.getModels()),
       activeModel,
     })
   })
 
   // GET /v1/models/:model - Get a specific model (from the full registry)
   router.get('/:model', (req, res) => {
-    const model = MODELS[req.params.model]
+    const model = registry.getModels()[req.params.model]
     if (model) return res.json(model)
 
     res

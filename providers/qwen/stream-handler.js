@@ -2,43 +2,12 @@ const { readSSE } = require('../../utils/sse-reader')
 const { LogSaver, serializeError } = require('../../utils/log-saver')
 
 const streamLog = new LogSaver({ name: 'qwen-error' })
-// Full raw-frame debug log — every SSE frame as it arrives, plus the reason
-// the stream ended. Rotates at 5MB since raw frames are verbose.
 const streamDebugLog = new LogSaver({ name: 'qwen-stream-debug', maxSize: 5 * 1024 * 1024 })
 
-// Error codes that indicate a transient, provider-side condition worth
-// retrying automatically (mirrors DeepSeek's RETRY_REASONS pattern).
 const RETRY_CODES = {
   quota_limit: true,
 }
 
-/**
- * Qwen AI (chat.qwen.ai) SSE Stream Handler
- *
- * Qwen streams SSE events whose `choices[0].delta` carries a `phase`:
- *   - 'think'            → reasoning_content delta (streamed live)
- *   - 'thinking_summary' → reasoning_content delta, from extra.summary_thought.content[]
- *   - 'web_search' / 'web_extractor' / etc. → internal tool calls; emitted
- *                          once as a `[toolName...]` reasoning_content status
- *                          line so the client doesn't see dead air during
- *                          tool rounds, then otherwise ignored
- *   - 'answer'           → visible content, delivered one of two ways:
- *       (a) plain `delta.content` deltas (older/simple turns), or
- *       (b) a `say` function_call whose `arguments` is a growing JSON
- *           string like `{"raw":"partial text..."}` — the real content must
- *           be incrementally extracted+decoded from that string since it is
- *           not valid JSON until the call completes.
- *   - null               → content delta (no phase marker)
- *
- * `status === 'finished'` on an answer/null phase ends the stream.
- * `response.created.response_id` is captured for the response id.
- *
- * @param {ReadableStream} stream
- * @param {object} session
- * @param {StreamPipeline} parser
- * @param {Function} [retry] — re-issues chatCompletion on a retryable inline
- *   provider error (see RETRY_CODES); omit to disable auto-retry.
- */
 function streamHandler(stream, session, parser, retry) {
   let responseId = ''
   let hasSentReasoningRole = false
@@ -47,13 +16,8 @@ function streamHandler(stream, session, parser, retry) {
   let dataCount = 0
   let producedOutput = false
   let lastEventType = null
-  // Tracks raw (still-JSON-escaped) argument text already emitted for the
-  // current function_call, so we can diff+decode only the new portion.
   let sayArgsEmitted = ''
-  // Tracks the last non-answer tool phase we emitted a status line for, so
-  // we emit one status per tool call instead of once per SSE frame.
   let lastToolPhase = null
-  // Guards the zero-data-frame stream close case so we only auto-retry once.
   let didRetry = false
 
   const logIssue = (reason, extra = {}) => {
@@ -70,9 +34,6 @@ function streamHandler(stream, session, parser, retry) {
     })
   }
 
-  // The assistant response_id returned by Qwen is the parent for the next
-  // turn. Persist it into session.parentMessageId so the next chatCompletion
-  // call sends it as parentId/parent_id (matches live capture behavior).
   const adoptResponseId = (id) => {
     if (!id) return
     responseId = id
@@ -106,27 +67,16 @@ function streamHandler(stream, session, parser, retry) {
     parser.sendFinalChunk()
   }
 
-  // Qwen's newer builds stream the visible answer as a `say` function_call
-  // whose `arguments` is a growing, *not yet valid* JSON string, e.g.:
-  //   {"raw": "Based on the recent commit
-  //   {"raw": "Based on the recent commit (311d
-  // We can't JSON.parse a half-open string, so we extract the longest safe
-  // prefix of the `"raw":"..."` value, unescape it, and diff against what
-  // has already been emitted.
   const extractSayText = (argsStr) => {
     const m = /"raw"\s*:\s*"/.exec(argsStr)
     if (!m) return null
     let body = argsStr.slice(m.index + m[0].length)
-    // Trim a dangling unescaped backslash (mid-escape-sequence) so we don't
-    // misdecode a partial \u escape or similar on the next chunk.
     let trail = 0
     while (trail < body.length && body[body.length - 1 - trail] === '\\') trail++
     if (trail % 2 === 1) body = body.slice(0, -1)
     try {
       return JSON.parse(`"${body}"`)
     } catch {
-      // Body may end mid-escape (e.g. "...\u12"); fall back to the longest
-      // JSON-parseable prefix by trimming from the end until it parses.
       for (let cut = body.length - 1; cut >= 0; cut--) {
         if (body[cut] === '\\') continue
         try {
@@ -220,12 +170,6 @@ function streamHandler(stream, session, parser, retry) {
     }
 
     if (phase && phase !== 'answer' && phase !== 'think' && phase !== 'thinking_summary') {
-      // Internal tool phases (web_search, web_extractor, etc.). Qwen can
-      // spend many seconds here with zero 'answer'/'think' output, which
-      // makes the stream look stalled to the client even though frames are
-      // arriving. Surface tool activity as reasoning_content so something
-      // visibly streams during these gaps, emitted once per call rather
-      // than once per SSE frame.
       if (delta.role === 'function' && status === 'finished') {
         lastToolPhase = null
         return
@@ -243,16 +187,8 @@ function streamHandler(stream, session, parser, retry) {
     }
 
     if (phase === 'answer' || phase === null) {
-      // Qwen emits role:"function" frames for its own internal tool-result
-      // messages ("Tool X does not exists.") and marks them status:"finished".
-      // A single stream contains MULTIPLE such answer rounds — a thinking
-      // round, a function round, then the real assistant answer. Treating the
-      // first status:"finished" as the end truncates the reply after the first
-      // round. Only assistant frames carry the real output; skip function ones.
       if (delta.role === 'function') return
 
-      // Newer Qwen builds stream the visible answer wrapped in a `say`
-      // function_call instead of plain `delta.content` — extract and diff it.
       const fc = delta.function_call
       if (fc && fc.name === 'say' && typeof fc.arguments === 'string') {
         const decoded = extractSayText(fc.arguments)
@@ -265,8 +201,6 @@ function streamHandler(stream, session, parser, retry) {
           }
         }
       } else if (fc && fc.name && fc.name !== 'say') {
-        // A different tool call (e.g. web_search/web_extractor) is starting —
-        // reset so a subsequent `say` call starts its diff from empty.
         sayArgsEmitted = ''
       }
 
@@ -303,9 +237,6 @@ function streamHandler(stream, session, parser, retry) {
           stopReason,
         })
 
-        // A stream that closes with zero data frames at all (dataCount===0)
-        // is upstream flakiness, not a parse/logic issue — retry once rather
-        // than silently emitting [DONE] with nothing shown to the user.
         if (noOutput && dataCount === 0 && retry && !didRetry) {
           didRetry = true
           finished = true

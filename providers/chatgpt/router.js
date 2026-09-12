@@ -1,10 +1,10 @@
 const express = require('express')
 
-const { StreamPipeline } = require('../engine/pipeline')
-const { ChatGPTAPI } = require('../core/chatgpt/api')
-const { chatgptStreamHandler } = require('../core/chatgpt/stream-handler')
-const { acquireSlot } = require('../utils/rate-limiter')
-const { validateMessages } = require('../utils/route-helpers')
+const { StreamPipeline } = require('../../engine/pipeline')
+const { ChatGPTAPI } = require('./api')
+const { chatgptStreamHandler } = require('./stream-handler')
+const { acquireSlot } = require('../../utils/rate-limiter')
+const { validateMessages } = require('../../utils/route-helpers')
 const chatgptApi = new ChatGPTAPI()
 
 async function buildChatGPTRouter(parsedFetch, session, _userData = null) {

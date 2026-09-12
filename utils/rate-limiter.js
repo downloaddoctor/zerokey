@@ -1,3 +1,5 @@
+const { tickWait } = require('./logger')
+
 const RATE_LIMIT = 15
 const RATE_WINDOW = 60_000
 
@@ -30,8 +32,10 @@ function acquireSlot(label = 'API', reset = false) {
   if (s.cooldownUntil && now < s.cooldownUntil) {
     const wait = s.cooldownUntil - now
     console.warn(`[${label}] ⚠ Provider cooldown — waiting ${(wait / 1000).toFixed(1)}s`)
+    const stopTick = tickWait(label, wait)
     return new Promise((resolve) => {
       setTimeout(() => {
+        stopTick()
         s.count = 0
         s.windowStart = Date.now()
         s.cooldownUntil = 0
@@ -61,8 +65,10 @@ function acquireSlot(label = 'API', reset = false) {
   }
 
   console.warn(`[${label}] ⚠ Rate limit — waiting ${(wait / 1000).toFixed(1)}s`)
+  const stopTick = tickWait(label, wait)
   return new Promise((resolve) => {
     setTimeout(() => {
+      stopTick()
       s.count = 0
       s.windowStart = Date.now()
       s.count++

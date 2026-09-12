@@ -1,18 +1,18 @@
 const express = require('express')
 
-const { StreamPipeline } = require('../engine/pipeline')
-const { DeepSeekAPI } = require('../core/deepseek/api')
-const { streamHandler } = require('../core/deepseek/stream-handler')
-const { acquireSlot } = require('../utils/rate-limiter')
-const { validateMessages } = require('../utils/route-helpers')
-const { REASONING } = require('../config/constants')
+const { StreamPipeline } = require('../../engine/pipeline')
+const { DeepSeekAPI } = require('./api')
+const { streamHandler } = require('./stream-handler')
+const { acquireSlot } = require('../../utils/rate-limiter')
+const { validateMessages } = require('../../utils/route-helpers')
+const { reasoning } = require('./config')
 
 const deepseekApi = new DeepSeekAPI()
 
-// O(1) reasoning_effort → thinking_enabled lookup.
+// O(1) reasoning_effort → { think, search } lookup.
 // Keys are the exact labels VS Code advertises (utils/sync-ide-config.js).
-// Anything not mapped disables thinking.
-const REASONING_MAP = REASONING.deepseek.map
+// Anything not mapped disables both thinking and search.
+const REASONING_MAP = reasoning.map
 
 async function buildDeepSeekRouter(parsedFetch, session, userData) {
   console.debug('[Deepseek] Initializing from parsed capture JSON')
@@ -53,7 +53,10 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
       }
     }
     const modelType = pipeline.isNewSession ? activeSession.model || 'default' : null
-    const thinkingEnabled = REASONING_MAP[reasoningEffort] ?? false
+    const { think: thinkingEnabled, search: searchEnabled } = REASONING_MAP[reasoningEffort] ?? {
+      think: false,
+      search: false,
+    }
 
     const fileIds = []
     pipeline.bindUploader(deepseekApi, fileIds)
@@ -76,7 +79,7 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
         prompt,
         activeSession.parentMessageId,
         thinkingEnabled,
-        true,
+        searchEnabled,
         modelType,
         fileIds,
       )
@@ -88,7 +91,7 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
           prompt,
           activeSession.parentMessageId,
           thinkingEnabled,
-          true,
+          searchEnabled,
           modelType,
           fileIds,
         )

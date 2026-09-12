@@ -1,6 +1,7 @@
 const express = require('express')
 
 const infoRouter = require('./routes/info')
+const docsRouter = require('./routes/docs')
 const buildModelsRouter = require('./routes/models')
 const buildHealthRouter = require('./routes/health')
 const buildRouter = require('./core/chat-router')
@@ -42,6 +43,7 @@ app.use((req, res, next) => {
   next()
 })
 
+app.use('/', docsRouter)
 app.use('/', infoRouter)
 ;(async () => {
   const selector = new SessionSelector()
@@ -95,15 +97,13 @@ app.use('/', infoRouter)
     if (!res.headersSent) res.status(status).json(openaiErr)
     else res.end()
   })
-
   const server = app.listen(port, '127.0.0.1', () => {
     console.success(`\n√ ZeroKey running on http://localhost:${port}`)
-    console.log('Endpoints:')
-    console.log(`  GET  http://localhost:${port}/`)
-    console.log(`  GET  http://localhost:${port}/health`)
-    console.log(`  GET  http://localhost:${port}/v1/models`)
-    console.log(`  POST http://localhost:${port}/v1/chat/completions`)
-    console.log(`\n  IDE from Authorization: Bearer <vscode|terax|opencode> (default: vscode)\n`)
+    console.log('')
+    console.log(`  POST  http://localhost:${port}/v1/chat/completions   Chat (SSE)`)
+    console.log(`  GET   http://localhost:${port}/v1/models             List models`)
+    console.log(`  GET   http://localhost:${port}/docs                  Swagger UI`)
+    console.log(`\n  IDE: Authorization: Bearer <vscode|terax|opencode> (default: vscode)\n`)
   })
 
   const shutdown = (signal) => {

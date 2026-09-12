@@ -1,11 +1,11 @@
 const express = require('express')
 
-const { StreamPipeline } = require('../engine/pipeline')
-const { ClaudeAPI } = require('../core/claude/api')
-const { claudeStreamHandler } = require('../core/claude/stream-handler')
-const { setClaudeInstructions } = require('../core/claude/set-instructions')
-const { acquireSlot } = require('../utils/rate-limiter')
-const { validateMessages } = require('../utils/route-helpers')
+const { StreamPipeline } = require('../../engine/pipeline')
+const { ClaudeAPI } = require('./api')
+const { claudeStreamHandler } = require('./stream-handler')
+const { setClaudeInstructions } = require('./set-instructions')
+const { acquireSlot } = require('../../utils/rate-limiter')
+const { validateMessages } = require('../../utils/route-helpers')
 const claudeApi = new ClaudeAPI()
 
 async function buildClaudeRouter(parsedFetch, session, userData = null) {

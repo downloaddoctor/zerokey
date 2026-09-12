@@ -1,42 +1,18 @@
-const https = require('https')
-
-const nodeFetch = require('node-fetch')
-
-const { CookieJar } = require('../../utils/cookie-jar')
+const { BaseAPI } = require('../base/BaseAPI')
 const { DeepSeekPOW } = require('./pow')
 const { humanDelay } = require('../../utils/human-delay')
 
-class DeepSeekAPI {
+class DeepSeekAPI extends BaseAPI {
   static BASE_URL = 'https://chat.deepseek.com/api/v0'
 
   constructor(options = {}) {
-    this._log = options.log !== false
-    this._cookies = new CookieJar()
+    super(options)
     this._powSolver = new DeepSeekPOW()
-    this._headers = {}
-    this._httpAgent = new https.Agent({
-      keepAlive: true,
-      maxSockets: 50,
-      maxFreeSockets: 10,
-      timeout: 300000,
-    })
   }
 
   async initializeFromJSON({ headers }) {
     await this._powSolver.initialize()
-
-    // Store all captured headers for later reuse
-    this._headers = { ...headers }
-
-    // Seed cookie jar from initial headers if present
-    const initialCookie = headers.cookie || headers.Cookie || ''
-    if (initialCookie) {
-      const count = this._cookies.seedFromHeader(initialCookie)
-      if (count > 0 && this._log) {
-        console.debug(`[DeepSeek] Seeded cookie jar with ${count} initial cookies`)
-      }
-    }
-
+    await super.initializeFromJSON({ headers })
     if (this._log) console.debug('[DeepSeek] Initialized from capture JSON')
   }
 
@@ -55,7 +31,6 @@ class DeepSeekAPI {
 
       const body = resp.data
 
-      // Top-level failure: code !== 0 means auth error, quota, etc.
       if (body?.code !== 0) {
         const err = new Error(
           `DeepSeek session create failed: ${body?.msg || `code ${body?.code}`}`,
@@ -65,7 +40,6 @@ class DeepSeekAPI {
         throw err
       }
 
-      // Inner biz layer: code 0 but biz_code indicates business-level error
       const bizCode = body.data?.biz_code
       const bizData = body.data?.biz_data
 
@@ -89,25 +63,19 @@ class DeepSeekAPI {
         throw err
       }
 
-      const id = bizData.id || bizData.chat_session?.id
-
-      // if (this._log) console.debug(`[DeepSeek] New session: ${id}`)
-      return id
+      return bizData.id || bizData.chat_session?.id
     } catch (error) {
       if (error.code === 'account_suspended' || error.code === 'session_create_failed') throw error
       throw new Error('Failed to create chat session: ' + error.message)
     }
   }
 
-  /**
-   * Send a chat completion request. Returns a Web ReadableStream.
-   */
   async chatCompletion(
     chatSessionId,
     prompt,
     parentMessageId = null,
     thinkingEnabled = false,
-    searchEnabled = true,
+    searchEnabled = false,
     modelType = null,
     refFileIds = [],
   ) {
@@ -152,7 +120,6 @@ class DeepSeekAPI {
       throw err
     }
 
-    // Detect JSON responses (account suspended, etc.) instead of expected SSE stream
     const contentType = res.headers.get('content-type') || ''
     if (contentType.includes('application/json')) {
       const json = await res.json()
@@ -179,21 +146,12 @@ class DeepSeekAPI {
     return res.body
   }
 
-  /**
-   * Upload a file to DeepSeek. Returns file_id on success.
-   * @param {string} fileName
-   * @param {Buffer|string} fileContent
-   * @param {number} fileSize - bytes
-   * @returns {Promise<string>} file_id
-   */
   async uploadFile(file) {
-    // 1. Get POW challenge for file upload
     const challenge = await this._getPowChallenge('/api/v0/file/upload_file')
     const powResponse = await this._powSolver.solveChallenge(challenge)
 
     const { filename, data, size } = file
 
-    // 2. Build multipart form data
     const boundary = '----WebKitFormBoundary' + Math.random().toString(36).slice(2)
     const CRLF = '\r\n'
     const header =
@@ -208,7 +166,6 @@ class DeepSeekAPI {
       Buffer.from(footer, 'utf-8'),
     ])
 
-    // 3. Upload
     const uploadHeaders = this._buildHeaders({
       'content-type': `multipart/form-data; boundary=${boundary}`,
       'x-ds-pow-response': powResponse,
@@ -219,11 +176,7 @@ class DeepSeekAPI {
 
     const res = await this._fetch(
       `${DeepSeekAPI.BASE_URL}/file/upload_file`,
-      {
-        method: 'POST',
-        headers: uploadHeaders,
-        body: bodyBuffer,
-      },
+      { method: 'POST', headers: uploadHeaders, body: bodyBuffer },
       true,
     )
 
@@ -236,16 +189,9 @@ class DeepSeekAPI {
     if (this._log)
       console.debug(`[DeepSeek] File uploaded: ${filename} (${size} bytes) → ${fileId}`)
 
-    // 4. Poll until processing completes
     return this._pollFile(fileId, filename)
   }
 
-  /**
-   * Poll file status until SUCCESS.
-   * @param {string} fileId
-   * @param {string} fileName
-   * @returns {Promise<string>} file_id
-   */
   async _pollFile(fileId, _fileName) {
     const maxAttempts = 30
     const delay = 5000
@@ -253,10 +199,7 @@ class DeepSeekAPI {
     for (let i = 0; i < maxAttempts; i++) {
       const res = await this._fetch(
         `${DeepSeekAPI.BASE_URL}/file/fetch_files?file_ids=${encodeURIComponent(fileId)}`,
-        {
-          method: 'GET',
-          headers: this._buildHeaders(),
-        },
+        { method: 'GET', headers: this._buildHeaders() },
         true,
       )
 
@@ -274,14 +217,12 @@ class DeepSeekAPI {
         throw new Error(`File ${fileId} processing error: ${file.error_code || 'unknown'}`)
       }
 
-      // Still PENDING — wait and retry
       await new Promise((resolve) => setTimeout(resolve, delay))
     }
 
     throw new Error(`File ${fileId} timed out waiting for processing`)
   }
 
-  // ─── Internal ───
   async _getPowChallenge(targetPath = '/api/v0/chat/completion') {
     try {
       const resp = await this._fetch(
@@ -293,25 +234,17 @@ class DeepSeekAPI {
         },
         true,
       )
-      const body = resp.data
-      return body.data.biz_data.challenge
+      return resp.data.data.biz_data.challenge
     } catch (error) {
       throw new Error('Failed to get POW challenge: ' + error.message)
     }
   }
 
-  /**
-   * Delete all chat sessions server-side (single bulk endpoint).
-   */
   async deleteAllSessions() {
     if (this._log) console.debug('[DeepSeek] Deleting all sessions...')
     const res = await this._fetch(
       `${DeepSeekAPI.BASE_URL}/chat_session/delete_all`,
-      {
-        method: 'POST',
-        headers: this._buildHeaders(),
-        body: null,
-      },
+      { method: 'POST', headers: this._buildHeaders(), body: null },
       false,
     )
 
@@ -323,10 +256,6 @@ class DeepSeekAPI {
     if (this._log) console.debug('[DeepSeek] All sessions deleted')
   }
 
-  /**
-   * Delete a single chat session server-side.
-   * @param {string} chatSessionId - the session UUID to delete
-   */
   async deleteSession(chatSessionId) {
     const res = await this._fetch(
       `${DeepSeekAPI.BASE_URL}/chat_session/delete`,
@@ -344,18 +273,10 @@ class DeepSeekAPI {
     }
   }
 
-  /**
-   * Fetch current user info from /api/v0/users/current.
-   * Used to verify session credentials are valid.
-   * Returns user profile data on success, throws on failure.
-   */
   async getCurrentUser() {
     const res = await this._fetch(
       `${DeepSeekAPI.BASE_URL}/users/current`,
-      {
-        method: 'GET',
-        headers: this._buildHeaders(),
-      },
+      { method: 'GET', headers: this._buildHeaders() },
       true,
     )
 
@@ -364,68 +285,6 @@ class DeepSeekAPI {
     }
 
     return res.data
-  }
-
-  // ─── Response header capture ─────────────────────────────────
-
-  _captureResponseHeaders(res) {
-    this._cookies.captureFromFetchHeaders(res.headers, ' DeepSeek')
-  }
-
-  // ─── Headers builder ─────────────────────────────────────────
-  _buildHeaders(overrides = {}) {
-    const cookieStr = this._cookies.toString()
-    const h = { ...this._headers }
-
-    // Always override these
-    h['content-type'] = 'application/json'
-    if (cookieStr) h['cookie'] = cookieStr
-
-    // Apply overrides (e.g. pow response)
-    Object.assign(h, overrides)
-
-    return h
-  }
-
-  // ─── HTTP fetch ───────────────────────────────────────────────
-
-  async _fetch(url, options = {}, parseJSON = false, timeoutMs = 300_000) {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), timeoutMs)
-
-    let res
-    try {
-      res = await nodeFetch(url, {
-        ...options,
-        redirect: 'follow',
-        signal: controller.signal,
-        agent: this._httpAgent,
-      })
-    } catch (err) {
-      clearTimeout(timer)
-      if (err.name === 'AbortError') {
-        const errorObj = {
-          error: {
-            type: 'request_timeout',
-            message: `Request timed out after ${timeoutMs / 1000}s`,
-          },
-        }
-        const te = new Error(JSON.stringify(errorObj))
-        te.status = 504
-        te.statusCode = 504
-        throw te
-      }
-      throw err
-    }
-    clearTimeout(timer)
-
-    if (parseJSON && res.ok) {
-      this._captureResponseHeaders(res)
-      const json = await res.json()
-      return { ok: true, status: res.status, data: json }
-    }
-
-    return res
   }
 }
 

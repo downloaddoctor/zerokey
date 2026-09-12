@@ -5,11 +5,7 @@ const { spawn } = require('child_process')
 
 const prompts = require('prompts')
 
-const { ClaudeAPI } = require('./claude/api')
-const { DeepSeekAPI } = require('./deepseek/api')
-const { ChatGPTAPI } = require('./chatgpt/api')
-const { QwenAPI } = require('./qwen/api')
-const { MODEL_HASH } = require('../config/constants')
+const registry = require('../providers/registry')
 const { text } = require('../utils/logger')
 
 class SessionSelector {
@@ -39,7 +35,8 @@ class SessionSelector {
     const allProviders = this._loadAll()
     const providerUsers = allProviders[this.provider] || {}
 
-    if (this.provider === 'claude') {
+    const waitPolicy = registry.get(this.provider)?.waitPolicy
+    if (waitPolicy) {
       for (const u of Object.values(providerUsers)) {
         if (u.waitUntil && u.waitUntil <= Date.now()) {
           delete u.waitUntil
@@ -49,10 +46,8 @@ class SessionSelector {
 
       while (this.user.waitUntil && this.user.waitUntil > Date.now()) {
         const mins = Math.ceil((this.user.waitUntil - Date.now()) / 60000)
-        const resetsAt = new Date(this.user.waitUntil).toLocaleTimeString()
-        console.warn(
-          `\n⚠  User "${this.user.username}" is at limit. Resets at ${resetsAt} (~${mins} min).\n`,
-        )
+        const resetsAt = this._formatResetTime(this.user.waitUntil)
+        console.warn(`\n${waitPolicy.userMessage(this.user.username, resetsAt, mins)}\n`)
 
         const availableUsers = Object.values(providerUsers).filter(
           (u) => u.username !== this.user.username && (!u.waitUntil || u.waitUntil <= Date.now()),
@@ -64,50 +59,14 @@ class SessionSelector {
             .filter((u) => u.ts)
             .sort((a, b) => a.ts - b.ts)[0]
           const minsLeft = Math.ceil((soonest.ts - Date.now()) / 60000)
-          const resetsAtSoonest = new Date(soonest.ts).toLocaleTimeString()
-          console.error(
-            `\n⚠ All Claude users are at their usage limit.\n` +
-              `    Soonest reset: "${soonest.username}" at ${resetsAtSoonest} (~${minsLeft} min).\n`,
-          )
+          const resetsAtSoonest = this._formatResetTime(soonest.ts)
+          console.error(`\n${waitPolicy.allMessage(soonest.username, resetsAtSoonest, minsLeft)}\n`)
           return this.select(false)
         }
 
         this.user = await this._stepUserLogin()
         if (!this.user) return null
       }
-    }
-
-    while (
-      this.provider === 'deepseek' &&
-      this.user.waitUntil &&
-      this.user.waitUntil > Date.now()
-    ) {
-      const resetsAt = new Date(this.user.waitUntil).toLocaleTimeString()
-      const mins = Math.ceil((this.user.waitUntil - Date.now()) / 60000)
-      console.warn(
-        `\n⚠  Account "${this.user.username}" is suspended until ${resetsAt} (~${mins} min).\n`,
-      )
-
-      const availableUsers = Object.values(providerUsers).filter(
-        (u) => u.username !== this.user.username && (!u.waitUntil || u.waitUntil <= Date.now()),
-      )
-
-      if (availableUsers.length === 0) {
-        const soonest = Object.values(providerUsers)
-          .map((u) => ({ username: u.username, ts: u.waitUntil }))
-          .filter((u) => u.ts)
-          .sort((a, b) => a.ts - b.ts)[0]
-        const minsLeft = Math.ceil((soonest.ts - Date.now()) / 60000)
-        const resetsAtSoonest = new Date(soonest.ts).toLocaleTimeString()
-        console.error(
-          `\n⚠ All DeepSeek accounts are suspended.\n` +
-            `    Soonest reset: "${soonest.username}" at ${resetsAtSoonest} (~${minsLeft} min).\n`,
-        )
-        return this.select(false)
-      }
-
-      this.user = await this._stepUserLogin()
-      if (!this.user) return null
     }
 
     this.session = await this._stepSessionSelection(sessionName)
@@ -186,17 +145,19 @@ class SessionSelector {
 
   async _stepProviderSelection(preset) {
     if (preset) return preset
+
+    const providers = registry.getAll()
+    const choices = providers.map((p) => ({
+      title: p.displayName || p.name,
+      value: p.name,
+    }))
+
     const { provider } = await prompts(
       {
         type: 'select',
         name: 'provider',
         message: 'Select AI Provider',
-        choices: [
-          { title: 'DeepSeek', value: 'deepseek' },
-          { title: 'Claude', value: 'claude' },
-          { title: 'ChatGPT', value: 'chatgpt' },
-          { title: 'Qwen', value: 'qwen' },
-        ],
+        choices,
       },
       { onCancel: () => process.exit(0) },
     )
@@ -213,7 +174,7 @@ class SessionSelector {
       const choices = savedUsers.map((username) => {
         const user = providerUsers[username]
         const limited =
-          (this.provider === 'claude' || this.provider === 'deepseek') &&
+          Boolean(registry.get(this.provider)?.waitPolicy) &&
           user.waitUntil &&
           user.waitUntil > Date.now()
         return {
@@ -244,94 +205,14 @@ class SessionSelector {
   }
 
   _validateFetchHeaders(parsedFetch) {
-    const h = Object.fromEntries(
-      Object.entries(parsedFetch.headers).map(([k, v]) => [k.toLowerCase(), v]),
-    )
-    const b = parsedFetch.body || {}
-    const url = parsedFetch.url || ''
-    const errors = []
-
-    if (this.provider === 'deepseek') {
-      if (!h['cookie']) errors.push('cookie — required for session auth')
-      if (!h['authorization']) errors.push('authorization — required (Bearer token)')
-      if (!url.endsWith('/api/v0/chat/completion'))
-        errors.push('URL must be /api/v0/chat/completion — wrong request copied')
-    }
-
-    if (this.provider === 'claude') {
-      if (!h['cookie']) errors.push('cookie — required for session auth')
-      if (!h['anthropic-device-id'])
-        errors.push('anthropic-device-id — missing; copy from the /completion request on claude.ai')
-      if (!/\/organizations\/[a-f0-9-]{36}/i.test(url))
-        errors.push(
-          'URL must contain /organizations/<uuid>/chat_conversations — wrong request copied',
-        )
-      if (!url.endsWith('/completion'))
-        errors.push(
-          'URL must end in /completion — copy the streaming completion request, not a GET',
-        )
-    }
-
-    if (this.provider === 'chatgpt') {
-      if (!h['cookie']) errors.push('cookie — required for session auth')
-      if (!h['authorization']) errors.push('authorization — required (Bearer token)')
-      if (!h['openai-sentinel-proof-token'])
-        errors.push(
-          'openai-sentinel-proof-token — missing; copy /backend-api/f/conversation, not a /sentinel/ request',
-        )
-      if (!h['oai-language'])
-        errors.push('oai-language — missing; copy from /backend-api/f/conversation request')
-      if (!h['oai-device-id'])
-        errors.push('oai-device-id — missing; copy from /backend-api/f/conversation request')
-      if (!url.endsWith('/backend-api/f/conversation'))
-        errors.push('URL must be /backend-api/f/conversation — wrong request copied')
-      if (!b['client_contextual_info'])
-        errors.push(
-          'body.client_contextual_info — missing; copy /backend-api/f/conversation, not /prepare or /sentinel/',
-        )
-    }
-
-    if (this.provider === 'qwen') {
-      if (!h['cookie']) errors.push('cookie — required for session auth')
-      // Qwen's JWT lives inside the cookie header as `token=<jwt>` on current
-      // builds; an authorization header is optional. Require at least one.
-      const cookieStr = h['cookie'] || ''
-      const hasTokenCookie = /(?:^|;\s*)token=[^;]+/.test(cookieStr)
-      if (!h['authorization'] && !hasTokenCookie) {
-        errors.push(
-          'token — cookie must contain a `token=<jwt>` value, or an authorization: Bearer header must be present',
-        )
-      }
-      if (!url.includes('/api/v2/chat/completions'))
-        errors.push('URL must contain /api/v2/chat/completions — wrong request copied')
-    }
-
-    return errors
+    const provider = registry.get(this.provider)
+    return provider?.validateFetch ? provider.validateFetch(parsedFetch) : []
   }
 
   async _validateLiveConnection(parsedFetch) {
-    const cfg = this._getProvider(parsedFetch, this.provider, { log: false })
-    const api = cfg.factory()
-    await cfg.init(api)
-
-    if (this.provider === 'deepseek') {
-      await api.getCurrentUser()
-      return
-    }
-
-    if (this.provider === 'claude') {
-      await api.getAccountProfile()
-      return
-    }
-
-    if (this.provider === 'chatgpt') {
-      await api.getMe()
-      return
-    }
-
-    if (this.provider === 'qwen') {
-      await api.getCurrentUser()
-    }
+    const provider = registry.get(this.provider)
+    const result = await provider.validateCredentials(parsedFetch || {})
+    if (!result.success) throw new Error(result.error)
   }
 
   _openBrowser(url) {
@@ -359,47 +240,21 @@ class SessionSelector {
 
     if (!username) return null
 
-    const PROVIDER_URLS = {
-      deepseek: 'https://chat.deepseek.com',
-      claude: 'https://claude.ai/new',
-      chatgpt: 'https://chatgpt.com',
-      qwen: 'https://chat.qwen.ai',
-    }
-
-    const providerUrl = PROVIDER_URLS[this.provider]
+    const provider = registry.get(this.provider)
+    const providerUrl = provider.setupSteps?.url
     if (providerUrl) {
       console.debug.mix(`\n  Opening ${text.blue(providerUrl)} in your browser...`)
       this._openBrowser(providerUrl)
     }
 
-    const PROVIDER_STEPS = {
-      deepseek: [
-        '  1. Open DevTools (F12) → Network tab',
-        '  2. Send any message on chat.deepseek.com',
-        `  3. Find a request to ${text.cyan('/api/v0/chat/completion')}`,
-        '  4. Right-click → Copy → Copy as fetch',
-      ],
-      claude: [
-        '  1. Open DevTools (F12) → Network tab',
-        '  2. Send any message on claude.ai',
-        `  3. Find a request to ${text.cyan('/api/organizations/.../completion')}`,
-        '  4. Right-click → Copy → Copy as fetch',
-      ],
-      chatgpt: [
-        '  1. Open DevTools (F12) → Network tab',
-        '  2. Send any message on chatgpt.com',
-        `  3. Find a request to ${text.cyan('/backend-api/f/conversation')}`,
-        '  4. Right-click → Copy → Copy as fetch',
-      ],
-      qwen: [
-        '  1. Open DevTools (F12) → Network tab',
-        '  2. Send any message on chat.qwen.ai',
-        `  3. Find a request to ${text.cyan('/api/v2/chat/completions')}`,
-        '  4. Right-click → Copy → Copy as fetch',
-      ],
+    const steps = []
+    if (provider.setupSteps) {
+      steps.push('  1. Open DevTools (F12) → Network tab')
+      steps.push('  2. Start a conversation')
+      steps.push(`  3. Find a request to ${text.cyan(provider.setupSteps.requestFilter)}`)
+      steps.push('  4. Right-click → Copy → Copy as fetch')
     }
 
-    const steps = PROVIDER_STEPS[this.provider] || []
     console.debug('\n  Paste the full fetch() call from browser DevTools:')
     steps.forEach((s) => console.debug.mix(s))
     console.debug('')
@@ -536,19 +391,12 @@ class SessionSelector {
       },
     ]
 
-    const MODEL_DESCRIPTIONS = {
-      claude: { 'claude-sonnet-4-6': 'recommended for tools' },
-      chatgpt: { auto: text.red('often forgets tools in Tools Mode') },
-      deepseek: { default: 'unified model (thinking + search + vision)' },
-      qwen: { 'qwen3.7-plus': 'recommended for tools', 'qwen3.7-max': 'larger model' },
-    }
-
-    const providerHash = MODEL_HASH[this.provider]
-    const modelEntries = Object.entries(providerHash?.models || {})
+    const providerDef = registry.get(this.provider)
+    const providerModels = providerDef?.models || {}
+    const modelEntries = Object.entries(providerModels.models || {})
 
     if (modelEntries.length > 0) {
-      const label = providerHash.title || this.provider
-      const descriptions = MODEL_DESCRIPTIONS[this.provider] || {}
+      const label = providerModels.title || providerDef.displayName || this.provider
       questions.push({
         type: 'select',
         name: 'model',
@@ -556,7 +404,7 @@ class SessionSelector {
         choices: modelEntries.map(([value, meta]) => ({
           title: meta.name,
           value,
-          description: descriptions[value],
+          description: meta.recommendedForTools ? 'recommended for tools' : undefined,
         })),
       })
     }
@@ -564,9 +412,8 @@ class SessionSelector {
     const answers = await prompts(questions, { onCancel: () => process.exit(0) })
     if (!answers.name) return null
 
-    // Derive vision from model metadata when available; fall back to per-provider defaults
-    const modelMeta = providerHash?.models?.[answers.model]
-    const vision = modelMeta?.vision ?? (this.provider === 'claude' || this.provider === 'chatgpt')
+    const modelMeta = providerModels.models?.[answers.model]
+    const vision = modelMeta?.vision ?? Boolean(providerDef.defaultVision)
 
     const newSession = {
       name: answers.name || defaultName,
@@ -663,43 +510,13 @@ class SessionSelector {
     return this._stepSessionSelection()
   }
 
-  _getProvider(parsedFetch, provider, options = {}) {
-    const providers = {
-      qwen: {
-        label: 'Qwen',
-        factory: () => new QwenAPI(options),
-        init: (api) => api.initializeFromJSON(parsedFetch || {}),
-      },
-      deepseek: {
-        label: 'DeepSeek',
-        factory: () => new DeepSeekAPI(options),
-        init: (api) => api.initializeFromJSON(parsedFetch || {}),
-      },
-      claude: {
-        label: 'Claude',
-        factory: () => new ClaudeAPI(options),
-        init: (api) => api.initializeFromJSON(parsedFetch || {}),
-      },
-      chatgpt: {
-        label: 'ChatGPT',
-        factory: () => new ChatGPTAPI(options),
-        init: (api) => api.initializeFromJSON(parsedFetch || {}),
-      },
-    }
-
-    const cfg = providers[provider]
-    if (!cfg) throw new Error(`Unknown provider: ${provider}`)
-    return cfg
-  }
-
   async _deleteProviderSessions() {
-    const cfg = this._getProvider(this.user.parsedFetch, this.provider, { log: false })
+    const provider = registry.get(this.provider)
+    const api = provider.createAPI({ log: false })
+    await api.initializeFromJSON(this.user.parsedFetch || {})
 
     const toDelete = this.user.sessions.filter((s) => s.chatSessionId)
     if (toDelete.length === 0) return
-
-    const api = cfg.factory()
-    await cfg.init(api)
 
     let deleted = 0
     process.stdout.write('\r                                      ')
@@ -825,6 +642,16 @@ class SessionSelector {
     }
   }
 
+  _formatResetTime(ts) {
+    const d = new Date(ts)
+    const now = new Date()
+    const sameDay =
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    return sameDay ? d.toLocaleTimeString() : d.toLocaleString()
+  }
+
   _formatTime(isoString) {
     if (!isoString) return 'never'
     try {
@@ -841,7 +668,8 @@ class SessionSelector {
 
   _modelName(provider, modelKey) {
     if (!modelKey) return ''
-    const meta = MODEL_HASH[provider]?.models?.[modelKey]
+    const providerDef = registry.get(provider)
+    const meta = providerDef?.models?.models?.[modelKey]
     return meta ? meta.name : modelKey
   }
 

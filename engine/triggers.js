@@ -105,6 +105,16 @@ function makeCoreToolsPassthrough() {
   }
 }
 
+function makeSummaryPassthrough() {
+  return ({ messages, index }) => {
+    messages.splice(index, 1, {
+      role: 'user',
+      content:
+        'Please write a concise but complete summary of this entire conversation — so it can be pasted into a fresh session to resume work seamlessly.',
+    })
+  }
+}
+
 /**
  * Fallback skill matcher for auto-registered MCP servers — called by
  * ToolCompiler.matchSkill when the leading trigger word isn't a static
@@ -186,6 +196,24 @@ const triggers = [
     get template() {
       return TEST_TEMPLATE.split('#{cwd}#').join(TEST_ROOT)
     },
+  },
+  {
+    trigger: '$summary',
+    template: '',
+    passthrough: true,
+    call: makeSummaryPassthrough(),
+  },
+  {
+    trigger: '$s',
+    template: '',
+    passthrough: true,
+    call: makeSummaryPassthrough(),
+  },
+  {
+    trigger: '$end',
+    template: '',
+    passthrough: true,
+    call: makeSummaryPassthrough(),
   },
 ]
 
