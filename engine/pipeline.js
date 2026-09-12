@@ -1,4 +1,4 @@
-const BPI = require('./bpi')
+const SYNTAX = require('./syntax')
 const ToolCompiler = require('./compiler')
 const { toOpenAIError } = require('../utils/errors')
 const {
@@ -73,7 +73,7 @@ function emitToolCalls(compiler, session, payloads, emit) {
   emit(delta)
 }
 
-const SAY = BPI.OPEN + 'say' + BPI.SEP + 'raw='
+const SAY = SYNTAX.OPEN + 'say' + SYNTAX.SEP + 'raw='
 
 class StreamPipeline {
   static setSSEHeaders(res) {
@@ -92,7 +92,7 @@ class StreamPipeline {
    *   this request as a real chat turn vs an ephemeral utility call
    *   (title-gen, tool-optimizer, etc.) via isRealChatSession. Ephemeral
    *   calls get a disposable session clone and rawMode=true (skips
-   *   instructions/skill/MCP-tag setup and the BPI tool-parser — see setup()
+   *   instructions/skill/MCP-tag setup and the block tool-parser — see setup()
    *   and scan()). Omit `messages` to always use the real session (e.g. for
    *   the title-gen short-circuit itself, which is already ephemeral by
    *   construction).
@@ -246,7 +246,7 @@ class StreamPipeline {
     this.emitAndEnd(`\n\n⚠ ${err.error.message}${err.error.action ? ' ' + err.error.action : ''}\n`)
   }
 
-  // ── BPI scanning ───────────────────────────────────────────────────────
+  // ── block scanning ───────────────────────────────────────────────────────
 
   scan(text) {
     if (this.rawMode) {
@@ -258,7 +258,7 @@ class StreamPipeline {
 
     while (true) {
       if (this.inTool) {
-        const closeIdx = this.buffer.indexOf(BPI.CLOSE)
+        const closeIdx = this.buffer.indexOf(SYNTAX.CLOSE)
         if (closeIdx === -1) {
           if (this.isSaying) {
             // Strip "raw=" once (first time it appears), then stream raw text.
@@ -290,7 +290,7 @@ class StreamPipeline {
       }
 
       if (this.toolStartFound) {
-        const pipeIdx = this.buffer.indexOf(BPI.SEP)
+        const pipeIdx = this.buffer.indexOf(SYNTAX.SEP)
         if (pipeIdx === -1) {
           if (this.buffer.length <= this._maxToolLen) return
           this.emitText(this.buffer)
@@ -320,7 +320,7 @@ class StreamPipeline {
         continue
       }
 
-      const startIdx = this.buffer.indexOf(BPI.OPEN)
+      const startIdx = this.buffer.indexOf(SYNTAX.OPEN)
       if (startIdx === -1) {
         if (this.buffer) this.lastChar = this.buffer[this.buffer.length - 1]
         this.emitText(this.buffer)
@@ -331,7 +331,7 @@ class StreamPipeline {
       const charBefore = startIdx > 0 ? this.buffer[startIdx - 1] : this.lastChar
       if (charBefore === '`') {
         this.emitText(this.buffer.slice(0, startIdx + 1))
-        this.lastChar = BPI.OPEN
+        this.lastChar = SYNTAX.OPEN
         this.buffer = this.buffer.slice(startIdx + 1)
         continue
       }
@@ -344,7 +344,7 @@ class StreamPipeline {
   }
 
   flush() {
-    if (this.inTool) this.scan(BPI.CLOSE)
+    if (this.inTool) this.scan(SYNTAX.CLOSE)
 
     emitToolCalls(this.compiler, this.session, this.toolBuffers, this.emit)
 

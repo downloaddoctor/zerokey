@@ -1,5 +1,5 @@
 /**
- * Extract declared param names from a bpi_syntax line, e.g.
+ * Extract declared param names from a block syntax line, e.g.
  * browser_click target={str} element={str} doubleClick={bool} -> ['target', 'element', 'doubleClick']
  *
  * @param {string} syntax
@@ -14,7 +14,7 @@ function extractValidKeys(syntax) {
  * Register MCP alias-map tools into the compiler's tool table and build
  * the inline grammar block used for prompt injection (e.g. via $browser).
  *
- * Alias-map format: { bpiName: [realName, bpiSyntaxLine] }
+ * Alias-map format: { toolName: [realName, syntaxLine] }
  *
  * @param {object} aliasMap - e.g. BROWSER_MCP from ./browser.js
  * @param {object} compilerTools - compiler.tools (mutated in-place)
@@ -23,9 +23,9 @@ function extractValidKeys(syntax) {
 function injectMcpAliases(aliasMap, compilerTools) {
   const grammarLines = []
 
-  for (const [bpiName, [realName, syntax]] of Object.entries(aliasMap)) {
-    if (!compilerTools[bpiName]) {
-      compilerTools[bpiName] = {
+  for (const [toolName, [realName, syntax]] of Object.entries(aliasMap)) {
+    if (!compilerTools[toolName]) {
+      compilerTools[toolName] = {
         _passthrough: true,
         _validKeys: new Set(extractValidKeys(syntax)),
         tool: realName,

@@ -33,7 +33,7 @@ OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, **ChatGPT**, and 
 > project's `AGENTS.md` (if present) for context. Built-in tools (`read`, `write`, `replace`,
 > `ls`, `mkdir`, `glob`, `grep`, `cmd`, `cmd_bg`, `cmd_poll`, `cmd_kill`, `fetch`, `errors`,
 > `todos_add`, `todos_set`, `ask`) and any MCP tools registered via `tools[]` in the request
-> work out of the box if enabled — see [MCP & Custom Skills](#mcp--custom-skills). If model stops using tools correctly, say: **"Use BPI only."**
+> work out of the box if enabled — see [MCP & Custom Skills](#mcp--custom-skills). If model stops using tools correctly, say: **"Use MHI only."**
 
 ## Contents
 
@@ -183,7 +183,7 @@ Full API reference: **[API.md](API.md)**
 
 ## MCP & Custom Skills
 
-ZeroKey's tool layer is extensible past the built-in BPI tools.
+ZeroKey's tool layer is extensible past the built-in MHI tools.
 
 - **MCP auto-registration** — tools named `mcp_<server>_<tool>` in the request's `tools[]` are
   auto-registered under a `$<server>` skill tag. No manual wiring required.
@@ -191,7 +191,7 @@ ZeroKey's tool layer is extensible past the built-in BPI tools.
 - **Inspect what's registered** — ask the agent `$mcp` to list currently registered MCP tags for
   the session, or `$mcp-dump` to dump the full alias map as JSON.
 - **Custom skills** — built-in skills (`$save`, `$test`, `$browser`, `$cwd`, `$mcp`, `$mcp-dump`)
-  are entries in `engine/triggers.js` — each is a trigger word plus a BPI template. Add a new
+  are entries in `engine/triggers.js` — each is a trigger word plus a MHI template. Add a new
   entry to teach the agent a new skill.
 - **Per-IDE tool grammar** — the same tool set compiles differently per IDE (VS Code, Terax,
   OpenCode) from one shared definition in `engine/tool-defs.js`.

@@ -1,4 +1,5 @@
 const fs = require('fs')
+const SYNTAX = require('./syntax')
 const path = require('path')
 const crypto = require('crypto')
 
@@ -6,17 +7,10 @@ const BASE_FILE = path.join(__dirname, 'instructions.md')
 const EXTRA_FILE = path.join(__dirname, 'skills-extra.md')
 
 const FORMAT_MANDATE = `<format_mandate>
-The ONLY valid tool-call format is a BPI block: open with ⟦, close with ⟧, params separated by ¦ with = joining key and value, no spaces around ¦ or =.
-NEVER emit XML tags, JSON tool calls, or function-call syntax as a means of invoking tools. Any tool invocation outside a BPI block is invalid and ignored.
-Every response consists of BPI block(s) only (max 6). No prose, no explanations, no text before or after blocks.
-To show raw text to the user, use ⟦say¦raw=...⟧
-If information is missing or ambiguous, use the ask block. Never guess.
-
-SELF-CHECK before every response - if ANY answer is no, you have forgotten the tools and must rewrite before sending:
-1. Did I use a real BPI block from bpi_list, not prose or a built-in tool?
-2. Is every block wrapped in ⟦ ... ⟧ with ¦ separators and no stray spaces?
-3. Is there zero text outside the blocks?
-4. If I need info, did I emit the ask block instead of asking in plain text?
+The ONLY valid format is a ${SYNTAX.NAME} block: open with ⟦, close with ⟧, params separated by ¦ with = joining key and value, no spaces around ¦ or =.
+Every response consists of ${SYNTAX.NAME} block(s) only (max 6). No prose, no explanations, no text before or after blocks.
+To show prose to the user, use ⟦say⟧
+If information is missing or ambiguous, use the ⟦ask⟧. Never guess.
 
 WRONG (all ignored):
   I will read the file now.
@@ -25,7 +19,6 @@ WRONG (all ignored):
 RIGHT:
   ⟦read¦path=/abs/file⟧
 
-If you drift to prose or built-in tool calls mid-conversation, the user may type $tools to re-inject this contract - comply immediately and resume emitting only BPI blocks.
 </format_mandate>`
 
 class Instructions {

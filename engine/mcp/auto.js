@@ -4,11 +4,11 @@
  * naming convention. Lets any MCP server exposed this way be triggered with
  * $<server> without a hand-written alias file. Tools that don't follow the
  * convention fall under a $native tag instead of being dropped, with their
- * bpi names prefixed 'native_' to avoid colliding with real inbuilt tools.
+ * tool names prefixed 'native_' to avoid colliding with real inbuilt tools.
  */
 
 const crypto = require('crypto')
-const BPI = require('../bpi')
+const SYNTAX = require('../syntax')
 
 /**
  * Hash a tools array (req.body.tools[]) deterministically, for cheap
@@ -28,11 +28,11 @@ function hashTools(tools) {
  * Group MCP tool schemas by server, inferred from the mcp_<server>_<toolname>
  * naming convention used to send MCP-bridged tools. Any tool that doesn't match
  * that convention is grouped under a 'native' key instead of being dropped —
- * its bpiName is prefixed with 'native_' so it can never collide with a real
+ * its toolName is prefixed with 'native_' so it can never collide with a real
  * inbuilt tool name once injected via injectMcpAliases.
  *
  * @param {Array} tools - req.body.tools[] (OpenAI-style function schemas)
- * @returns {Object<string, Array>} server -> array of { rawName, bpiName, tool }
+ * @returns {Object<string, Array>} server -> array of { rawName, toolName, tool }
  */
 function groupToolsByServer(tools) {
   const groups = {}
@@ -44,17 +44,17 @@ function groupToolsByServer(tools) {
     const match = /^mcp_([a-z0-9]+)_(.+)$/i.exec(rawName)
 
     const key = match ? match[1].toLowerCase() : 'native'
-    const bpiName = match ? match[2] : `native_${rawName}`
+    const toolName = match ? match[2] : `native_${rawName}`
 
     if (!groups[key]) groups[key] = []
-    groups[key].push({ rawName, bpiName, tool })
+    groups[key].push({ rawName, toolName, tool })
   }
 
   return groups
 }
 
 /**
- * Build a bpi_syntax param fragment from a JSON-schema tool definition,
+ * Build a block syntax param fragment from a JSON-schema tool definition,
  * e.g. "|target={str}(|element={str})?" from { target: required, element: optional }
  *
  * @param {object} tool
@@ -67,7 +67,7 @@ function buildParamSyntax(tool) {
 
   const entries = Object.entries(props)
   if (entries.length === 0) {
-    return BPI.SEP + 'call={true}'
+    return SYNTAX.SEP + 'call={true}'
   }
 
   return entries
@@ -81,7 +81,7 @@ function buildParamSyntax(tool) {
               ? 'json'
               : 'str'
       const hint = `${key}={${type}}`
-      return required.has(key) ? `${BPI.SEP}${hint}` : `(${BPI.SEP}${hint})?`
+      return required.has(key) ? `${SYNTAX.SEP}${hint}` : `(${SYNTAX.SEP}${hint})?`
     })
     .join('')
 }
@@ -103,11 +103,11 @@ function buildAutoAliasMaps(tools) {
   for (const [server, entries] of Object.entries(groups)) {
     const aliasMap = {}
 
-    for (const { rawName, bpiName, tool } of entries) {
+    for (const { rawName, toolName, tool } of entries) {
       const desc = tool.function?.description || tool.description || ''
       const paramSyntax = buildParamSyntax(tool)
       const suffix = desc ? ' - ' + desc : ''
-      aliasMap[bpiName] = [rawName, BPI.OPEN + bpiName + paramSyntax + BPI.CLOSE + suffix]
+      aliasMap[toolName] = [rawName, SYNTAX.OPEN + toolName + paramSyntax + SYNTAX.CLOSE + suffix]
     }
 
     result[`$${server}`] = aliasMap

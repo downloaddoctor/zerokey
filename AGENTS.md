@@ -27,10 +27,10 @@
    stream-handler.js # chatgptStreamHandler — SSE parsing, session-id tracking
    pow.js # ChatGPTProofOfWork — sentinel proof token decode/generate/solve
   engine/
-   bpi.js # BpiRegistry — global BPI block registry for tool-call emission (compile/parse/emit)
+   syntax.js # MhiRegistry — global MHI block registry for tool-call emission (compile/parse/emit)
    compiler.js # ToolCompiler — singleton per IDE×provider: uploadAndGetMessages, uploadAndFormatPrompt, uploadAndFormatPromptForRaw, buildPrompt, compile/parse/emit, matchSkill
    instructions.js # Instructions — lazy-loads instructions.md + skills-extra.md, hash for change detection
-   instructions.md # Base system prompt (agent rules, BPI syntax, execution model, output contract)
+   instructions.md # Base system prompt (agent rules, MHI syntax, execution model, output contract)
    pipeline.js # StreamPipeline — SSE stream head: scanning, emitting (incl. say-block prose), MCP injection, skill handling, error formatting
    skills-extra.md # Extra prompt appends (tool grammar, dynamic-tools listing)
    tool-defs.js # TOOLS — generic tool grammar + per-IDE mappings (vscode, terax, opencode), output shorteners
@@ -112,7 +112,7 @@
   new session (non-raw): setQwenInstructions → pipeline.haveInstructionsAPI = true (skips buildPrompt inlining)
  pipeline.js
   → engine/compiler (ToolCompiler)
-  → engine/bpi (BpiRegistry)
+  → engine/syntax (MhiRegistry)
   → engine/triggers (restoreMcpInjections, showAvailableMcpTags, handleSkill)
   → utils/errors (classifyError)
   → utils/session-classifier (isRealChatSession), utils/ephemeral-session (ephemeralSession)
@@ -140,7 +140,7 @@
    → toolCalling: registerAutoMcpServers → restoreMcpInjections → showAvailableMcpTags (new session) → compiler.uploadAndFormatPrompt (uploads attachments, skill check) → buildPrompt
   → acquireSlot (rate limit)
   → providerApi.chatCompletion → stream
-  → streamHandler → pipeline.scan (rawMode: emits text straight through, skips BPI tool-call parser; else BPI TOOL parsing, SSE chunk emission)
+  → streamHandler → pipeline.scan (rawMode: emits text straight through, skips MHI tool-call parser; else MHI TOOL parsing, SSE chunk emission)
   → pipeline.sendFinalChunk → activeSession.lastUsed updated (ephemeral clone never persisted to user.sessions) → pipeline.onFinalChunk fires if set
 
 ## SCHEMA
@@ -218,7 +218,7 @@
  pipeline.isNewSession, pipeline.toolCalling, pipeline.haveInstructionsAPI, pipeline.ephemeralMode set by StreamPipeline constructor; Claude sets haveInstructionsAPI=true
  Auto MCP registration: mcp_<server>_<tool> naming → $<server> tag, merged into MCP_ALIAS_MAPS
  StreamPipeline defers tool-call emission for terax/opencode (batched at flush), emits immediately for vscode; say block streams as plain text (raw= prefix stripped once, closer not emitted) instead of going to toolBuffers
- Rate limiter: 5 req/15s window per provider label; provider 429 → setProviderCooldown(label, ms) blocks all requests for that label until cooldown expires (default: time left until next UTC hour boundary, since ChatGPT's limit is hourly; overridable via body cooldown_ms/retry_after_ms or retry-after header)
+ Rate limiter: 15 req/60s window per provider label; provider 429 → setProviderCooldown(label, ms) blocks all requests for that label until cooldown expires (default: time left until next UTC hour boundary, since ChatGPT's limit is hourly; overridable via body cooldown_ms/retry_after_ms or retry-after header)
  ChatGPT 403 with "unusual activity" body text → device/IP flagged by Cloudflare (not a stale session); triggers 10 min setProviderCooldown('ChatGPT', ...), classified separately in errors.js (category device_flagged) from generic 401/403 session_expired
  server.js unhandled-error handler and all 4 stream handlers write via LogSaver (utils/log-saver.js, mkdir-p temp, size-rotation, optional beforeSave)
  Error log: temp/errors.log (1MB rotation); per-provider stream logs: temp/{deepseek,claude,chatgpt,qwen}-error.log (100KB rotation); stream entries carry reason, chatSessionId, parentMessageId, lastEventType, dataCount, producedOutput, finished, error:serializeError(e) — real thrown error's full field set, not a synthesized string
@@ -232,7 +232,7 @@
  New IDE: add entry in IDES_PROMPT_OPTIMIZER (tool-defs.js), add IDE name to VALID_IDES (server.js)
  New provider: add BUILDERS entry (chat-router.js), add to SessionSelector provider list + PROVIDER_URLS/PROVIDER_STEPS, add MODEL_HASH + REASONING entries (constants.js)
  New tool: add entry to TOOLS object (tool-defs.js), add per-IDE mapping
- New skill: add entry to triggers array (triggers.js), with trigger word + bpi template
+ New skill: add entry to triggers array (triggers.js), with trigger word + mhi template
  Stream pipeline: StreamPipeline owns the SSE lifecycle; ToolCompiler is a stateless service created by StreamPipeline
  MCP integration: tools with mcp_<server>_<tool> naming auto-register as $<server> skill tag
  Dynamic tools: passed via req.body.tools[], hashed per session for change detection

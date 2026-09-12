@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const SYNTAX = require('../engine/syntax')
 const { spawn } = require('child_process')
 
 const prompts = require('prompts')
@@ -525,7 +526,11 @@ class SessionSelector {
         name: 'toolCalling',
         message: 'Session mode',
         choices: [
-          { title: text.cyan('Tools Mode'), description: 'BPI agent — recommended', value: true },
+          {
+            title: text.cyan('Tools Mode'),
+            description: SYNTAX.NAME + ' agent — recommended',
+            value: true,
+          },
           { title: 'Raw Mode', description: 'Plain chat, no tools', value: false },
         ],
       },

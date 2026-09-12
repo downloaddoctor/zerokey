@@ -400,8 +400,8 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
    c. "message_limit" → check utilization (5h + 7d windows), if >= 90% delegates to route callback
    d. "message_stop" / "error" → sendFinalChunk or onError
 4. On rate limit (>= 90%): route callback requests a conversation summary from Claude,
-   emits an ask BPI with provider-switch options, sets waitUntil on userData,
-   then calls process.exit(0). On hard exceeded errors, emits ask BPI in SSE and exits.
+   emits an ask MHI with provider-switch options, sets waitUntil on userData,
+   then calls process.exit(0). On hard exceeded errors, emits ask MHI in SSE and exits.
    Switching Claude users requires restarting the server.
 ```
 
@@ -484,9 +484,9 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
 
 When either the 5h or 7d usage window reaches >= 90% utilization, the stream handler
 delegates to the route callback. The route requests a conversation summary from Claude,
-emits an ask BPI with provider-switch options, sets `waitUntil` on userData, then calls
+emits an ask MHI with provider-switch options, sets `waitUntil` on userData, then calls
 `process.exit(0)`. On hard exceeded errors (caught in the catch block), the route emits
-an ask BPI directly in the SSE stream and exits. `userData.waitUntil` / `waitReason` are
+an ask MHI directly in the SSE stream and exits. `userData.waitUntil` / `waitReason` are
 consulted at startup in `SessionSelector.select()` — blocked users show "(limit reached)"
 suffix and auto-switch to available users is offered.
 
@@ -672,7 +672,7 @@ Singleton per IDE×provider (cached in `ToolCompiler.objects`):
 
 - **`formatPrompt(messages, pipeline)`** → dispatches messages to role-specific handlers, handles file uploads via pipeline.upload, returns `{ prompt, skill }`
 - **`buildPrompt(userPrompt, pipeline)`** → prepends system instructions on new sessions (unless pipeline.haveInstructionsAPI)
-- **`compile(compactStr, session)`** → parses BPI compact string, emits IDE-specific tool call
+- **`compile(compactStr, session)`** → parses MHI compact string, emits IDE-specific tool call
 - **`parse(compactStr)`** → 3-part parser: tool name, key=value pairs, repeating array groups
 - **`emit(internal, session)`** → converts internal JSON to IDE-specific tool call format
 - **`matchSkill(text, raw)`** → static — O(1) trigger-word lookup with positional param substitution
@@ -682,7 +682,7 @@ Singleton per IDE×provider (cached in `ToolCompiler.objects`):
 Created per-request by routes — owns the SSE lifecycle:
 
 - **`setup(messages, tools, req)`** → restoreMcpInjections → formatPrompt → skill check → buildPrompt → showAvailableMcpTags
-- **`scan(text)`** → 3-state FSM (outside/toolStartFound/inTool) — parses BPI tool syntax, batches tool_calls on flush
+- **`scan(text)`** → 3-state FSM (outside/toolStartFound/inTool) — parses MHI tool syntax, batches tool_calls on flush
 - **`onError(error)`** → emits OpenAI-compatible error via stream
 - **`emitAndEnd(text)`** → scan + flush + stop + DONE
 

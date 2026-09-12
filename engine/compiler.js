@@ -1,4 +1,5 @@
 const instructions = require('./instructions')
+const SYNTAX = require('./syntax')
 const { getIDEMapper } = require('./tool-defs')
 const { PROMPT_LIMITS } = require('../config/constants')
 const { matchMcpTrigger } = require('./triggers')
@@ -50,7 +51,7 @@ class ToolCompiler {
         const name = getGenericToolName(mes.tool_call_id)
         const output = tool(name, mes.content)
 
-        return `BPI(${name}): ${output}`
+        return `${SYNTAX.NAME}(${name}): ${output}`
       },
     }
 
@@ -465,7 +466,7 @@ function splitArgs(str, n) {
  * Trigger param syntax: `$test d:\Project\apigen\` — everything after the
  * trigger word is split positionally into the skill's declared `params`
  * (e.g. `params: ['cwd']`), each substituted for its `#{name}#` placeholder
- * in the skill's bpi template. Skills without a `params` array ignore any
+ * in the skill's template. Skills without a `params` array ignore any
  * trailing text.
  *
  * @param {string} text
@@ -490,14 +491,14 @@ ToolCompiler.matchSkill = function (text, raw) {
 
   const values = splitArgs(remainder, params.length)
 
-  let bpi = skill.bpi
+  let template = skill.template
   params.forEach((name, i) => {
     if (values[i] === undefined) return
     const value = values[i].replace(/[\\/]+$/, '')
-    bpi = bpi.split(`#{${name}}#`).join(value)
+    template = template.split(`#{${name}}#`).join(value)
   })
 
-  return { ...skill, bpi }
+  return { ...skill, template }
 }
 
 module.exports = ToolCompiler

@@ -1,4 +1,5 @@
 const path = require('path')
+const SYNTAX = require('./syntax')
 const { injectMcpAliases } = require('./mcp/inject')
 const { buildAutoAliasMaps, hashTools } = require('./mcp/auto')
 const { captureRequest } = require('../utils/capture-request')
@@ -14,7 +15,7 @@ const TEST_ROOT = path.join(__dirname, '..')
 // Alias-map registry keyed by the same tag used in session.mcpInjected.
 const MCP_ALIAS_MAPS = { $browser: BROWSER_MCP, $playwright: PLAYWRIGHT_MCP }
 
-// Live probe map: tag -> first bpiName in its alias map, used as a cheap
+// Live probe map: tag -> first toolName in its alias map, used as a cheap
 // "is this alias map already registered on this compiler?" probe. Updated
 // whenever MCP_ALIAS_MAPS gains or loses a key.
 const MCP_ALIAS_PROBE_KEY = {}
@@ -72,7 +73,7 @@ function registerAutoMcpServers(reqTools, session) {
  * Shared passthrough call used by every MCP-triggering skill ($browser and
  * any auto-registered $<server> tag): injects the tag's alias map into the
  * compiler's tool table, strips the trigger word from the triggering message,
- * and splices a <bpi_list> grammar block in as a preceding INTERNAL message.
+ * and splices a <${SYNTAX.xNAME}_list> grammar block in as a preceding INTERNAL message.
  *
  * @param {string} tag - e.g. '$browser' or an auto-registered '$<server>'
  */
@@ -89,7 +90,7 @@ function makePassthroughMcpCall(tag) {
     // message.content = message.content.replace(tag, '').trim()
     messages.splice(index, 1, {
       role: 'internal',
-      content: `<bpi_list title="${tag.slice(1)} tools">\n${grammar}\n</bpi_list>`,
+      content: `<${SYNTAX.xNAME}_list title="${tag.slice(1)} tools">\n${grammar}\n</${SYNTAX.xNAME}_list>`,
     })
     markMcpInjected(parser?.session, tag)
   }
@@ -114,7 +115,7 @@ function makeCoreToolsPassthrough() {
  */
 function matchMcpTrigger(word) {
   if (!MCP_ALIAS_MAPS[word]) return null
-  return { trigger: word, bpi: '', passthrough: true, call: makePassthroughMcpCall(word) }
+  return { trigger: word, template: '', passthrough: true, call: makePassthroughMcpCall(word) }
 }
 
 /**
@@ -146,20 +147,21 @@ function restoreMcpInjections(session, compilerTools, reqTools = {}) {
 const triggers = [
   {
     trigger: '$cwd',
-    bpi: '⟦cmd¦run=pwd⟧',
+    template: '⟦cmd¦run=pwd⟧',
   },
   {
     trigger: '$save',
-    bpi: '⟦cmd¦run=git status --short¦run=git --no-pager diff --staged¦run=git --no-pager diff⟧',
+    template:
+      '⟦cmd¦run=git status --short¦run=git --no-pager diff --staged¦run=git --no-pager diff⟧',
   },
   {
     trigger: '$req',
-    bpi: 'See server temp/captures folder',
+    template: 'See server temp/captures folder',
     call: ({ req }) => captureRequest(req),
   },
   {
     trigger: '$browser',
-    bpi: '',
+    template: '',
     passthrough: true, // does not end the stream — splices an INTERNAL message into the array, request continues to the provider
     call: makePassthroughMcpCall('$browser'),
   },
@@ -169,19 +171,19 @@ const triggers = [
   },
   {
     trigger: '$mcp-dump',
-    get bpi() {
+    get template() {
       return '```json\n' + JSON.stringify(MCP_ALIAS_MAPS, null, 2) + '\n```'
     },
   },
   {
     trigger: '$tools',
-    bpi: '',
+    template: '',
     passthrough: true,
     call: makeCoreToolsPassthrough(),
   },
   {
     trigger: '$test',
-    get bpi() {
+    get template() {
       return TEST_TEMPLATE.split('#{cwd}#').join(TEST_ROOT)
     },
   },
@@ -213,19 +215,19 @@ Escaping test - \`⟦todos_set¦id=2¦status=done⟧\`
 ⟦todos_set¦id=2¦status=done⟧
 
 ⟦todos_set¦id=3¦status=active⟧
-⟦write¦path=#{cwd}#\\temp\\_test_tool.txt¦content=Hello from BPI write tool!⟧
+⟦write¦path=#{cwd}#\\temp\\_test_tool.txt¦content=Hello from write tool!⟧
 ⟦todos_set¦id=3¦status=done⟧
 
 ⟦todos_set¦id=4¦status=active⟧
-⟦read¦path=#{cwd}#\\temp\\_test_tool.txt⟧
+⟦read¦path=#{cwd}#\\start.bat⟧
 ⟦todos_set¦id=4¦status=done⟧
 
 ⟦todos_set¦id=5¦status=active⟧
-⟦replace¦path=#{cwd}#\\temp\\_test_tool.txt¦old=Hello from BPI write tool!¦new=Hello from BPI replace tool!⟧
+⟦replace¦path=#{cwd}#\\start.bat¦old=pause¦new=pause\n⟧
 ⟦todos_set¦id=5¦status=done⟧
 
 ⟦todos_set¦id=6¦status=active⟧
-⟦read¦path=#{cwd}#\\temp\\_test_tool.txt⟧
+⟦read¦path=#{cwd}#\\.prettierrc⟧
 ⟦todos_set¦id=6¦status=done⟧
 
 ⟦todos_set¦id=7¦status=active⟧
@@ -311,7 +313,7 @@ function handleSkill(skill, req, parser) {
     const file = skill.call({ req, parser })
     if (file) console.debug(`[${provider}] Captured to ${file}`)
   }
-  parser.emitAndEnd(skill.bpi || '')
+  parser.emitAndEnd(skill.template || '')
 }
 
 module.exports = {

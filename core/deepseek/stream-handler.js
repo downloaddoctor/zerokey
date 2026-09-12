@@ -32,7 +32,7 @@ const RETRY_REASONS = {
  *
  * THINK fragments are emitted as OpenAI-style `reasoning_content` deltas
  * (matching the Qwen handler); RESPONSE fragments go through `parser.scan`
- * so BPI tool-calls / raw text pass through the normal pipeline.
+ * so BLOCK tool-calls / raw text pass through the normal pipeline.
  *
  * Other event shapes:
  *   data: {"o":"SET","v":"FINISHED"}         → stream complete (legacy path)

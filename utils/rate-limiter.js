@@ -1,5 +1,5 @@
-const RATE_LIMIT = 5
-const RATE_WINDOW = 15_000
+const RATE_LIMIT = 15
+const RATE_WINDOW = 60_000
 
 // { [label]: { count, windowStart, cooldownUntil } }
 const _state = {}
@@ -12,7 +12,7 @@ const KNOWN_LABELS = new Set(['DeepSeek', 'Claude', 'ChatGPT', 'Qwen'])
 /**
  * Block all future acquires for `label` until `Date.now() + ms`.
  * Called by provider APIs when they receive a 429 from the upstream server.
- * The cooldown overrides the normal 5/15s window — all requests wait until
+ * The cooldown overrides the normal 15/60s window — all requests wait until
  * the cooldown expires, then the counter resets.
  */
 function setProviderCooldown(label, ms) {
