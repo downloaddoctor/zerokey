@@ -10,6 +10,14 @@ module.exports = {
   promptLimit,
   setupSteps,
   defaultVision: false,
+  waitPolicy: {
+    label: 'daily_limit',
+    userMessage: (username, resetsAt, mins) =>
+      `⚠  Account "${username}" hit its daily usage limit, resets at ${resetsAt} (~${mins} min).`,
+    allMessage: (soonestUser, resetsAt, mins) =>
+      `⚠ All Qwen accounts have hit their daily usage limit.\n` +
+      `    Soonest reset: "${soonestUser}" at ${resetsAt} (~${mins} min).`,
+  },
   createAPI: (options) => new QwenAPI(options),
   validateCredentials: async (parsedFetch) => {
     const api = new QwenAPI()

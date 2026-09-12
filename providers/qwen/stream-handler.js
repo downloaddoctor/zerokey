@@ -247,11 +247,14 @@ function streamHandler(stream, session, parser, retry) {
               streamHandler(newStream, session, parser, retry)
             })
             .catch((retryErr) => {
+              // retry() itself throws for hard failures (e.g. RateLimited —
+              // api.js now converts non-SSE 200 responses into a thrown
+              // error), so surface that via the normal error path instead
+              // of a generic retry-failed message.
               logIssue(`retry failed — ${retryErr?.message || retryErr}`, {
                 error: serializeError(retryErr),
               })
-              parser.emitText(`\n⚠ Retry failed: ${retryErr?.message || retryErr}\n`)
-              parser.sendFinalChunk()
+              parser.onError(retryErr)
             })
           return
         }

@@ -8,6 +8,21 @@ const { humanDelay } = require('../../utils/human-delay')
 
 const QWEN_AI_BASE = 'https://chat.qwen.ai'
 
+/**
+ * Qwen's RateLimited body carries `num` alongside a `template` string that
+ * says whether it means minutes or hours (wording varies), e.g.
+ * "...wait {{num}} hours..." vs "...wait {{num}} minutes...". Parse the
+ * unit from the template text rather than assuming, and return milliseconds.
+ * Defaults to minutes if the template doesn't mention a unit (safer
+ * under-estimate than assuming hours).
+ */
+function parseWaitMs(num, template) {
+  if (typeof num !== 'number') return null
+  const t = (template || '').toLowerCase()
+  if (t.includes('hour')) return num * 60 * 60 * 1000
+  return num * 60 * 1000
+}
+
 function uuid() {
   try {
     return crypto.randomUUID()
@@ -185,15 +200,75 @@ class QwenAPI {
     )
 
     if (!res.ok) {
-      const errText = await res.text().catch(() => '')
-      const err = new Error(`Qwen HTTP ${res.status}: ${errText.slice(0, 300)}`)
-      err.status = res.status
-      err.statusCode = res.status
+      throw await this._buildQwenError(res)
+    }
+
+    // Qwen sometimes returns HTTP 200 with a JSON error body instead of an
+    // SSE stream (e.g. daily RateLimited) — content-type won't be
+    // text/event-stream in that case, so sniff and convert to a thrown error.
+    const contentType = res.headers.get('content-type') || ''
+    if (!contentType.includes('text/event-stream')) {
+      const text = await res.text().catch(() => '')
+      let parsed = null
+      try {
+        parsed = JSON.parse(text)
+      } catch {
+        // not JSON either; fall through to a generic error below
+      }
+
+      const dataCode = parsed?.data?.code
+      const message = dataCode
+        ? `Qwen HTTP 200 (non-stream): ${dataCode} — ${parsed.data.details || ''}`.trim()
+        : `Qwen returned non-stream response: ${text.slice(0, 300)}`
+
+      const err = new Error(message)
+      err.status = 200
+      err.statusCode = 200
+      if (dataCode) {
+        err.code = dataCode
+        err.num = parsed.data.num
+        err.details = parsed.data.details
+        err.waitMs = parseWaitMs(parsed.data.num, parsed.data.template)
+      }
       throw err
     }
 
     this._captureResponseHeaders(res)
     return res.body
+  }
+
+  /**
+   * Parse a non-ok Qwen response body for the structured
+   * { success:false, data:{ code, details, num, template } } shape and
+   * attach the fields onto the thrown Error so utils/errors.js can classify
+   * it (e.g. code:'RateLimited' — daily quota). `waitMs` is derived from
+   * `num` + `template` (see parseWaitMs — unit varies between responses).
+   * Falls back to a plain text error if the body isn't JSON/doesn't match.
+   */
+  async _buildQwenError(res) {
+    const errText = await res.text().catch(() => '')
+    let parsed = null
+    try {
+      parsed = JSON.parse(errText)
+    } catch {
+      // not JSON, fall through to plain text error
+    }
+
+    const dataCode = parsed?.data?.code
+    const message = dataCode
+      ? `Qwen HTTP ${res.status}: ${dataCode} — ${parsed.data.details || ''}`.trim()
+      : `Qwen HTTP ${res.status}: ${errText.slice(0, 300)}`
+
+    const err = new Error(message)
+    err.status = res.status
+    err.statusCode = res.status
+    if (dataCode) {
+      err.code = dataCode
+      err.num = parsed.data.num
+      err.details = parsed.data.details
+      err.waitMs = parseWaitMs(parsed.data.num, parsed.data.template)
+    }
+    return err
   }
 
   async deleteSession(chatSessionId) {

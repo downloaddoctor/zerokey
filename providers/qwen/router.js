@@ -76,6 +76,11 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
 
       streamHandler(qwenStream, activeSession, pipeline, retry)
     } catch (error) {
+      if (error?.code === 'RateLimited' && userData) {
+        const waitMs = typeof error.waitMs === 'number' ? error.waitMs : 24 * 60 * 60 * 1000
+        userData.waitUntil = Date.now() + waitMs
+        userData.waitReason = 'daily_limit'
+      }
       return pipeline.onError(error)
     }
   })

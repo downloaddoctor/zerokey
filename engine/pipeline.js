@@ -241,7 +241,7 @@ class StreamPipeline {
    * @param {Error} error
    */
   onError(error) {
-    console.error(`[${this.provider}] Route error: ${error.message}`)
+    console.error(`[${this.provider}] Route error:\n`, error)
     const err = toOpenAIError(error, this.provider)
     this.emitAndEnd(`\n\n⚠ ${err.error.message}${err.error.action ? ' ' + err.error.action : ''}\n`)
   }

@@ -52,6 +52,42 @@ function classifyError(error, provider) {
     }
   }
 
+  // ── Chat session deleted server-side (Qwen) ─────────────
+  // The chat was removed upstream (e.g. cleaned up after a daily-limit hit,
+  // or expired). Restarting the server re-runs the session wizard and
+  // creates a fresh session, which is simpler and more reliable than an
+  // in-request auto-recreate.
+  if (error?.code === 'CHAT_NOT_FOUND') {
+    return {
+      category: 'session_expired',
+      message: `${provider} reports this chat session no longer exists.`,
+      action: 'Restart the server to start a fresh session.',
+      status: 404,
+    }
+  }
+
+  // ── Daily quota exhausted (Qwen) ────────────────────────
+  // Qwen returns { success:false, data:{ code:'RateLimited', num } } when
+  // the account's daily message allowance is used up — distinct from
+  // 'quota_limit' (temporary overload, retry soon). `waitMs` unit (minutes vs
+  // hours) is parsed from Qwen's template string — see providers/qwen/api.js.
+  if (error?.code === 'RateLimited') {
+    const waitMs = error?.waitMs
+    const waitLabel = waitMs
+      ? waitMs >= 60 * 60 * 1000
+        ? `~${Math.ceil(waitMs / 3600000)} hour${Math.ceil(waitMs / 3600000) === 1 ? '' : 's'}`
+        : `~${Math.ceil(waitMs / 60000)} minute${Math.ceil(waitMs / 60000) === 1 ? '' : 's'}`
+      : null
+    return {
+      category: 'daily_limit',
+      message: `${provider} daily usage limit reached.`,
+      action: waitLabel
+        ? `Wait ${waitLabel} before trying again, or switch to a different account in the startup wizard.`
+        : 'Wait before trying again tomorrow, or switch to a different account in the startup wizard.',
+      status: 429,
+    }
+  }
+
   // ── Provider quota/capacity exhausted ──────────────────
   // Qwen (and others) push an inline `error` frame with code 'quota_limit'
   // when the provider itself is overloaded — not a client-side rate limit,
