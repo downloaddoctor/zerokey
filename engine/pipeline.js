@@ -281,7 +281,7 @@ class StreamPipeline {
         this.inTool = false
         this.toolStartFound = false
 
-        if (this.isSaying) this.emitText(payload.slice(this.sayStripped ? 0 : SAY.length))
+        if (this.isSaying) this.emitText(payload.slice(this.sayStripped ? 0 : SAY.length, -1))
         else this.toolBuffers.push(payload)
 
         this.isSaying = false

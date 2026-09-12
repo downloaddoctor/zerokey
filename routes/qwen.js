@@ -64,7 +64,17 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
         { model: activeSession.model },
       )
 
-      streamHandler(qwenStream, activeSession, pipeline)
+      const retry = async () => {
+        await acquireSlot('Qwen', true)
+        return qwenApi.chatCompletion(
+          activeSession.chatSessionId,
+          prompt,
+          activeSession.parentMessageId,
+          { model: activeSession.model },
+        )
+      }
+
+      streamHandler(qwenStream, activeSession, pipeline, retry)
     } catch (error) {
       return pipeline.onError(error)
     }

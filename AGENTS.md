@@ -20,7 +20,7 @@
    pow.js # DeepSeekPOW — WASM-based proof-of-work solver
   qwen/
    api.js # QwenAPI — chat.qwen.ai client, session CRUD, bearer/cookie auth, file upload
-   stream-handler.js # streamHandler — Qwen SSE parsing (think / thinking_summary / answer phases), reasoning_content emission
+   stream-handler.js # streamHandler — Qwen SSE parsing (think / thinking_summary / answer phases), reasoning_content emission; tool-phase (web_search/web_extractor) status lines so client sees activity during tool rounds; auto-retries once on quota_limit inline error or on a zero-data-frame stream close; stop-reason logged to temp/qwen-stream-debug.log (100KB→5MB rotation)
    set-instructions.js # setQwenInstructions — writes ZeroKey prompt to POST /api/v2/users/user/settings/update personalization.instruction (hash-gated)
   chatgpt/
    api.js # ChatGPTAPI — sentinel refresh, conduit token, prepare flow, file upload (Azure blob)
@@ -57,6 +57,7 @@
   capture-request.js # captureRequest — dumps req.body to temp/captures/*.json ($req skill)
   ephemeral-session.js # ephemeralSession — clones session with chatSessionId/parentMessageId nulled, for ephemeral/utility calls
   sequential-queue.js # sequentialQueue — Express middleware serializing all requests through one app instance, one in flight at a time
+  human-delay.js # humanDelay — randomized delay (default 3-9s) used before DeepSeek session-create/chatCompletion calls
   session-classifier.js # isRealChatSession — per-IDE fingerprinted system-prompt prefix match; default-deny classifies non-matching system-first calls as ephemeral
   logger.js # console color wrappers (debug, info, success, warn, error)
   log-saver.js # LogSaver — rotating file logger (temp/<name>.log, size-based rotation, optional beforeSave); serializeError flattens Error → JSON (name/message/stack/status/statusCode/code/type/cause/cooldownMs + own props)
@@ -222,6 +223,9 @@
  ChatGPT 403 with "unusual activity" body text → device/IP flagged by Cloudflare (not a stale session); triggers 10 min setProviderCooldown('ChatGPT', ...), classified separately in errors.js (category device_flagged) from generic 401/403 session_expired
  server.js unhandled-error handler and all 4 stream handlers write via LogSaver (utils/log-saver.js, mkdir-p temp, size-rotation, optional beforeSave)
  Error log: temp/errors.log (1MB rotation); per-provider stream logs: temp/{deepseek,claude,chatgpt,qwen}-error.log (100KB rotation); stream entries carry reason, chatSessionId, parentMessageId, lastEventType, dataCount, producedOutput, finished, error:serializeError(e) — real thrown error's full field set, not a synthesized string
+ Qwen additionally logs to temp/qwen-stream-debug.log (5MB rotation): stop-reason only (per-frame raw dump currently disabled in code)
+ Qwen stream-handler accepts optional retry callback (routes/qwen.js supplies one): auto-retries once on RETRY_CODES inline error (quota_limit) or on a stream close with zero data frames; utils/errors.js classifies quota_limit as category provider_overloaded (status 503)
+ DeepSeek createChatSession/chatCompletion await utils/human-delay.js humanDelay() before firing, to randomize request timing
  DeepSeek stream-close reason distinguishes partial vs no output (producedOutput flag); ChatGPT [DONE] onDone is normal, not an error path
  Provider-error frames logged with raw payload alongside serialized error (Claude case 'error', Qwen data.error, DeepSeek data.type==='error')
  VS Code model sync writes to %APPDATA%/Code/User/chatLanguageModels.json

@@ -4,6 +4,7 @@ const nodeFetch = require('node-fetch')
 
 const { CookieJar } = require('../../utils/cookie-jar')
 const { DeepSeekPOW } = require('./pow')
+const { humanDelay } = require('../../utils/human-delay')
 
 class DeepSeekAPI {
   static BASE_URL = 'https://chat.deepseek.com/api/v0'
@@ -41,6 +42,7 @@ class DeepSeekAPI {
 
   async createChatSession() {
     try {
+      await humanDelay()
       const resp = await this._fetch(
         `${DeepSeekAPI.BASE_URL}/chat_session/create`,
         {
@@ -109,6 +111,7 @@ class DeepSeekAPI {
     modelType = null,
     refFileIds = [],
   ) {
+    await humanDelay()
     const challenge = await this._getPowChallenge()
     const powResponse = await this._powSolver.solveChallenge(challenge)
 

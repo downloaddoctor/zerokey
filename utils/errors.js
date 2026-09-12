@@ -52,6 +52,20 @@ function classifyError(error, provider) {
     }
   }
 
+  // ── Provider quota/capacity exhausted ──────────────────
+  // Qwen (and others) push an inline `error` frame with code 'quota_limit'
+  // when the provider itself is overloaded — not a client-side rate limit,
+  // not a bad request. Retrying later with the same account is the fix.
+  if (error?.code === 'quota_limit' || msg.includes('quota_limit') || msg.includes('high demand')) {
+    return {
+      category: 'provider_overloaded',
+      message: `${provider} is currently experiencing high demand and rejected the request (quota_limit).`,
+      action:
+        'Wait a bit and try again. This is on the provider side, not your account or request.',
+      status: 503,
+    }
+  }
+
   // ── Provider-stream inline error frame ─────────────────
   // Emitted by stream handlers when the provider pushes an `error` payload
   // mid-stream (bad model, quota, invalid param, etc.). Preserve the actual
