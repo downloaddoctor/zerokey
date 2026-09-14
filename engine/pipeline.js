@@ -1,6 +1,9 @@
 const SYNTAX = require('./syntax')
 const ToolCompiler = require('./compiler')
 const { toOpenAIError } = require('../utils/errors')
+const { LogSaver, serializeError } = require('../utils/log-saver')
+
+const routeErrorLog = new LogSaver({ name: 'errors', maxSize: 1024 * 1024 })
 const {
   restoreMcpInjections,
   showAvailableMcpTags,
@@ -241,7 +244,15 @@ class StreamPipeline {
    * @param {Error} error
    */
   onError(error) {
-    console.error(`[${this.provider}] Route error:\n`, error)
+    console.error(`[${this.provider}] Route error:\n`, error.message)
+    routeErrorLog.log({
+      ts: new Date().toISOString(),
+      provider: this.provider,
+      reason: 'route error',
+      chatSessionId: this.session?.chatSessionId,
+      model: this.session?.model,
+      error: serializeError(error),
+    })
     const err = toOpenAIError(error, this.provider)
     this.emitAndEnd(`\n\n⚠ ${err.error.message}${err.error.action ? ' ' + err.error.action : ''}\n`)
   }
