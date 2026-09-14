@@ -6,6 +6,11 @@ const { claudeStreamHandler } = require('./stream-handler')
 const { setClaudeInstructions } = require('./set-instructions')
 const { acquireSlot } = require('../../utils/rate-limiter')
 const { validateMessages } = require('../../utils/route-helpers')
+const { models, reasoning } = require('./config')
+
+const CLAUDE_MODELS = models.models
+const PROVIDER_REASONING_LABELS = reasoning.labels
+
 const claudeApi = new ClaudeAPI()
 
 async function buildClaudeRouter(parsedFetch, session, userData = null) {
@@ -15,7 +20,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
   const router = express.Router()
 
   router.post('/', async (req, res) => {
-    const { messages = [], tools, reasoning_effort: reasoningEffort = null } = req.body
+    const { messages = [], tools, reasoning_effort: rawReasoningEffort = null } = req.body
 
     if (!validateMessages(messages, res)) return
 
@@ -23,6 +28,16 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
     const pipeline = new StreamPipeline(res, session, 'claude', req.ide, messages)
     const activeSession = pipeline.session
     const model = activeSession.model
+
+    // Enforce per-model allowed reasoning modes; fall back to first allowed
+    const modelMeta = CLAUDE_MODELS[model] || {}
+    const allowedModes = modelMeta.reasoning || PROVIDER_REASONING_LABELS
+    let reasoningEffort = rawReasoningEffort
+    if (allowedModes.length === 0) {
+      reasoningEffort = null
+    } else if (rawReasoningEffort && !allowedModes.includes(rawReasoningEffort)) {
+      reasoningEffort = allowedModes[0]
+    }
 
     if (userData?.waitUntil && userData.waitUntil > Date.now()) {
       emitLimitResponse(
@@ -63,6 +78,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
         [],
         fileIds,
         reasoningEffort,
+        pipeline.ephemeralMode,
       )
 
       if (chatSessionId && !activeSession.chatSessionId) {

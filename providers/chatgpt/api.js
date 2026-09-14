@@ -5,6 +5,7 @@ const nodeFetch = require('node-fetch')
 
 const { ChatGPTProofOfWork } = require('./pow')
 const { CookieJar } = require('../../utils/cookie-jar')
+const { humanDelay } = require('../../utils/human-delay')
 
 /**
  * ChatGPT API Client
@@ -158,6 +159,7 @@ class ChatGPTAPI {
     model = 'auto',
     attachments = [],
   ) {
+    await humanDelay()
     if (!this._ready) throw new Error('Not initialized')
 
     const messageId = crypto.randomUUID()

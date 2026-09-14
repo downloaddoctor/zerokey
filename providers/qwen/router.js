@@ -6,6 +6,9 @@ const { streamHandler } = require('./stream-handler')
 const { setQwenInstructions } = require('./set-instructions')
 const { acquireSlot } = require('../../utils/rate-limiter')
 const { validateMessages } = require('../../utils/route-helpers')
+const { models } = require('./config')
+
+const QWEN_MODELS = models.models
 
 const qwenApi = new QwenAPI()
 
@@ -23,12 +26,22 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
   const router = express.Router()
 
   router.post('/', async (req, res) => {
-    const { messages = [], tools } = req.body
+    const { messages = [], tools, reasoning_effort: rawReasoningEffort = null } = req.body
     if (!validateMessages(messages, res)) return
 
     StreamPipeline.setSSEHeaders(res)
     const pipeline = new StreamPipeline(res, session, 'qwen', req.ide, messages)
     const activeSession = pipeline.session
+
+    // Enforce per-model allowed reasoning modes; fall back to first allowed
+    const modelMeta = QWEN_MODELS[activeSession.model] || QWEN_MODELS[session.model] || {}
+    const allowedModes = modelMeta.reasoning || []
+    let reasoningEffort = rawReasoningEffort
+    if (allowedModes.length === 0) {
+      reasoningEffort = null
+    } else if (!reasoningEffort || !allowedModes.includes(reasoningEffort)) {
+      reasoningEffort = allowedModes[0]
+    }
 
     if (pipeline.isNewSession && !pipeline.rawMode) {
       await setQwenInstructions(qwenApi, userData, pipeline.toolCalling)
@@ -61,7 +74,10 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
         activeSession.chatSessionId,
         prompt,
         activeSession.parentMessageId,
-        { model: activeSession.model },
+        {
+          model: activeSession.model,
+          reasoningEffort: reasoningEffort,
+        },
       )
 
       const retry = async () => {
@@ -70,11 +86,17 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
           activeSession.chatSessionId,
           prompt,
           activeSession.parentMessageId,
-          { model: activeSession.model },
+          {
+            model: activeSession.model,
+            reasoningEffort: reasoningEffort,
+          },
         )
       }
 
-      streamHandler(qwenStream, activeSession, pipeline, retry)
+      const onFinished = (responseId) => {
+        qwenApi.selectMessage(activeSession.chatSessionId, responseId).catch(() => {})
+      }
+      streamHandler(qwenStream, activeSession, pipeline, retry, onFinished)
     } catch (error) {
       if (error?.code === 'RateLimited' && userData) {
         const waitMs = typeof error.waitMs === 'number' ? error.waitMs : 24 * 60 * 60 * 1000

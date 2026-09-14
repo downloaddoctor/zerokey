@@ -8,7 +8,7 @@ const RETRY_CODES = {
   quota_limit: true,
 }
 
-function streamHandler(stream, session, parser, retry) {
+function streamHandler(stream, session, parser, retry, onFinished) {
   let responseId = ''
   let hasSentReasoningRole = false
   let summaryText = ''
@@ -65,6 +65,7 @@ function streamHandler(stream, session, parser, retry) {
     if (finished) return
     finished = true
     parser.sendFinalChunk()
+    if (onFinished && responseId) onFinished(responseId)
   }
 
   const extractSayText = (argsStr) => {

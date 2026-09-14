@@ -15,6 +15,7 @@ const models = {
       created: 1_772_736_000,
       context_length: 1_000_000,
       max_output_length: 65_536,
+      reasoning: ['Auto', 'Think', 'Fast'],
     },
     'qwen3.8-max': {
       id: 'qwen3.8-max',
@@ -23,6 +24,7 @@ const models = {
       created: 1_772_736_000,
       context_length: 1_000_000,
       max_output_length: 131_072,
+      reasoning: ['Auto', 'Think', 'Fast'],
     },
     'qwen3.7-max': {
       id: 'qwen3.7-max',
@@ -31,6 +33,7 @@ const models = {
       created: 1_772_736_000,
       context_length: 1_000_000,
       max_output_length: 81_920,
+      reasoning: ['Think', 'Fast'],
     },
     'qwen3.6-plus': {
       id: 'qwen3.6-plus',
@@ -39,6 +42,7 @@ const models = {
       created: 1_772_736_000,
       context_length: 1_000_000,
       max_output_length: 65_536,
+      reasoning: ['Auto', 'Think', 'Fast'],
     },
     'qwen3.5-plus': {
       id: 'qwen3.5-plus',
@@ -47,6 +51,7 @@ const models = {
       created: 1_772_736_000,
       context_length: 1_000_000,
       max_output_length: 65_536,
+      reasoning: ['Auto', 'Think', 'Fast'],
     },
     'qwen3.5-omni-plus': {
       id: 'qwen3.5-omni-plus',
@@ -55,13 +60,35 @@ const models = {
       created: 1_772_736_000,
       context_length: 262_144,
       max_output_length: 65_536,
+      reasoning: [],
     },
   },
 }
 
 const reasoning = {
-  labels: [],
-  map: {},
+  labels: ['Auto', 'Think', 'Fast'],
+  map: {
+    Auto: {
+      thinking_enabled: true,
+      auto_thinking: true,
+      thinking_mode: 'Auto',
+      thinking_format: 'summary',
+      auto_search: true,
+    },
+    Think: {
+      thinking_enabled: true,
+      auto_thinking: false,
+      thinking_mode: 'Thinking',
+      thinking_format: 'summary',
+      auto_search: true,
+    },
+    Fast: {
+      thinking_enabled: false,
+      auto_thinking: false,
+      thinking_mode: 'Fast',
+      auto_search: true,
+    },
+  },
 }
 
 const promptLimit = 128_000

@@ -31,6 +31,7 @@ const models = {
       created: 1_772_736_000,
       context_length: 200_000,
       max_output_length: 64_000,
+      reasoning: ['No Think', 'Think'],
     },
   },
 }
@@ -38,6 +39,7 @@ const models = {
 const reasoning = {
   labels: ['Low', 'Low Think', 'Medium', 'Medium Think', 'High', 'High Think', 'Max', 'Max Think'],
   map: {
+    Off: { think: false },
     Low: { think: false, tier: 'low' },
     'Low Think': { think: true, tier: 'low' },
     Medium: { think: false, tier: 'medium' },
@@ -46,6 +48,9 @@ const reasoning = {
     'High Think': { think: true, tier: 'high' },
     Max: { think: false, tier: 'max' },
     'Max Think': { think: true, tier: 'max' },
+    // Haiku: extended thinking only, no tier budget
+    Think: { think: true, extended: true },
+    'No Think': { think: false, extended: false },
   },
 }
 

@@ -65,7 +65,7 @@
   capture-request.js # captureRequest — dumps req.body to temp/captures/*.json ($req skill)
   ephemeral-session.js # ephemeralSession — clones session with chatSessionId/parentMessageId nulled, for ephemeral/utility calls
   sequential-queue.js # sequentialQueue — Express middleware serializing all requests through one app instance, one in flight at a time
-  human-delay.js # humanDelay — randomized delay (default 3-9s) used before DeepSeek session-create/chatCompletion calls; → utils/logger (tickWait)
+  human-delay.js # humanDelay — randomized delay (default 3-9s) used before every provider chatCompletion and session-create call where applicable; → utils/logger (tickWait)
   session-classifier.js # isRealChatSession — per-IDE fingerprinted system-prompt prefix match; default-deny classifies non-matching system-first calls as ephemeral
   logger.js # console color wrappers (debug, info, success, warn, error); tickWait(label,ms) — shared \r countdown display, returns stop fn
   log-saver.js # LogSaver — rotating file logger (temp/<name>.log, size-based rotation, optional beforeSave); serializeError flattens Error → JSON (name/message/stack/status/statusCode/code/type/cause/cooldownMs + own props)
@@ -203,7 +203,11 @@
  qwen/config.js models mirrors live chat.qwen.ai /api/v2/models list (6 models); vision flags taken from meta.capabilities.vision; max_output_length maps to meta.max_summary_generation_length (thinking length for qwen3.7-max which lacks summary)
  Qwen auth via cookie `token=<jwt>` (authorization Bearer optional); session auth validated by throwaway chat create+delete in QwenAPI.getCurrentUser()
  Qwen custom instructions written server-side via POST /api/v2/users/user/settings/update (personalization.instruction), hash-gated; routes/qwen.js sets haveInstructionsAPI=true on new sessions
- No API keys — all auth via browser session cookies captured from DevTools fetch()
+Qwen reasoning: labels ['Auto','Think','Fast'] (providers/qwen/config.js); REASONING_MAP O(1) lookup maps to feature_config (thinking_enabled, auto_thinking, thinking_mode, thinking_format, auto_search); Fast mode omits thinking_format field; reasoningEffort passed from req.body.reasoning_effort; per-model restrictions: qwen3.7-max ['Think','Fast'] (no Auto), qwen3.5-omni-plus [] (no reasoning), all others ['Auto','Think','Fast']; unsupported reasoningEffort falls back to first allowed mode
+Qwen selectMessage: POST /api/v2/chats/:chatId/messages/select called after each stream finishes (onFinished callback in stream-handler); marks selected response branch server-side; non-critical, failures silently ignored
+Claude reasoning: provider-level labels ['Low'..'Max Think'] (8 tiers); Haiku override reasoning:['No Think','Think'] → thinking_mode:'extended'|'off', no effort tier; other models fall back to provider labels; per-model enforcement in router same pattern as Qwen
+sync-ide-config.js reasoning: reads modelConfig.reasoning first (per-model), falls back to providerDef.reasoning.labels; supportsThinking = supportsReasoning (any provider with reasoning gets thinking:true in VS Code entry)
+No API keys — all auth via browser session cookies captured from DevTools fetch()
  SessionSelector parses browser "Copy as fetch" string; TUI menu: saved users + Create + Delete (__delete__ → confirm → provider session cleanup → _removeUser); users.json atomic write via .tmp + rename
  ToolCompiler is a singleton per IDE×provider (cached in ToolCompiler.objects)
  Session state (chatSessionId, parentMessageId, lastUsed, todos) is mutated in-memory; persisted to users.json only on shutdown via selector.flush()

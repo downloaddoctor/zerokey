@@ -5,6 +5,10 @@ const nodeFetch = require('node-fetch')
 
 const { CookieJar } = require('../../utils/cookie-jar')
 const { humanDelay } = require('../../utils/human-delay')
+const { reasoning } = require('./config')
+
+// O(1) reasoning_effort → feature_config lookup
+const QWEN_REASONING_MAP = reasoning.map
 
 const QWEN_AI_BASE = 'https://chat.qwen.ai'
 
@@ -123,6 +127,7 @@ class QwenAPI {
   async chatCompletion(chatSessionId, prompt, parentMessageId = null, options = {}) {
     await humanDelay()
     const modelId = options.model || 'qwen3.7-plus'
+    const reasoningEffort = options.reasoningEffort || 'Auto'
 
     if (this._log) {
       console.debug('[PROMPT] REQ', {
@@ -130,6 +135,7 @@ class QwenAPI {
         parentMessageId,
         prompt,
         promptLength: prompt.length,
+        reasoningEffort,
       })
     }
 
@@ -137,19 +143,17 @@ class QwenAPI {
     const childId = uuid()
     const ts = Math.floor(Date.now() / 1000)
 
-    const modelLower = String(modelId).toLowerCase()
-    const enableThinking = options.enableThinking ?? true
-    const enableSearch = options.enableSearch ?? true
-    void modelLower
+    // Get reasoning config from map, fallback to Auto
+    const reasoningConfig = QWEN_REASONING_MAP[reasoningEffort] || QWEN_REASONING_MAP.Auto
 
     const featureConfig = {
-      thinking_enabled: enableThinking,
+      thinking_enabled: reasoningConfig.thinking_enabled,
       output_schema: 'phase',
       research_mode: 'normal',
-      auto_thinking: enableThinking,
-      thinking_mode: 'Auto',
-      thinking_format: 'summary',
-      auto_search: enableSearch,
+      auto_thinking: reasoningConfig.auto_thinking,
+      thinking_mode: reasoningConfig.thinking_mode,
+      ...(reasoningConfig.thinking_format && { thinking_format: reasoningConfig.thinking_format }),
+      auto_search: reasoningConfig.auto_search,
     }
 
     const payload = {
@@ -269,6 +273,23 @@ class QwenAPI {
       err.waitMs = parseWaitMs(parsed.data.num, parsed.data.template)
     }
     return err
+  }
+
+  async selectMessage(chatSessionId, responseId) {
+    if (!chatSessionId || !responseId) return
+    try {
+      await this._fetch(
+        `${QWEN_AI_BASE}/api/v2/chats/${chatSessionId}/messages/select`,
+        {
+          method: 'POST',
+          headers: this._buildHeaders({ accept: 'application/json, text/plain, */*' }),
+          body: JSON.stringify({ ids: [responseId] }),
+        },
+        false,
+      )
+    } catch {
+      // non-critical — ignore failures
+    }
   }
 
   async deleteSession(chatSessionId) {

@@ -2,6 +2,7 @@ const crypto = require('crypto')
 
 const { BaseAPI } = require('../base/BaseAPI')
 const { reasoning } = require('./config')
+const { humanDelay } = require('../../utils/human-delay')
 
 // O(1) reasoning_effort → { think, tier } lookup.
 // Keys are the exact labels VS Code advertises (utils/sync-ide-config.js).
@@ -120,7 +121,9 @@ class ClaudeAPI extends BaseAPI {
     tools = [],
     fileIds = [],
     reasoningEffort = null,
+    isEphemeral = false,
   ) {
+    await humanDelay()
     if (!this._orgId) throw new Error('Organization ID not set')
 
     // Generate conversation UUID for new conversations (client-side pregen)
@@ -135,7 +138,7 @@ class ClaudeAPI extends BaseAPI {
       prompt,
       timezone: this._body.timezone,
       locale: this._body.locale,
-      model,
+      model: isEphemeral ? 'claude-haiku-4-5-20251001' : model,
       tools,
       turn_message_uuids: {
         human_message_uuid: humanMessageUuid,
@@ -153,10 +156,15 @@ class ClaudeAPI extends BaseAPI {
     // directly: a "<Tier> Think" label enables thinking, a bare tier disables
     // it. O(1) lookup keyed by the exact labels VS Code advertises
     // (utils/sync-ide-config.js); anything not mapped disables thinking.
-    const effort = REASONING_MAP[reasoningEffort]
+    const effort = isEphemeral ? REASONING_MAP.Off : REASONING_MAP[reasoningEffort]
     if (effort) {
-      body.thinking_mode = effort.think ? 'auto' : 'off'
-      if (effort.tier) body.effort = effort.tier
+      if (effort.extended) {
+        // Haiku: uses thinking_mode:'extended', no effort tier
+        body.thinking_mode = effort.think ? 'extended' : 'off'
+      } else {
+        body.thinking_mode = effort.think ? 'auto' : 'off'
+        if (effort.tier) body.effort = effort.tier
+      }
     } else {
       body.thinking_mode = 'off'
     }
@@ -168,11 +176,11 @@ class ClaudeAPI extends BaseAPI {
       body.create_conversation_params = {
         name: '',
         model,
-        include_conversation_preferences: true,
+        include_conversation_preferences: !isEphemeral,
         paprika_mode: null,
         compass_mode: null,
         tool_search_mode: 'off',
-        is_temporary: false,
+        is_temporary: isEphemeral,
         enabled_imagine: false,
       }
     }

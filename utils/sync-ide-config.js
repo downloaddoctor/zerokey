@@ -105,10 +105,19 @@ async function syncIdeConfig(preSelected, port) {
         }
       }
 
-      const supportsReasoning = ['claude', 'deepseek'].includes(preSelected.provider)
-      const supportsThinking = preSelected.provider === 'claude'
+      const providerName = preSelected.provider
+      const modelId = preSelected.session.model
 
-      const reasoningEfforts = registry.get(preSelected.provider)?.reasoning?.labels
+      // Resolve reasoning labels: prefer per-model override, fall back to provider-level labels
+      const providerDef = registry.get(providerName)
+      const modelConfig = providerDef?.models?.models?.[modelId]
+      const perModelReasoning = modelConfig?.reasoning
+      const reasoningEfforts = Array.isArray(perModelReasoning)
+        ? perModelReasoning
+        : providerDef?.reasoning?.labels || []
+      const supportsReasoning = reasoningEfforts.length > 0
+
+      const supportsThinking = supportsReasoning
       const existingModel = zeroKeyEntry.models.find((m) => m.id === targetId)
       if (existingModel) {
         existingModel.name = modelName
