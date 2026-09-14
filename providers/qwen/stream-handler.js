@@ -211,13 +211,7 @@ function streamHandler(stream, session, parser, retry, onFinished) {
       }
 
       if (status === 'finished') {
-        streamDebugLog.log({
-          ts: new Date().toISOString(),
-          chatSessionId: session.chatSessionId,
-          dataCount,
-          stopReason: 'finished status received (normal completion)',
-        })
-        finish()
+        finished = true
       }
     }
   }
@@ -226,10 +220,15 @@ function streamHandler(stream, session, parser, retry, onFinished) {
     onData,
     onDone: () => {
       if (!finished) {
+        // Stream closed by the server — the normal completion path. Qwen
+        // emits all trailing frames (usage, response.completed, branch
+        // metadata) before closing, so by the time we reach onDone the
+        // upstream turn is truly over. Now it is safe to send our final
+        // chunk and fire onFinished (selectMessage).
         const noOutput = !producedOutput
-        const stopReason = noOutput
-          ? 'stream closed without finished status (no output)'
-          : 'stream closed without finished status (partial output)'
+        const stopReason = producedOutput
+          ? 'stream closed by upstream (normal completion)'
+          : 'stream closed without any output'
         logIssue(stopReason)
         streamDebugLog.log({
           ts: new Date().toISOString(),
@@ -255,7 +254,15 @@ function streamHandler(stream, session, parser, retry, onFinished) {
               logIssue(`retry failed — ${retryErr?.message || retryErr}`, {
                 error: serializeError(retryErr),
               })
-              parser.onError(retryErr)
+              parser.onError(retryErr, {
+                source: 'stream',
+                detail: `retry failed — ${retryErr?.message || retryErr}`,
+                finished,
+                lastEventType,
+                dataCount,
+                producedOutput,
+                responseId,
+              })
             })
           return
         }
@@ -266,18 +273,15 @@ function streamHandler(stream, session, parser, retry, onFinished) {
       }
       finish()
     },
-    onError: (e) => {
-      if (finished) return
-      finished = true
-      logIssue(`read error — ${e?.message || e}`, { error: serializeError(e) })
-      streamDebugLog.log({
-        ts: new Date().toISOString(),
-        chatSessionId: session.chatSessionId,
+    onError: (e) =>
+      parser.onError(e, {
+        source: 'stream',
+        finished,
+        lastEventType,
         dataCount,
-        stopReason: `read error — ${e?.message || e}`,
-      })
-      parser.onError(e)
-    },
+        producedOutput,
+        responseId,
+      }),
   })
 }
 

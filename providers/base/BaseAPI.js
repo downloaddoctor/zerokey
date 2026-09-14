@@ -51,7 +51,7 @@ class BaseAPI {
     return h
   }
 
-  async _fetch(url, options = {}, parseJSON = false, timeoutMs = 300_000) {
+  async _fetch(url, options = {}, parseJSON = false, timeoutMs = 300000) {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs)
 

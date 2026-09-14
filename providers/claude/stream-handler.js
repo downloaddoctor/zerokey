@@ -1,7 +1,4 @@
 const { readSSE } = require('../../utils/sse-reader')
-const { LogSaver, serializeError } = require('../../utils/log-saver')
-
-const streamLog = new LogSaver({ name: 'claude-error' })
 
 /**
  * @param {object} w - window object from Claude API { utilization, resets_at }
@@ -48,21 +45,6 @@ async function claudeStreamHandler(stream, session, parser, cb) {
   // content_block_delta{delta:{type:"thinking_delta"}}. Mirror Qwen/DeepSeek:
   // open the reasoning channel once, then stream reasoning_content deltas.
   let hasSentReasoningRole = false
-
-  const logIssue = (reason, extra = {}) => {
-    streamLog.log({
-      ts: new Date().toISOString(),
-      reason,
-      chatSessionId: session.chatSessionId,
-      parentMessageId: session.parentMessageId,
-      lastEventType,
-      dataCount,
-      producedOutput,
-      hasSentReasoningRole,
-      finished,
-      ...extra,
-    })
-  }
 
   const emitReasoning = (delta) => {
     if (!delta) return
@@ -128,32 +110,23 @@ async function claudeStreamHandler(stream, session, parser, cb) {
           }
           break
         }
-        case 'error': {
-          const err = parsed.error || {}
-          finished = true
-          logIssue(`provider error — ${err.message || err.type || 'unknown'}`, {
-            error: serializeError(err),
-            raw: parsed,
-          })
-          parser.onError({ message: err.message, type: err.type })
-          break
-        }
       }
     },
     onDone: () => {
-      if (finished) return
-      logIssue(
-        producedOutput
-          ? 'stream closed without message_stop (partial output)'
-          : 'stream closed without message_stop (no output)',
-      )
+      if (!finished) {
+        parser.emitText(`\n\n⚠ Claude stream closed before message_stop.\n`)
+      }
+      parser.sendFinalChunk()
     },
-    onError: (e) => {
-      if (finished) return
-      finished = true
-      logIssue(`read error — ${e?.message || e}`, { error: serializeError(e) })
-      parser.onError(e)
-    },
+    onError: (e) =>
+      parser.onError(e, {
+        source: 'stream',
+        finished,
+        lastEventType,
+        dataCount,
+        producedOutput,
+        hasSentReasoningRole,
+      }),
   })
 
   if (limitReached && cb) {

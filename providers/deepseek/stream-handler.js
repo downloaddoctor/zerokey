@@ -129,7 +129,6 @@ function streamHandler(stream, session, parser, retry) {
     if (data.o === 'SET') {
       if (data.v === 'FINISHED') {
         finished = true
-        parser.sendFinalChunk()
       }
       return
     }
@@ -184,7 +183,10 @@ function streamHandler(stream, session, parser, retry) {
 
   const onDone = () => {
     if (cancelled) return
-    if (finished) return
+    if (finished) {
+      parser.sendFinalChunk()
+      return
+    }
     doRetry(
       producedOutput
         ? 'stream closed unexpectedly (partial output)'
@@ -195,20 +197,15 @@ function streamHandler(stream, session, parser, retry) {
   readSSE(stream, {
     onData,
     onDone,
-    onError: (e) => {
-      streamLog.log({
-        ts: new Date().toISOString(),
-        reason: `read error — ${e?.message || e}`,
-        chatSessionId: session.chatSessionId,
-        parentMessageId: session.parentMessageId,
-        currentFragmentType,
+    onError: (e) =>
+      parser.onError(e, {
+        source: 'stream',
+        finished,
         lastEventType,
         dataCount,
         producedOutput,
-        error: serializeError(e),
-      })
-      parser.onError(e)
-    },
+        currentFragmentType,
+      }),
   })
 }
 

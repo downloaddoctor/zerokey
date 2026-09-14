@@ -243,16 +243,38 @@ class StreamPipeline {
    * Emit an error through the stream in OpenAI-compatible format.
    * @param {Error} error
    */
-  onError(error) {
-    console.error(`[${this.provider}] Route error:\n`, error.message)
+  onError(error, ctx = {}) {
+    const source = ctx.source || 'route'
+    const responseClosed = this._finished
+    const contentComplete = !!ctx.finished
+    const detail = ctx.detail || error?.message || String(error)
+
+    const reason = responseClosed
+      ? `post-finalization ${source} error — ${detail}`
+      : contentComplete
+        ? `post-completion ${source} error — ${detail}`
+        : `${source} error — ${detail}`
+
     routeErrorLog.log({
       ts: new Date().toISOString(),
       provider: this.provider,
-      reason: 'route error',
+      reason,
       chatSessionId: this.session?.chatSessionId,
+      parentMessageId: this.session?.parentMessageId,
       model: this.session?.model,
+      lastEventType: ctx.lastEventType,
+      dataCount: ctx.dataCount,
+      producedOutput: ctx.producedOutput,
+      currentFragmentType: ctx.currentFragmentType,
+      hasSentReasoningRole: ctx.hasSentReasoningRole,
+      responseId: ctx.responseId,
       error: serializeError(error),
     })
+
+    if (responseClosed || contentComplete) return
+
+    this._finished = true
+    console.error(`[${this.provider}] ${source} error:\n`, error.message)
     const err = toOpenAIError(error, this.provider)
     this.emitAndEnd(`\n\n⚠ ${err.error.message}${err.error.action ? ' ' + err.error.action : ''}\n`)
   }

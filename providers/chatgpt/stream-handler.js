@@ -1,7 +1,4 @@
 const { readSSE } = require('../../utils/sse-reader')
-const { LogSaver, serializeError } = require('../../utils/log-saver')
-
-const streamLog = new LogSaver({ name: 'chatgpt-error' })
 
 /**
  * ChatGPT SSE Stream Handler
@@ -21,20 +18,6 @@ async function chatgptStreamHandler(stream, session, parser) {
   let producedOutput = false
   let lastEventType = null
 
-  const logIssue = (reason, extra = {}) => {
-    streamLog.log({
-      ts: new Date().toISOString(),
-      reason,
-      chatSessionId: session.chatSessionId,
-      parentMessageId: session.parentMessageId,
-      lastEventType,
-      dataCount,
-      producedOutput,
-      finished,
-      ...extra,
-    })
-  }
-
   const onData = (data) => {
     if (!data) return
     dataCount++
@@ -47,7 +30,6 @@ async function chatgptStreamHandler(stream, session, parser) {
     if (data.type === 'message_stream_complete') {
       finished = true
       session.chatSessionId = data.conversation_id
-      parser.sendFinalChunk()
       return
     }
     if (data.type === 'resume_conversation_token' && data.conversation_id) {
@@ -76,7 +58,6 @@ async function chatgptStreamHandler(stream, session, parser) {
         }
         if (op.p === '/message/status' && op.o === 'replace' && op.v === 'finished_successfully') {
           finished = true
-          parser.sendFinalChunk()
         }
       }
     }
@@ -84,18 +65,15 @@ async function chatgptStreamHandler(stream, session, parser) {
 
   await readSSE(stream, {
     onData,
-    // ChatGPT closes normally on [DONE] (which readSSE routes here) even when
-    // no explicit finish marker arrives, so onDone is NOT an error path here.
-    onDone: () => {
-      finished = true
-      parser.sendFinalChunk()
-    },
-    onError: (e) => {
-      if (finished) return
-      finished = true
-      logIssue(`read error — ${e?.message || e}`, { error: serializeError(e) })
-      parser.onError(e)
-    },
+    onDone: () => parser.sendFinalChunk(),
+    onError: (e) =>
+      parser.onError(e, {
+        source: 'stream',
+        finished,
+        lastEventType,
+        dataCount,
+        producedOutput,
+      }),
   })
 }
 
