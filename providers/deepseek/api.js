@@ -70,6 +70,44 @@ class DeepSeekAPI extends BaseAPI {
     }
   }
 
+  async warmupSession(chatSessionId) {
+    // Fire a unique math prompt to prime the session naturally before the real
+    // system/build prompt arrives on the second turn. Each session gets a
+    // different expression so the opening message is never identical.
+    const ops = [
+      () => {
+        const a = Math.floor(Math.random() * 900) + 100
+        const b = Math.floor(Math.random() * 900) + 100
+        return `What is ${a} + ${b}?`
+      },
+      () => {
+        const a = Math.floor(Math.random() * 900) + 100
+        const b = Math.floor(Math.random() * 90) + 10
+        return `What is ${a} - ${b}?`
+      },
+      () => {
+        const a = Math.floor(Math.random() * 90) + 10
+        const b = Math.floor(Math.random() * 90) + 10
+        return `What is ${a} × ${b}?`
+      },
+      () => {
+        const a = Math.floor(Math.random() * 900) + 100
+        const b = [2, 3, 4, 5, 6, 7, 8, 9][Math.floor(Math.random() * 8)]
+        return `What is ${a} ÷ ${b}? (round to 2 decimal places)`
+      },
+    ]
+    const prompt = ops[Math.floor(Math.random() * ops.length)]()
+    try {
+      const stream = await this.chatCompletion(chatSessionId, prompt, null, false, false, null, [])
+      await new Promise((resolve) => {
+        const { readSSE } = require('../../utils/sse-reader')
+        readSSE(stream, { onData: () => {}, onDone: resolve, onError: resolve })
+      })
+    } catch {
+      // non-critical — ignore warmup failures
+    }
+  }
+
   async chatCompletion(
     chatSessionId,
     prompt,
@@ -91,6 +129,8 @@ class DeepSeekAPI extends BaseAPI {
       ref_file_ids: refFileIds,
       thinking_enabled: thinkingEnabled,
       search_enabled: searchEnabled,
+      action: null,
+      preempt: false,
     }
 
     if (this._log)
