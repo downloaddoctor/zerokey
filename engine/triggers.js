@@ -3,6 +3,7 @@ const SYNTAX = require('./syntax')
 const { injectMcpAliases } = require('./mcp/inject')
 const { buildAutoAliasMaps, hashTools } = require('./mcp/auto')
 const { captureRequest } = require('../utils/capture-request')
+const { SUMMARIZE_CONVERSATION } = require('../utils/prompts')
 const instructions = require('./instructions')
 
 const BROWSER_MCP = require('./mcp/browser')
@@ -109,8 +110,7 @@ function makeSummaryPassthrough() {
   return ({ messages, index }) => {
     messages.splice(index, 1, {
       role: 'user',
-      content:
-        'Please write a concise but complete summary of this entire conversation — so it can be pasted into a fresh session to resume work seamlessly.',
+      content: SUMMARIZE_CONVERSATION,
     })
   }
 }

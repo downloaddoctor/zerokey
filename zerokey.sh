@@ -194,7 +194,7 @@ echo "${C_BOLD}${C_YELLOW}[ UPDATE AVAILABLE ]${C_RESET}"
 echo "${C_GRAY}local:  ${C_DIM}${LOCAL:0:8}${C_RESET}"
 echo "${C_GRAY}remote: ${C_DIM}${REMOTE:0:8}${C_RESET}"
 echo ""
-read -rp "  Update now? (y/n): " DOUPDATE
+read -rp "  Update now? (y/N): " DOUPDATE
 if [ "$DOUPDATE" = "y" ] || [ "$DOUPDATE" = "Y" ]; then
     section "Pull - fast-forward origin/$BRANCH"
     git fetch origin "$BRANCH"

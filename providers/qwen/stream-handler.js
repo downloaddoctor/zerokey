@@ -2,7 +2,6 @@ const { readSSE } = require('../../utils/sse-reader')
 const { LogSaver, serializeError } = require('../../utils/log-saver')
 
 const streamLog = new LogSaver({ name: 'qwen-error' })
-const streamDebugLog = new LogSaver({ name: 'qwen-stream-debug', maxSize: 5 * 1024 * 1024 })
 
 const RETRY_CODES = {
   quota_limit: true,
@@ -18,7 +17,8 @@ function streamHandler(stream, session, parser, retry, onFinished) {
   let lastEventType = null
   let sayArgsEmitted = ''
   let lastToolPhase = null
-  let didRetry = false
+  let finalized = false
+  let superseded = false
 
   const logIssue = (reason, extra = {}) => {
     streamLog.log({
@@ -61,11 +61,16 @@ function streamHandler(stream, session, parser, retry, onFinished) {
     emitChunk({ reasoning_content: delta })
   }
 
+  // Finalization is close-driven: the upstream socket's onDone is the sole
+  // trigger. `superseded` only suppresses the *outer* handler from firing
+  // onFinished (the nested retry handler owns that); sendFinalChunk is safe
+  // to call from either because StreamPipeline guards it with _finished.
   const finish = () => {
-    if (finished) return
+    if (finalized) return
+    finalized = true
     finished = true
     parser.sendFinalChunk()
-    if (onFinished && responseId) onFinished(responseId)
+    if (!superseded && onFinished && responseId) onFinished(responseId)
   }
 
   const extractSayText = (argsStr) => {
@@ -116,6 +121,7 @@ function streamHandler(stream, session, parser, retry, onFinished) {
       })
 
       if (RETRY_CODES[code] && retry) {
+        superseded = true
         parser.emitText(`\n\n⚠ Stream error: ${reason}\n`)
         parser.emitText(`Retrying...\n`)
         try {
@@ -123,20 +129,18 @@ function streamHandler(stream, session, parser, retry, onFinished) {
         } catch {}
         retry()
           .then((newStream) => {
-            streamHandler(newStream, session, parser, retry)
+            streamHandler(newStream, session, parser, retry, onFinished)
           })
           .catch((retryErr) => {
             logIssue(`retry failed — ${retryErr?.message || retryErr}`, {
               error: serializeError(retryErr),
             })
             parser.emitText(`\n⚠ Retry failed: ${retryErr?.message || retryErr}\n`)
-            parser.sendFinalChunk()
           })
         return
       }
 
       parser.emitText(`\n\n⚠ Stream error: ${reason}\n`)
-      parser.sendFinalChunk()
       return
     }
 
@@ -218,61 +222,7 @@ function streamHandler(stream, session, parser, retry, onFinished) {
 
   readSSE(stream, {
     onData,
-    onDone: () => {
-      if (!finished) {
-        // Stream closed by the server — the normal completion path. Qwen
-        // emits all trailing frames (usage, response.completed, branch
-        // metadata) before closing, so by the time we reach onDone the
-        // upstream turn is truly over. Now it is safe to send our final
-        // chunk and fire onFinished (selectMessage).
-        const noOutput = !producedOutput
-        const stopReason = producedOutput
-          ? 'stream closed by upstream (normal completion)'
-          : 'stream closed without any output'
-        logIssue(stopReason)
-        streamDebugLog.log({
-          ts: new Date().toISOString(),
-          chatSessionId: session.chatSessionId,
-          dataCount,
-          stopReason,
-        })
-
-        if (noOutput && dataCount === 0 && retry && !didRetry) {
-          didRetry = true
-          finished = true
-          parser.emitText(`\n\n⚠ Qwen stream closed with no data. Retrying...\n`)
-          retry()
-            .then((newStream) => {
-              finished = false
-              streamHandler(newStream, session, parser, retry)
-            })
-            .catch((retryErr) => {
-              // retry() itself throws for hard failures (e.g. RateLimited —
-              // api.js now converts non-SSE 200 responses into a thrown
-              // error), so surface that via the normal error path instead
-              // of a generic retry-failed message.
-              logIssue(`retry failed — ${retryErr?.message || retryErr}`, {
-                error: serializeError(retryErr),
-              })
-              parser.onError(retryErr, {
-                source: 'stream',
-                detail: `retry failed — ${retryErr?.message || retryErr}`,
-                finished,
-                lastEventType,
-                dataCount,
-                producedOutput,
-                responseId,
-              })
-            })
-          return
-        }
-
-        if (noOutput) {
-          parser.emitText(`\n\n⚠ Qwen stream closed with no output.\n`)
-        }
-      }
-      finish()
-    },
+    onDone: () => finish(),
     onError: (e) =>
       parser.onError(e, {
         source: 'stream',

@@ -6,6 +6,7 @@ const { claudeStreamHandler } = require('./stream-handler')
 const { setClaudeInstructions } = require('./set-instructions')
 const { acquireSlot } = require('../../utils/rate-limiter')
 const { validateMessages } = require('../../utils/route-helpers')
+const { SUMMARIZE_CONVERSATION } = require('../../utils/prompts')
 const { models, reasoning } = require('./config')
 
 const CLAUDE_MODELS = models.models
@@ -40,12 +41,11 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
     }
 
     if (userData?.waitUntil && userData.waitUntil > Date.now()) {
-      emitLimitResponse(
+      return emitLimitResponse(
         pipeline,
         userData.waitUntil,
         `This user's usage quota is still over its limit`,
       )
-      return
     }
 
     if (pipeline.isNewSession && !pipeline.rawMode) {
@@ -96,20 +96,18 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
 
           if (overUtilized) {
             console.warn(`[Claude] ⚠ Usage at ${limitReached.pct} — over limit, skipping summary`)
-            emitLimitResponse(
+            return emitLimitResponse(
               pipeline,
               userData.waitUntil,
               `This user's usage quota has already been reached (${limitReached.pct})`,
             )
-            return
           }
 
           console.warn(`[Claude] ⚠ Usage at ${limitReached.pct} — requesting summary`)
 
           try {
-            const summaryPrompt = `Please write a concise but complete summary of this entire conversation — so it can be pasted into a fresh session to resume work seamlessly.`
             const { stream: summaryStream } = await claudeApi.chatCompletion(
-              summaryPrompt,
+              SUMMARIZE_CONVERSATION,
               activeSession.chatSessionId,
               activeSession.parentMessageId,
               model,
@@ -117,11 +115,9 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
             )
 
             pipeline.scan('\n\n````text\n')
-            await claudeStreamHandler(summaryStream, activeSession, pipeline, () => {
-              pipeline.scan('\n````')
-              pipeline.scan(limitMessageText(resetTime, mins))
-              pipeline.sendFinalChunk()
-            })
+            await claudeStreamHandler(summaryStream, activeSession, pipeline)
+            pipeline.scan('\n````')
+            pipeline.scan(limitMessageText(resetTime, mins))
           } catch (summaryErr) {
             console.error(`[Claude] Summary failed: ${summaryErr.message}`)
             emitLimitResponse(
@@ -134,6 +130,8 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
           return
         }
       })
+
+      pipeline.sendFinalChunk()
     } catch (error) {
       console.error(`[Claude] Route error: ${error.message}`)
 
@@ -149,13 +147,11 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
         }
 
         if (payload?.resolved?.status === 'exceeded') {
-          emitLimitResponse(
+          return emitLimitResponse(
             pipeline,
             userData.waitUntil,
             `This user's usage quota has been reached`,
           )
-
-          return
         }
       } catch {}
 

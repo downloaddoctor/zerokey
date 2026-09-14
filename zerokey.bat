@@ -90,7 +90,7 @@ echo !C_BOLD!!C_YELLOW![ UPDATE AVAILABLE ]!C_RESET!
 echo !C_GRAY!local:  !C_DIM!%LOCAL:~0,8%!C_RESET!
 echo !C_GRAY!remote: !C_DIM!%REMOTE:~0,8%!C_RESET!
 echo.
-set /p DOUPDATE="  Update now? (y/n): "
+set /p DOUPDATE="  Update now? (y/N): "
 if /i "!DOUPDATE!"=="y" (
     call :section "Pull - fast-forward origin/%BRANCH%"
     git fetch origin %BRANCH%

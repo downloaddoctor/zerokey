@@ -41,6 +41,12 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
 
     StreamPipeline.setSSEHeaders(res)
     const pipeline = new StreamPipeline(res, session, 'deepseek', req.ide, messages)
+
+    if (pipeline.ephemeralMode) {
+      pipeline.sendFinalChunk()
+      return
+    }
+
     const activeSession = pipeline.session
     if (!activeSession.chatSessionId) {
       try {
@@ -65,11 +71,6 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
 
     const { prompt, handled } = await pipeline.setup(messages, tools, req)
     if (handled) return
-
-    if (pipeline.ephemeralMode) {
-      pipeline.sendFinalChunk()
-      return
-    }
 
     try {
       await acquireSlot('DeepSeek')

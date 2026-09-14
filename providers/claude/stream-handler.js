@@ -116,7 +116,6 @@ async function claudeStreamHandler(stream, session, parser, cb) {
       if (!finished) {
         parser.emitText(`\n\n⚠ Claude stream closed before message_stop.\n`)
       }
-      parser.sendFinalChunk()
     },
     onError: (e) =>
       parser.onError(e, {
@@ -129,12 +128,7 @@ async function claudeStreamHandler(stream, session, parser, cb) {
       }),
   })
 
-  if (limitReached && cb) {
-    await cb(limitReached)
-    return
-  }
-
-  parser.sendFinalChunk()
+  if (limitReached && cb) await cb(limitReached)
 }
 
 module.exports = { claudeStreamHandler }
