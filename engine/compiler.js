@@ -39,6 +39,7 @@ class ToolCompiler {
       agent: (mes) => `AGENT: ${mes.content}`,
       assistant: (mes) => `ASSISTANT: ${mes.content}`,
       internal: (mes) => `<internal>\n${mes.content}\n</internal>`,
+      instructions: (mes) => `<instructions>\n${mes.content}\n</instructions>`,
       user: async (mes, messages, isNewSession) => {
         if (mes.content === '<attachments>') return ''
         if (mes.content.startsWith('<attachment ')) {
@@ -192,7 +193,7 @@ class ToolCompiler {
    */
   parse(compactStr) {
     console.debug('[TOOL]', compactStr)
-    const parts = compactStr.split('¦').filter((e) => e)
+    const parts = SYNTAX.splitPayload(compactStr).filter((e) => e)
     const toolName = parts[0]
     const params = {}
 
@@ -432,6 +433,9 @@ const { triggers: skills } = require('./triggers')
 const skillsByTrigger = new Map()
 for (const skill of skills) {
   if (skill.trigger) skillsByTrigger.set(skill.trigger.toLowerCase(), skill)
+  if (Array.isArray(skill.aliases)) {
+    for (const alias of skill.aliases) skillsByTrigger.set(alias.toLowerCase(), skill)
+  }
 }
 
 /**

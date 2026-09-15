@@ -21,7 +21,7 @@ const BROWSER_MCP = {
   ],
   open_browser_page: [
     'open_browser_page',
-    `⟦open_browser_page(¦url={str})?(¦forceNew={bool})?⟧ — open a new browser page (omit url to prompt user to share an existing tab)`,
+    `⟦open_browser_page¦url={str}(¦forceNew={bool})?⟧ — open a new browser page`,
   ],
   read_page: ['read_page', `⟦read_page¦pageId={str}⟧ — accessibility snapshot of page`],
   run_playwright_code: [

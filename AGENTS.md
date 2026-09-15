@@ -37,14 +37,14 @@
   chat-router.js # buildRouter(selected) → registry.get(selected.provider).buildRouter(...)
   session-selector.js # SessionSelector — TUI wizard for provider/user/session, live-credential validation, rate-limit awareness, user deletion (local + provider cleanup); pulls setupSteps/models/reasoning via registry.get(this.provider)
  engine/
-  syntax.js # MhiRegistry — global MHI block registry for tool-call emission (compile/parse/emit)
+  syntax.js # SYNTAX tokens (OPEN/CLOSE/SEP/ESC) + findClose, splitPayload — backslash-escaped block/param parsing shared by compiler.js and pipeline.js¦new_check
   compiler.js # ToolCompiler — singleton per IDE×provider: uploadAndGetMessages, uploadAndFormatPrompt, uploadAndFormatPromptForRaw, buildPrompt, compile/parse/emit, matchSkill
   instructions.js # Instructions — lazy-loads instructions.md + skills-extra.md, hash for change detection
   instructions.md # Base system prompt (agent rules, MHI syntax, execution model, output contract)
-  pipeline.js # StreamPipeline — SSE stream head: scanning, emitting (incl. say-block prose), MCP injection, skill handling, error formatting
+  pipeline.js # StreamPipeline — SSE stream head: scanning (via SYNTAX.findClose/splitPayload), emitting, MCP injection, skill handling, error formatting
   skills-extra.md # Extra prompt appends (tool grammar, dynamic-tools listing)
   tool-defs.js # TOOLS — generic tool grammar + per-IDE mappings (vscode, terax, opencode), output shorteners
-  triggers.js # Skills: $cwd, $save, $test, $browser, $mcp, $mcp-dump; MCP auto-registration, passthrough, restore
+  triggers.js # Skills: $cwd, $save, $req, $browser($B), $mcp, $mcp-dump, $tools($T), $R, $test, $summary($S); MCP auto-registration, passthrough, restore
  mcp/
   browser.js # BROWSER_MCP — built-in browser MCP alias map
   inject.js # injectMcpAliases — registers MCP tools into compiler.tools
@@ -77,7 +77,7 @@
   check-modules.js # Dependency integrity check
 
 ## SKILLS
- Skill triggers (engine/triggers.js): $cwd, $save, $req, $browser, $mcp, $mcp-dump, $test, $tools, $summary
+ Skill triggers (engine/triggers.js): $cwd, $save, $req, $browser($B), $mcp, $mcp-dump, $test, $tools($T), $R, $summary($S). Aliases share one trigger entry via skill.aliases[], registered in compiler.js skillsByTrigger.
  $tools # re-emits the instructions.md — reminds LLM if forgotten mid-session
 
 ## BUILD

@@ -90,7 +90,7 @@ function makePassthroughMcpCall(tag) {
     // const message = messages[index]
     // message.content = message.content.replace(tag, '').trim()
     messages.splice(index, 1, {
-      role: 'internal',
+      role: 'instructions',
       content: `<${SYNTAX.xNAME}_list title="${tag.slice(1)} tools">\n${grammar}\n</${SYNTAX.xNAME}_list>`,
     })
     markMcpInjected(parser?.session, tag)
@@ -100,8 +100,17 @@ function makePassthroughMcpCall(tag) {
 function makeCoreToolsPassthrough() {
   return ({ messages, index }) => {
     messages.splice(index, 1, {
-      role: 'internal',
+      role: 'instructions',
       content: instructions.getBase().content,
+    })
+  }
+}
+
+function makeBasicToolsPassthrough() {
+  return ({ messages, index }) => {
+    messages.splice(index, 1, {
+      role: 'instructions',
+      content: `Reminder — emit MHI as literal text, human runs it, paste back 'MHI(name): <result>'. Never simulate output. MHI only, max 6 per turn, no prose around directives.`,
     })
   }
 }
@@ -171,6 +180,7 @@ const triggers = [
   },
   {
     trigger: '$browser',
+    aliases: ['$B'],
     template: '',
     passthrough: true, // does not end the stream — splices an INTERNAL message into the array, request continues to the provider
     call: makePassthroughMcpCall('$browser'),
@@ -187,9 +197,16 @@ const triggers = [
   },
   {
     trigger: '$tools',
+    aliases: ['$T'],
     template: '',
     passthrough: true,
     call: makeCoreToolsPassthrough(),
+  },
+  {
+    trigger: '$R',
+    template: '',
+    passthrough: true,
+    call: makeBasicToolsPassthrough(),
   },
   {
     trigger: '$test',
@@ -199,18 +216,7 @@ const triggers = [
   },
   {
     trigger: '$summary',
-    template: '',
-    passthrough: true,
-    call: makeSummaryPassthrough(),
-  },
-  {
-    trigger: '$s',
-    template: '',
-    passthrough: true,
-    call: makeSummaryPassthrough(),
-  },
-  {
-    trigger: '$end',
+    aliases: ['$S'],
     template: '',
     passthrough: true,
     call: makeSummaryPassthrough(),
