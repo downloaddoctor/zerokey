@@ -2,12 +2,18 @@ const express = require('express')
 
 const { StreamPipeline } = require('../../engine/pipeline')
 const { DeepSeekAPI } = require('./api')
+const { getSharedTransport } = require('./browser-transport')
 const { streamHandler } = require('./stream-handler')
 const { acquireSlot } = require('../../utils/rate-limiter')
 const { validateMessages } = require('../../utils/route-helpers')
 const { reasoning } = require('./config')
 
-const deepseekApi = new DeepSeekAPI()
+// Transport selection: 'browser' (default) drives the real web UI; 'api' keeps
+// the legacy direct-fetch path (PoW headers, cookie jar). Set via env when you
+// need to compare or fall back. Same singleton as validateCredentials so the
+// profile dir is held by exactly one Chromium.
+const TRANSPORT = (process.env.DEEPSEEK_TRANSPORT || 'browser').toLowerCase()
+const deepseekApi = TRANSPORT === 'api' ? new DeepSeekAPI() : getSharedTransport()
 
 // O(1) reasoning_effort → { think, search } lookup.
 // Keys are the exact labels VS Code advertises (utils/sync-ide-config.js).

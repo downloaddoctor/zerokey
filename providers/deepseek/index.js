@@ -1,6 +1,10 @@
 const { DeepSeekAPI } = require('./api')
+const { getSharedTransport } = require('./browser-transport')
 const { buildDeepSeekRouter } = require('./router')
 const { models, reasoning, promptLimit, setupSteps } = require('./config')
+
+// Same env switch as router.js — keeps validation and runtime on the same path.
+const TRANSPORT = (process.env.DEEPSEEK_TRANSPORT || 'browser').toLowerCase()
 
 module.exports = {
   name: 'deepseek',
@@ -20,9 +24,12 @@ module.exports = {
   },
   createAPI: (options) => new DeepSeekAPI(options),
   validateCredentials: async (parsedFetch) => {
-    const api = new DeepSeekAPI()
-    await api.initializeFromJSON(parsedFetch)
+    // Browser transport: no capture needed for auth — the profile holds the JWT.
+    // parsedFetch is still accepted (and stored) for DEEPSEEK_TRANSPORT=api.
+    const api = TRANSPORT === 'api' ? new DeepSeekAPI() : getSharedTransport()
+
     try {
+      await api.initializeFromJSON(parsedFetch)
       const user = await api.getCurrentUser()
       return { success: true, user: user.data?.user?.username || 'unknown' }
     } catch (error) {

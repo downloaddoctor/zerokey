@@ -15,9 +15,37 @@
    BaseStreamHandler.js # BaseStreamHandler — shared SSE stream-handler base class
   deepseek/
    index.js # provider def: {name,displayName,models,reasoning,promptLimit,setupSteps,createAPI,validateCredentials,buildRouter}
-   router.js # buildDeepSeekRouter
+   router.js # buildDeepSeekRouter — picks transport via env DEEPSEEK_TRANSPORT (default 'browser', alt 'api')
+   browser-transport.js # DeepSeekBrowserTransport — drives chat.deepseek.com via persistent-profile Chromium (temp/deepseek-transport-profile); same surface as DeepSeekAPI; taps /api/v0/chat/completion response only (no request interception); buffers SSE body to a Readable for stream-handler
+
+   # Browser transport: session model
+   #   new chat      → createChatSession() clicks "New chat", sends warmup prompt, reads UUID from URL /a/chat/s/<uuid>
+   #   existing chat → chatCompletion() navigates to https://chat.deepseek.com/a/chat/s/<chatSessionId> (original link) if not already there; UI auto-opens the thread, composer reuses it
+   #   warmupSession() is a no-op (warmup runs inside createChatSession)
+   #
+   # Browser transport: streaming (v3)
+   #   Page-side fetch/XHR tee installed via context.addInitScript BEFORE navigation — tees ReadableStream, forwards one branch to app, pushes the other back to Node via exposeFunction (__dsChunk/__dsDone/__dsError)
+   #   Chosen over CDP Fetch (v2): Fetch at Response stage unreliable for text/event-stream (no requestPaused until body begins, IO.read/continueResponse race); page tee has none of those problems
+   #   Prompt delivery: CDP Input.insertText (atomic, multi-KB safe) — page.keyboard.type() drops chars on large prompts; no clipboard permissions needed
+   #   Navigation: _gotoFast() uses waitUntil:'commit' (not domcontentloaded) — DeepSeek SPA boot is slow; composer readiness checked separately via _waitForComposer()
+   #   Launch flags: --no-first-run, --disable-session-crashed-bubble, --disable-background-networking, --disable-sync etc. — kill Chromium's profile-side background work that stalled launch
+   #   Do NOT request clipboard permissions: they are negotiated at launch and add 30s+ before the first navigation; Input.insertText doesn't use the clipboard anyway
+   #
+   # Browser transport: limitations (v3)
+   #   uploadFile() throws — DOM file-picker flow not implemented; ref_file_ids always []
+   #   parent_message_id ignored — server assigns it; router passes stale value, transport drops it
+   #   profile dir is single-instance — cannot run two server processes or share with Playwright MCP concurrently
+   #   toggles (DeepThink/Search) are best-effort — matched by role=button + text; verify aria-pressed/class heuristics if state drifts
+   #
+   # Browser transport: human delay
+   #   humanDelay() (utils/human-delay.js, 3-9s randomized) runs at the chatCompletion() — parity with the direct-API DeepSeekAPI
+   #
+   # Browser transport: shared instance
+   #   getSharedTransport() — module-level singleton used by BOTH validateCredentials (wizard) and router (runtime)
+   #   only one Chromium may hold temp/deepseek-transport-profile, so both must go through the same instance
+   #   TRANSPORT switch (DEEPSEEK_TRANSPORT) is read by both index.js and router.js — keep them in sync
    config.js # models, reasoning, promptLimit, setupSteps
-   api.md # internal reference: upstream endpoints, POW flow, SSE event table, session shape
+   api.md # internal reference: upstream endpoints, POW flow, SSE event table, session shape (direct-API transport, kept for validateCredentials + DEEPSEEK_TRANSPORT=api)
   claude/
    index.js # provider def (same shape as deepseek/index.js)
    router.js # buildClaudeRouter
@@ -183,11 +211,18 @@
 
 ## ENV
  PORT # default 7250
+ DEEPSEEK_TRANSPORT # 'browser' (default) | 'api' — selects transport in providers/deepseek/router.js
 
 ## DEPENDENCIES
  express ^5.2.1
  node-fetch ^2.7.0
  prompts ^2.4.2
+ dev: playwright ^1.63.0 (scripts/browser-flow.js — persistent-profile session capture reference)
+
+## SCRIPTS
+ scripts/browser-flow.js # DeepSeek web-UI driver — persistent-profile Chromium (temp/browser-profile), auto login via localStorage.userToken, drives composer (New chat → fill → Enter); passive response tap (page.on('response') on /api/v0/chat/completion) dumps raw SSE to temp/browser-flow-last.sse + summary to temp/browser-flow.log (never touches request)
+ .vscode/mcp.json # MCP host config — registers @playwright/mcp (stdio, npx) with --user-data-dir=temp/browser-profile (same profile as scripts/browser-flow.js); profile is single-instance, so MCP and the script cannot run concurrently
+ scripts/check-modules.js # Dependency integrity check
 
 ## CONFIG
  config/constants.js: CONFIG.PORT → env PORT or 7250 (only global config left here)

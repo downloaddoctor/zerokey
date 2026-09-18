@@ -27,3 +27,4 @@ Thumbs.db
 # Debug
 *.log
 npm-debug.log*
+.playwright-mcp
