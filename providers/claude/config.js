@@ -15,6 +15,7 @@ const models = {
       created: 1_772_736_000,
       context_length: 1_000_000,
       max_output_length: 128_000,
+      defaultReasoning: 'Low',
     },
     'claude-sonnet-5': {
       id: 'claude-sonnet-5',
@@ -23,6 +24,7 @@ const models = {
       created: 1_772_736_000,
       context_length: 1_000_000,
       max_output_length: 128_000,
+      defaultReasoning: 'Medium',
     },
     'claude-haiku-4-5-20251001': {
       id: 'claude-haiku-4-5-20251001',
@@ -32,6 +34,7 @@ const models = {
       context_length: 200_000,
       max_output_length: 64_000,
       reasoning: ['No Think', 'Think'],
+      defaultReasoning: 'No Think',
     },
   },
 }

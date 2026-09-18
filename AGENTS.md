@@ -72,7 +72,7 @@
   rate-limiter.js # acquireSlot — per-provider rate limiting (15 req / 60s window); → utils/logger (tickWait)
   route-helpers.js # validateMessages — shared route middleware
   sse-reader.js # readSSE — generic SSE stream reader for both Web and Node streams
-  sync-ide-config.js # syncIdeConfig — writes ZeroKey model entry into VS Code chatLanguageModels.json
+  sync-ide-config.js # syncIdeConfig — writes ZeroKey model entry into VS Code chatLanguageModels.json; also writes model.defaultReasoning into zeroKeyEntry.settings[modelId].reasoningEffort (deletes key/entry if absent)
  scripts/
   check-modules.js # Dependency integrity check
 
@@ -192,7 +192,7 @@
 ## CONFIG
  config/constants.js: CONFIG.PORT → env PORT or 7250 (only global config left here)
  providers/<name>/config.js (single source of truth per provider):
-  models → { title, owned_by, models: { id: { id, name, vision, created, context_length, max_output_length } } }
+  models → { title, owned_by, models: { id: { id, name, vision, created, context_length, max_output_length, defaultReasoning? } } }
   reasoning → { labels, map } for reasoning_effort (see KNOWN-INVARIANTS)
   promptLimit → prompt/output char limit (claude/chatgpt 64k, deepseek/qwen 128k)
   setupSteps → { url, requestFilter, instructions } for SessionSelector TUI
@@ -206,8 +206,7 @@
 Qwen reasoning: labels ['Auto','Think','Fast'] (providers/qwen/config.js); REASONING_MAP O(1) lookup maps to feature_config (thinking_enabled, auto_thinking, thinking_mode, thinking_format, auto_search); Fast mode omits thinking_format field; reasoningEffort passed from req.body.reasoning_effort; per-model restrictions: qwen3.7-max ['Think','Fast'] (no Auto), qwen3.5-omni-plus [] (no reasoning), all others ['Auto','Think','Fast']; unsupported reasoningEffort falls back to first allowed mode
 Qwen selectMessage: POST /api/v2/chats/:chatId/messages/select called after each stream finishes (onFinished callback in stream-handler); marks selected response branch server-side; non-critical, failures silently ignored
 Claude reasoning: provider-level labels ['Low'..'Max Think'] (8 tiers); Haiku override reasoning:['No Think','Think'] → thinking_mode:'extended'|'off', no effort tier; other models fall back to provider labels; per-model enforcement in router same pattern as Qwen
-sync-ide-config.js reasoning: reads modelConfig.reasoning first (per-model), falls back to providerDef.reasoning.labels; supportsThinking = supportsReasoning (any provider with reasoning gets thinking:true in VS Code entry)
-No API keys — all auth via browser session cookies captured from DevTools fetch()
+sync-ide-config.js reasoning: reads modelConfig.reasoning first (per-model), falls back to providerDef.reasoning.labels; supportsThinking = supportsReasoning (any provider with reasoning gets thinking:true in VS Code entry) model.defaultReasoning (providers/<name>/config.js, optional) seeds initial reasoningEffort per model in VS Code settings; triggers.js role 'instructions' renamed 'live_instructions' (compiler.js template + engine/instructions.md), passthrough injections (core/basic tools, MCP tag lists) now emit as <live_instructions> blocksNo API keys — all auth via browser session cookies captured from DevTools fetch()
  SessionSelector parses browser "Copy as fetch" string; TUI menu: saved users + Create + Delete (__delete__ → confirm → provider session cleanup → _removeUser); users.json atomic write via .tmp + rename
  ToolCompiler is a singleton per IDE×provider (cached in ToolCompiler.objects)
  Session state (chatSessionId, parentMessageId, lastUsed, todos) is mutated in-memory; persisted to users.json only on shutdown via selector.flush()

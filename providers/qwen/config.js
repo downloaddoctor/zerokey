@@ -16,6 +16,7 @@ const models = {
       context_length: 1_000_000,
       max_output_length: 65_536,
       reasoning: ['Auto', 'Think', 'Fast'],
+      defaultReasoning: 'Auto',
     },
     'qwen3.8-max': {
       id: 'qwen3.8-max',
@@ -25,6 +26,7 @@ const models = {
       context_length: 1_000_000,
       max_output_length: 131_072,
       reasoning: ['Auto', 'Think', 'Fast'],
+      defaultReasoning: 'Auto',
     },
     'qwen3.7-max': {
       id: 'qwen3.7-max',
@@ -34,6 +36,7 @@ const models = {
       context_length: 1_000_000,
       max_output_length: 81_920,
       reasoning: ['Think', 'Fast'],
+      defaultReasoning: 'Think',
     },
     'qwen3.6-plus': {
       id: 'qwen3.6-plus',
@@ -43,6 +46,7 @@ const models = {
       context_length: 1_000_000,
       max_output_length: 65_536,
       reasoning: ['Auto', 'Think', 'Fast'],
+      defaultReasoning: 'Auto',
     },
     'qwen3.5-plus': {
       id: 'qwen3.5-plus',
@@ -52,6 +56,7 @@ const models = {
       context_length: 1_000_000,
       max_output_length: 65_536,
       reasoning: ['Auto', 'Think', 'Fast'],
+      defaultReasoning: 'Auto',
     },
     'qwen3.5-omni-plus': {
       id: 'qwen3.5-omni-plus',

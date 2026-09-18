@@ -123,7 +123,7 @@ class ClaudeAPI extends BaseAPI {
     reasoningEffort = null,
     isEphemeral = false,
   ) {
-    await humanDelay()
+    await humanDelay(1e3, 3e3)
     if (!this._orgId) throw new Error('Organization ID not set')
 
     // Generate conversation UUID for new conversations (client-side pregen)

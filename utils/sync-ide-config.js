@@ -118,6 +118,8 @@ async function syncIdeConfig(preSelected, port) {
       const supportsReasoning = reasoningEfforts.length > 0
 
       const supportsThinking = supportsReasoning
+      const defaultReasoningEffort = modelConfig?.defaultReasoning || null
+
       const existingModel = zeroKeyEntry.models.find((m) => m.id === targetId)
       if (existingModel) {
         existingModel.name = modelName
@@ -151,6 +153,20 @@ async function syncIdeConfig(preSelected, port) {
               }
             : {}),
         })
+      }
+
+      // Write default reasoning into settings[targetId]
+      if (!zeroKeyEntry.settings) zeroKeyEntry.settings = {}
+      if (defaultReasoningEffort) {
+        zeroKeyEntry.settings[targetId] = {
+          ...zeroKeyEntry.settings[targetId],
+          reasoningEffort: defaultReasoningEffort,
+        }
+      } else if (zeroKeyEntry.settings[targetId]) {
+        delete zeroKeyEntry.settings[targetId].reasoningEffort
+        if (Object.keys(zeroKeyEntry.settings[targetId]).length === 0) {
+          delete zeroKeyEntry.settings[targetId]
+        }
       }
     }
 

@@ -40,6 +40,7 @@ class ToolCompiler {
       assistant: (mes) => `ASSISTANT: ${mes.content}`,
       internal: (mes) => `<internal>\n${mes.content}\n</internal>`,
       instructions: (mes) => `<instructions>\n${mes.content}\n</instructions>`,
+      live_instructions: (mes) => `<live_instructions>\n${mes.content}\n</live_instructions>`,
       user: async (mes, messages, isNewSession) => {
         if (mes.content === '<attachments>') return ''
         if (mes.content.startsWith('<attachment ')) {

@@ -90,7 +90,7 @@ function makePassthroughMcpCall(tag) {
     // const message = messages[index]
     // message.content = message.content.replace(tag, '').trim()
     messages.splice(index, 1, {
-      role: 'instructions',
+      role: 'live_instructions',
       content: `<${SYNTAX.xNAME}_list title="${tag.slice(1)} tools">\n${grammar}\n</${SYNTAX.xNAME}_list>`,
     })
     markMcpInjected(parser?.session, tag)
@@ -100,7 +100,7 @@ function makePassthroughMcpCall(tag) {
 function makeCoreToolsPassthrough() {
   return ({ messages, index }) => {
     messages.splice(index, 1, {
-      role: 'instructions',
+      role: 'live_instructions',
       content: instructions.getBase().content,
     })
   }
@@ -109,7 +109,7 @@ function makeCoreToolsPassthrough() {
 function makeBasicToolsPassthrough() {
   return ({ messages, index }) => {
     messages.splice(index, 1, {
-      role: 'instructions',
+      role: 'live_instructions',
       content: `Reminder — emit MHI as literal text, human runs it, paste back 'MHI(name): <result>'. Never simulate output. MHI only, max 6 per turn, no prose around directives.`,
     })
   }
