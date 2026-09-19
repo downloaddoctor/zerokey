@@ -23,15 +23,16 @@ module.exports = {
       `    Soonest reset: "${soonestUser}" at ${resetsAt} (~${mins} min).`,
   },
   createAPI: (options) => new DeepSeekAPI(options),
-  validateCredentials: async (parsedFetch) => {
-    // Browser transport: no capture needed for auth — the profile holds the JWT.
-    // parsedFetch is still accepted (and stored) for DEEPSEEK_TRANSPORT=api.
-    const api = TRANSPORT === 'api' ? new DeepSeekAPI() : getSharedTransport()
+  validateCredentials: async (parsedFetch, username) => {
+    // Browser transport: auth = profile dir keyed by local alphanumeric key.
+    // localStorage.userToken presence is the only check — no fetch capture,
+    // no getCurrentUser() call. parsedFetch is accepted (and stored) only for
+    // DEEPSEEK_TRANSPORT=api.
+    const api = TRANSPORT === 'api' ? new DeepSeekAPI() : getSharedTransport({ username })
 
     try {
       await api.initializeFromJSON(parsedFetch)
-      const user = await api.getCurrentUser()
-      return { success: true, user: user.data?.user?.username || 'unknown' }
+      return { success: true, user: username }
     } catch (error) {
       return { success: false, error: error.message }
     }

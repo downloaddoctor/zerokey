@@ -209,9 +209,9 @@ class SessionSelector {
     return provider?.validateFetch ? provider.validateFetch(parsedFetch) : []
   }
 
-  async _validateLiveConnection(parsedFetch) {
+  async _validateLiveConnection(parsedFetch, username) {
     const provider = registry.get(this.provider)
-    const result = await provider.validateCredentials(parsedFetch || {})
+    const result = await provider.validateCredentials(parsedFetch || {}, username)
     if (!result.success) throw new Error(result.error)
   }
 
@@ -225,20 +225,47 @@ class SessionSelector {
     spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore' }).unref()
   }
 
+  _existingLocalKeys() {
+    const all = this._loadAll()
+    return Object.keys(all[this.provider] || {}).map((k) => k.toLowerCase())
+  }
+
+  _profileDirFor(username) {
+    return path.join(__dirname, '..', 'temp', 'profiles', this.provider, username)
+  }
+
+  _validateLocalKey(raw) {
+    const v = String(raw || '')
+      .trim()
+      .toLowerCase()
+    if (!v) return 'Username is required'
+    if (!/^[a-z0-9]{1,32}$/.test(v)) {
+      return 'Alphanumeric only (a-z, 0-9), 1–32 chars'
+    }
+    if (this._existingLocalKeys().includes(v)) {
+      return `User "${v}" already exists — pick another key or delete it first`
+    }
+    if (fs.existsSync(this._profileDirFor(v))) {
+      return `Profile dir for "${v}" already exists — pick another key or delete it manually`
+    }
+    return true
+  }
+
   async _promptNewUser() {
     console.info('\n  ── Create New User ──\n')
 
-    const { username } = await prompts(
+    const { username: rawUsername } = await prompts(
       {
         type: 'text',
         name: 'username',
-        message: 'Username',
-        validate: (v) => v.trim().length > 0 || 'Username is required',
+        message: 'Username (local key, a-z 0-9, immutable)',
+        validate: (v) => this._validateLocalKey(v),
       },
       { onCancel: () => process.exit(0) },
     )
 
-    if (!username) return null
+    if (!rawUsername) return null
+    const username = String(rawUsername).trim().toLowerCase()
 
     const provider = registry.get(this.provider)
     const providerUrl = provider.setupSteps?.url
@@ -295,7 +322,7 @@ class SessionSelector {
 
       process.stdout.write(text.dim('  Validating browser session...'))
       try {
-        await this._validateLiveConnection(parsedFetch)
+        await this._validateLiveConnection(parsedFetch, username)
         process.stdout.write('\r                                  ')
         process.stdout.write('\r  ' + text.green('√ Session verified') + '\n\n')
       } catch (e) {
@@ -481,6 +508,11 @@ class SessionSelector {
     this.provider = savedProvider
 
     this._removeUser(savedProvider, target)
+    try {
+      fs.rmSync(this._profileDirFor(target.toLowerCase()), { recursive: true, force: true })
+    } catch (e) {
+      console.warn(`  ⚠ Failed to remove profile dir: ${e.message}`)
+    }
     console.info(`  ${text.green('√')} User "${target}" removed.\n`)
 
     return this._stepUserLogin()

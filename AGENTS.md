@@ -16,7 +16,7 @@
   deepseek/
    index.js # provider def: {name,displayName,models,reasoning,promptLimit,setupSteps,createAPI,validateCredentials,buildRouter}
    router.js # buildDeepSeekRouter — picks transport via env DEEPSEEK_TRANSPORT (default 'browser', alt 'api')
-   browser-transport.js # DeepSeekBrowserTransport — drives chat.deepseek.com via persistent-profile Chromium (temp/deepseek-transport-profile); same surface as DeepSeekAPI; taps /api/v0/chat/completion response only (no request interception); buffers SSE body to a Readable for stream-handler
+   browser-transport.js # DeepSeekBrowserTransport — drives chat.deepseek.com via persistent-profile Chromium keyed per user (temp/profiles/deepseek/<username>); same surface as DeepSeekAPI; taps /api/v0/chat/completion response only (no request interception); buffers SSE body to a Readable for stream-handler
 
    # Browser transport: session model
    #   new chat      → createChatSession() clicks "New chat", sends warmup prompt, reads UUID from URL /a/chat/s/<uuid>
@@ -32,17 +32,18 @@
    #   Do NOT request clipboard permissions: they are negotiated at launch and add 30s+ before the first navigation; Input.insertText doesn't use the clipboard anyway
    #
    # Browser transport: limitations (v3)
-   #   uploadFile() throws — DOM file-picker flow not implemented; ref_file_ids always []
+   #   uploadFile({filename,data,mimeType}) — drives the hidden <input type="file"> via setInputFiles; polls Send button (ds-button--disabled class) until upload completes; app attaches file ids to the request itself, ref_file_ids stays []
    #   parent_message_id ignored — server assigns it; router passes stale value, transport drops it
    #   profile dir is single-instance — cannot run two server processes or share with Playwright MCP concurrently
-   #   toggles (DeepThink/Search) are best-effort — matched by role=button + text; verify aria-pressed/class heuristics if state drifts
+   #   toggles (DeepThink/Search) — div.ds-toggle-button + exact text; state read from aria-pressed; click then poll for React commit (aria-pressed flips asynchronously)
    #
    # Browser transport: human delay
    #   humanDelay() (utils/human-delay.js, 3-9s randomized) runs at the chatCompletion() — parity with the direct-API DeepSeekAPI
    #
    # Browser transport: shared instance
-   #   getSharedTransport() — module-level singleton used by BOTH validateCredentials (wizard) and router (runtime)
-   #   only one Chromium may hold temp/deepseek-transport-profile, so both must go through the same instance
+   #   getSharedTransport({username}) — lazy singleton, first call binds the key, later calls with a different key throw
+   #   username is the local wizard key (alphanumeric, 1-32, lowercased, immutable); profile dir = temp/profiles/deepseek/<key>/
+   #   built inside buildDeepSeekRouter (not at module load) using userData.username; validateCredentials(parsedFetch, username) passes the same key from the wizard
    #   TRANSPORT switch (DEEPSEEK_TRANSPORT) is read by both index.js and router.js — keep them in sync
    config.js # models, reasoning, promptLimit, setupSteps
    api.md # internal reference: upstream endpoints, POW flow, SSE event table, session shape (direct-API transport, kept for validateCredentials + DEEPSEEK_TRANSPORT=api)

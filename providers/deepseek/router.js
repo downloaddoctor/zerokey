@@ -10,10 +10,11 @@ const { reasoning } = require('./config')
 
 // Transport selection: 'browser' (default) drives the real web UI; 'api' keeps
 // the legacy direct-fetch path (PoW headers, cookie jar). Set via env when you
-// need to compare or fall back. Same singleton as validateCredentials so the
-// profile dir is held by exactly one Chromium.
+// need to compare or fall back. The transport singleton is resolved lazily
+// inside buildDeepSeekRouter so it can be keyed to the selected local username
+// (profile dir = temp/profiles/deepseek/<username>/) — never constructed at
+// module load.
 const TRANSPORT = (process.env.DEEPSEEK_TRANSPORT || 'browser').toLowerCase()
-const deepseekApi = TRANSPORT === 'api' ? new DeepSeekAPI() : getSharedTransport()
 
 // O(1) reasoning_effort → { think, search } lookup.
 // Keys are the exact labels VS Code advertises (utils/sync-ide-config.js).
@@ -21,6 +22,12 @@ const deepseekApi = TRANSPORT === 'api' ? new DeepSeekAPI() : getSharedTransport
 const REASONING_MAP = reasoning.map
 
 async function buildDeepSeekRouter(parsedFetch, session, userData) {
+  const username = userData?.username
+  if (TRANSPORT !== 'api' && !username) {
+    throw new Error('[Deepseek] userData.username (local key) is required for browser transport')
+  }
+  const deepseekApi = TRANSPORT === 'api' ? new DeepSeekAPI() : getSharedTransport({ username })
+
   console.debug('[Deepseek] Initializing from parsed capture JSON')
   await deepseekApi.initializeFromJSON(parsedFetch)
 

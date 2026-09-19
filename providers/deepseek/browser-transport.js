@@ -32,7 +32,8 @@
  *                full history and the composer reuses it.
  *
  * Limitations (v3):
- *   - uploadFile() throws — DOM file-picker flow not implemented; ref_file_ids [].
+ *   - uploadFile() drives the hidden <input type="file"> and waits for Send to
+ *     re-enable; the app attaches file ids to the request, ref_file_ids stays [].
  *   - parent_message_id is server-assigned; the value the router passes is ignored.
  *   - profile dir is single-instance — cannot share with Playwright MCP or run
  *     two ZeroKey processes on the same dir.
@@ -46,7 +47,7 @@ const { chromium } = require('playwright')
 const { humanDelay } = require('../../utils/human-delay')
 
 const TEMP_DIR = path.join(__dirname, '..', '..', 'temp')
-const DEFAULT_PROFILE = path.join(TEMP_DIR, 'deepseek-transport-profile')
+const PROFILES_ROOT = path.join(TEMP_DIR, 'profiles', 'deepseek')
 const START_URL = 'https://chat.deepseek.com/'
 const COMPLETION_PATH = '/api/v0/chat/completion'
 
@@ -59,7 +60,12 @@ class DeepSeekBrowserTransport {
   constructor(options = {}) {
     this._log = options.log !== false
     this._headless = options.headless ?? false
-    this._profileDir = options.profileDir || DEFAULT_PROFILE
+    if (!options.username) throw new Error('[DeepSeek/browser] username (local key) is required')
+    this._username = String(options.username).toLowerCase()
+    if (!/^[a-z0-9]{1,32}$/.test(this._username)) {
+      throw new Error(`[DeepSeek/browser] invalid username key: ${options.username}`)
+    }
+    this._profileDir = options.profileDir || path.join(PROFILES_ROOT, this._username)
     this._context = null
     this._page = null
     this._cdp = null
@@ -267,14 +273,20 @@ class DeepSeekBrowserTransport {
     await this._ensureContext()
     await humanDelay()
 
-    try {
-      const btn = this._page
-        .locator('div')
-        .filter({ hasText: /^New chat$/ })
-        .first()
-      await btn.click({ timeout: 5000 })
-    } catch {
-      await this._gotoFast(`${START_URL}a/chat`)
+    // Only click "New chat" when the SPA is already on an existing thread
+    // (/a/chat/s/<uuid>). A fresh nav to START_URL lands on the new-chat page
+    // directly — the click is unnecessary and its locator is fragile.
+    const onExistingThread = /\/a\/chat\/s\//.test(this._page.url())
+    if (onExistingThread) {
+      try {
+        const btn = this._page
+          .locator('div')
+          .filter({ hasText: /^New chat$/ })
+          .first()
+        await btn.click({ timeout: 5000 })
+      } catch {
+        await this._gotoFast(`${START_URL}a/chat`)
+      }
     }
     await this._waitForComposer(15_000)
 
@@ -362,21 +374,53 @@ class DeepSeekBrowserTransport {
     await composer.press('Enter')
   }
 
+  // DeepSeek composer toggles are <div class="ds-toggle-button" tabindex=0
+  // aria-pressed="true|false">. Label is a hashed-class child span. Locate by
+  // the semantic ds-toggle-button class + exact visible text, not by role or
+  // child class. React commits aria-pressed asynchronously after onClick, so
+  // poll for the change to stick before returning — otherwise the next step
+  // (send prompt) may race ahead of the re-render.
   async _setToggle(labelText, desiredOn) {
     try {
       const btn = this._page
-        .locator(`div[role="button"]:has-text("${labelText}"), button:has-text("${labelText}")`)
+        .locator('div.ds-toggle-button')
+        .filter({ hasText: new RegExp(`^${labelText}$`) })
         .first()
       if ((await btn.count()) === 0) return
 
-      const isOn = await btn.evaluate((el) => {
-        const aria = el.getAttribute('aria-pressed') || el.getAttribute('aria-checked')
-        if (aria === 'true') return true
-        if (aria === 'false') return false
-        return /(active|selected|checked|enabled)/i.test(el.className || '')
-      })
+      const read = () =>
+        btn.evaluate((el) => {
+          const aria = el.getAttribute('aria-pressed') || el.getAttribute('aria-checked')
+          if (aria === 'true') return true
+          if (aria === 'false') return false
+          return /ds-toggle-button--selected/.test(el.className || '')
+        })
 
-      if (isOn !== desiredOn) await btn.click({ timeout: 3000 })
+      if ((await read()) === desiredOn) return
+
+      await btn.click({ timeout: 3000 })
+
+      // React commits the toggle state asynchronously. Poll until the DOM
+      // reflects desiredOn, then hold for a short stabilization window so a
+      // bounce (SPA re-render / auth reset) is caught rather than assumed OK.
+      const deadline = Date.now() + 3000
+      let last = null
+      while (Date.now() < deadline) {
+        last = await read()
+        if (last === desiredOn) break
+        await this._page.waitForTimeout(100)
+      }
+
+      if (last === desiredOn) {
+        await this._page.waitForTimeout(300)
+        last = await read()
+      }
+
+      if (last !== desiredOn && this._log) {
+        console.debug(
+          `[DeepSeek/browser] toggle "${labelText}" did not reach ${desiredOn} (last=${last})`,
+        )
+      }
     } catch {
       /* non-fatal */
     }
@@ -416,8 +460,56 @@ class DeepSeekBrowserTransport {
     })
   }
 
-  async uploadFile(_file) {
-    throw new Error('[DeepSeek/browser] file upload via browser transport not implemented yet')
+  // Upload via the real UI. Caller passes { filename, data, size, mimeType }
+  // (utils/extract-files.js decodeContentParts). DeepSeek exposes a single
+  // hidden <input type="file" multiple> whose React onChange drives the upload.
+  // Playwright setInputFiles works on display:none inputs, so we drive the
+  // input directly — no attach-button click, no filechooser event.
+  //
+  // After setting the file, the composer disables Send (class ds-button--disabled)
+  // until the upload finishes, then re-enables it. We poll for that re-enable.
+  // The app attaches the file ids to the outgoing /chat/completion itself, so
+  // chatCompletion's _refFileIds arg is ignored on this transport. The return
+  // value is only pushed into the router's collector for bookkeeping.
+  async uploadFile(file) {
+    await this._ensureContext()
+
+    const input = this._page.locator('input[type="file"]').first()
+    if ((await input.count()) === 0) {
+      throw new Error('[DeepSeek/browser] file input not found in composer')
+    }
+
+    const filename = file.filename || file.name || `file_${Date.now()}`
+    const mimeType = file.mimeType || 'application/octet-stream'
+    const buffer = Buffer.isBuffer(file.data)
+      ? file.data
+      : Buffer.isBuffer(file.buffer)
+        ? file.buffer
+        : Buffer.from(file.data || file.buffer || '', 'utf-8')
+
+    const sendBtn = this._page.locator('div.ds-button--circle.ds-button--primary').first()
+    const isSendDisabled = async () => {
+      if ((await sendBtn.count()) === 0) return false
+      return sendBtn.evaluate((el) => /ds-button--disabled/.test(el.className || ''))
+    }
+
+    await input.setInputFiles({ name: filename, mimeType, buffer })
+
+    // Send flips disabled → enabled once the upload completes. Poll up to 60s.
+    const deadline = Date.now() + 60_000
+    let disabled = await isSendDisabled()
+    while (disabled && Date.now() < deadline) {
+      await this._page.waitForTimeout(200)
+      disabled = await isSendDisabled()
+    }
+
+    if (disabled) {
+      throw new Error('[DeepSeek/browser] upload did not finish — Send still disabled after 60s')
+    }
+
+    if (this._log) console.debug(`[DeepSeek/browser] uploaded ${filename} (${buffer.length} bytes)`)
+
+    return { filename, size: buffer.length }
   }
 }
 
@@ -430,8 +522,22 @@ function drain(readable) {
 }
 
 let _shared = null
-function getSharedTransport(options) {
-  if (!_shared) _shared = new DeepSeekBrowserTransport(options)
+let _sharedKey = null
+
+function getSharedTransport(options = {}) {
+  const key = options.username ? String(options.username).toLowerCase() : null
+  if (!_shared) {
+    if (!key)
+      throw new Error('[DeepSeek/browser] getSharedTransport requires a username on first call')
+    _shared = new DeepSeekBrowserTransport({ ...options, username: key })
+    _sharedKey = key
+    return _shared
+  }
+  if (key && key !== _sharedKey) {
+    throw new Error(
+      `[DeepSeek/browser] transport already bound to "${_sharedKey}"; cannot rebind to "${key}"`,
+    )
+  }
   return _shared
 }
 
