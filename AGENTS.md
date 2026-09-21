@@ -22,6 +22,7 @@
    #   new chat      → createChatSession() clicks "New chat", sends warmup prompt, reads UUID from URL /a/chat/s/<uuid>
    #   existing chat → chatCompletion() navigates to https://chat.deepseek.com/a/chat/s/<chatSessionId> (original link) if not already there; UI auto-opens the thread, composer reuses it
    #   warmupSession() is a no-op (warmup runs inside createChatSession)
+   # auto-login: initializeFromJSON(parsedFetch) extracts Bearer from Authorization - _seedToken (no launch, wizard stays fast); _launch() lazy on first chat, _injectUserToken() writes localStorage.userToken then reloads, _waitForLogin polls presence; no-op if profile already has a userToken value
    #
    # Browser transport: streaming (v3)
    #   Page-side fetch/XHR tee installed via context.addInitScript BEFORE navigation — tees ReadableStream, forwards one branch to app, pushes the other back to Node via exposeFunction (__dsChunk/__dsDone/__dsError)

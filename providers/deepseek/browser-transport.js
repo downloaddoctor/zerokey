@@ -72,12 +72,22 @@ class DeepSeekBrowserTransport {
     this._launchPromise = null
     this._streamHookReady = null
     this._pendingTap = null
+    this._seedToken = null
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
 
-  async initializeFromJSON(_parsedFetch) {
-    await this._ensureContext()
+  async initializeFromJSON(parsedFetch) {
+    // Seed userToken from the wizard's fetch capture so a fresh profile
+    // auto-logins. The bearer token in `Authorization` is the same value
+    // DeepSeek stores under localStorage.userToken.value. If the fetch has
+    // no auth header, fall back to whatever the profile already has.
+    //
+    // Deliberately does NOT await _ensureContext(): the launch is deferred
+    // to the first chat call so the TUI wizard stays fast. _seedToken is
+    // picked up by _injectUserToken inside _launch.
+    const token = extractBearer(parsedFetch)
+    if (token) this._seedToken = token
   }
 
   async _ensureContext() {
@@ -116,6 +126,7 @@ class DeepSeekBrowserTransport {
     await this._streamHookReady
 
     await this._gotoFast(START_URL)
+    await this._injectUserToken()
     const ok = await this._waitForLogin(LOGIN_TIMEOUT_MS)
     if (!ok) {
       throw new Error('[DeepSeek/browser] login timed out — open the profile window and sign in')
@@ -219,6 +230,35 @@ class DeepSeekBrowserTransport {
       }
       window.XMLHttpRequest = PatchedXHR
     }, COMPLETION_PATH)
+  }
+
+  // Writes userToken into localStorage on the DeepSeek origin, then reloads
+  // so the SPA boots already-authenticated. No-op if we have no seeded token
+  // or the profile already holds one (avoids clobbering a valid login).
+  async _injectUserToken() {
+    if (!this._seedToken) return
+    try {
+      const wrote = await this._page.evaluate((value) => {
+        try {
+          const existing = localStorage.getItem('userToken')
+          if (existing) {
+            const parsed = JSON.parse(existing)
+            if (parsed && parsed.value) return false
+          }
+          localStorage.setItem('userToken', JSON.stringify({ value, __version: '0' }))
+          return true
+        } catch {
+          return false
+        }
+      }, this._seedToken)
+
+      if (wrote) {
+        if (this._log) console.debug('[DeepSeek/browser] seeded userToken into localStorage')
+        await this._gotoFast(START_URL)
+      }
+    } catch (err) {
+      if (this._log) console.debug(`[DeepSeek/browser] userToken inject failed: ${err.message}`)
+    }
   }
 
   async _waitForLogin(timeoutMs) {
@@ -511,6 +551,18 @@ class DeepSeekBrowserTransport {
 
     return { filename, size: buffer.length }
   }
+}
+
+// Extract the bearer token from a "Copy as fetch" capture. Case-insensitive
+// header lookup — the wizard stores headers as-copied from DevTools.
+function extractBearer(parsedFetch) {
+  const headers = parsedFetch && parsedFetch.headers
+  if (!headers) return null
+  const key = Object.keys(headers).find((k) => k.toLowerCase() === 'authorization')
+  if (!key) return null
+  const raw = String(headers[key] || '')
+  const m = /^Bearer\s+(.+)$/i.exec(raw.trim())
+  return m ? m[1].trim() : raw.trim() || null
 }
 
 function drain(readable) {

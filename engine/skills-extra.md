@@ -51,6 +51,6 @@ TRIGGER: "save"
 
 1. ⟦cmd¦run=git status --short¦run=git diff --staged¦run=git diff⟧
 2. Update AGENTS.md only if stale (step2 rules). Else skip.
-3. ⟦cmd¦run=git add -A¦run=git commit -m "emoji type: subject" (-m "body-only-when-breaking-changes")?⟧
+3. ⟦cmd¦run=git add -A¦run=git commit -m "[conventional_commit]"⟧
 4. Verify the working tree is clean after the commit.
 </save_workflow>
