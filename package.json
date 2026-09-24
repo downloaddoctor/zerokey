@@ -3,6 +3,7 @@
   "version": "0.3.0",
   "description": "OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT & Qwen — no API keys, real browser sessions",
   "main": "server.js",
+  "packageManager": "pnpm@10.13.1",
   "engines": {
     "node": ">=18.0.0"
   },
@@ -13,24 +14,17 @@
     "format:fix": "prettier --write .",
     "check": "node scripts/check-modules.js",
     "precommit": "pnpm format && pnpm lint && pnpm check",
-    "prepare": "npx simple-git-hooks",
-    "changelog": "git-cliff --unreleased -o CHANGELOG.md",
-    "release": "git-cliff --current -o CHANGELOG.md"
-  },
-  "simple-git-hooks": {
-    "pre-commit": "pnpm precommit"
+    "postinstall": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "express": "^5.2.1",
     "node-fetch": "^2.7.0",
+    "playwright": "^1.63.0",
     "prompts": "^2.4.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.10.0",
-    "git-cliff": "^2.13.1",
-    "playwright": "^1.63.0",
-    "prettier": "^3.9.6",
-    "simple-git-hooks": "^2.14.0"
+    "prettier": "^3.9.6"
   }
 }

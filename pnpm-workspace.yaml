@@ -1,5 +1,2 @@
-allowBuilds:
-  simple-git-hooks: true
-
 overrides:
   qs: '>=6.16.0'

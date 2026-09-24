@@ -1,5 +1,0 @@
-{
-  "watch": ["server.js", "core/", "routes/", "lib/", "utils/", "config/"],
-  "ignore": ["temp", "data", "node_modules"],
-  "ext": "js,json,md"
-}

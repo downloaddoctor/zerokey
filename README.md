@@ -23,6 +23,19 @@
 
 OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, **ChatGPT**, and **Qwen** — use your own browser sessions and your own credentials to connect your own accounts with VS Code (Chat), Terax, or OpenCode. Personal use only. Just paste a fetch() call from DevTools. ZeroKey does not provide shared accounts, API access, or commercial access to third-party services.
 
+> **Why DeepSeek uses a real browser.** DeepSeek's direct HTTP API is aggressively
+> flagged during their ban waves. In testing, **7 different accounts** were tried
+> across multiple workarounds — each was banned **three separate times** before
+> a single account survived. Switching to the browser transport (a real Chromium
+> profile driven via Playwright, talking to `chat.deepseek.com` through its own
+> web UI) has been stable ever since: **2M+ tokens** consumed across **two
+> accounts** with no bans.
+>
+> The tradeoff: ZeroKey is **no longer a lightweight proxy** for DeepSeek. The
+> browser transport launches a full Chromium instance per user profile
+> (`temp/profiles/deepseek/<username>/`). This is intentional — the browser is
+> what makes the session survive.
+
 > **Is it safe? How do I start?** See [llms.txt](docs/llms.txt) for a short, machine-readable summary, or the [landing page](https://downloaddoctor.github.io/zerokey/).
 
 > **Heads up:** ZeroKey is per-session — one server process is pinned to the session picked at
@@ -82,9 +95,9 @@ git clone https://github.com/downloaddoctor/zerokey.git
 cd zerokey
 pnpm install
 pnpm start
-# or on Windows
-start.bat
 ```
+
+On Windows, `zerokey.bat` and on Linux/macOS `zerokey.sh` handle clone + toolchain install + run in one step.
 
 On startup, the interactive wizard guides you through:
 
@@ -110,6 +123,10 @@ Pick whichever provider you chose in the setup wizard:
 3. Find a request to `/api/v0/chat/completion`
 4. Right-click → Copy → Copy as fetch (Node.js)
 5. Paste into the startup wizard
+
+The wizard's fetch() capture is used for auto-login (the Bearer token seeds
+`localStorage.userToken` in the browser profile). After that, requests flow
+through the real web UI — no further captures needed.
 
 ### ChatGPT
 

@@ -54,13 +54,6 @@ class Instructions {
     return { content: this._fullContent, hash: this._fullHash }
   }
 
-  invalidate() {
-    this._base = null
-    this._extra = null
-    this._baseHash = null
-    this._fullContent = null
-    this._fullHash = null
-  }
 }
 
 module.exports = new Instructions()

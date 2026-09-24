@@ -1,0 +1,5 @@
+#!/bin/sh
+files=$(git diff --name-only --diff-filter=ACM)
+pnpm prettier --write $files
+git add $files
+pnpm lint && pnpm check

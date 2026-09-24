@@ -6,11 +6,6 @@ const RATE_WINDOW = 60_000
 // { [label]: { count, windowStart, cooldownUntil } }
 const _state = {}
 
-// Known provider labels — used only for documentation. Actual labels are
-// passed at call sites (deepseek, claude, chatgpt, qwen) and
-// created on demand in acquireSlot.
-const KNOWN_LABELS = new Set(['DeepSeek', 'Claude', 'ChatGPT', 'Qwen'])
-
 /**
  * Block all future acquires for `label` until `Date.now() + ms`.
  * Called by provider APIs when they receive a 429 from the upstream server.
@@ -77,4 +72,4 @@ function acquireSlot(label = 'API', reset = false) {
   })
 }
 
-module.exports = { acquireSlot, setProviderCooldown, KNOWN_LABELS }
+module.exports = { acquireSlot, setProviderCooldown }

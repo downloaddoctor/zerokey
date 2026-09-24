@@ -1,3 +1,4 @@
+const fs = require('fs')
 const path = require('path')
 const SYNTAX = require('./syntax')
 const { injectMcpAliases } = require('./mcp/inject')
@@ -211,6 +212,8 @@ const triggers = [
   {
     trigger: '$test',
     get template() {
+      fs.writeFileSync(path.join(TEST_ROOT, 'temp', 'temp.txt'), 'Hello')
+      fs.writeFileSync(path.join(TEST_ROOT, 'temp', 'tempR.txt'), 'Hello Code')
       return TEST_TEMPLATE.split('#{cwd}#').join(TEST_ROOT)
     },
   },
@@ -227,10 +230,10 @@ const TEST_TEMPLATE = `Testing all basic tools...
 
 ⟦todos_add¦id=1¦title=Execute todos_add command¦desc=Add Task One and Task Two
 ¦id=2¦title=Execute todos_set command¦desc=Set Task 1 status to done
-¦id=3¦title=Execute write command¦desc=Write _test_tool.txt
-¦id=4¦title=Execute read command (1st)¦desc=Read _test_tool.txt after write
-¦id=5¦title=Execute replace command¦desc=Replace content in _test_tool.txt
-¦id=6¦title=Execute read command (2nd)¦desc=Read _test_tool.txt after replace
+¦id=3¦title=Execute write command¦desc=Write temp.txt (Hello)
+¦id=4¦title=Execute read command (1st)¦desc=Read temp.txt after write
+¦id=5¦title=Execute replace command¦desc=Replace Hello with Hello Code in temp.txt
+¦id=6¦title=Execute read command (2nd)¦desc=Read temp.txt to verify expected Hello Code result
 ¦id=7¦title=Execute ls command (1st)¦desc=List current directory
 ¦id=8¦title=Execute glob command¦desc=Search **/*.js max 10
 ¦id=9¦title=Execute grep command¦desc=Search Router in *.js max 5
@@ -249,19 +252,19 @@ Escaping test - \`⟦todos_set¦id=2¦status=done⟧\`
 ⟦todos_set¦id=2¦status=done⟧
 
 ⟦todos_set¦id=3¦status=active⟧
-⟦write¦path=#{cwd}#\\temp\\_test_tool.txt¦content=Hello from write tool!⟧
+⟦write¦path=#{cwd}#\\temp\\_test.txt¦content=Hello!⟧
 ⟦todos_set¦id=3¦status=done⟧
 
 ⟦todos_set¦id=4¦status=active⟧
-⟦read¦path=#{cwd}#\\start.bat⟧
+⟦read¦path=#{cwd}#\\temp\\temp.txt⟧
 ⟦todos_set¦id=4¦status=done⟧
 
 ⟦todos_set¦id=5¦status=active⟧
-⟦replace¦path=#{cwd}#\\start.bat¦old=pause¦new=pause\n⟧
+⟦replace¦path=#{cwd}#\\temp\\temp.txt¦old=Hello¦new=Hello Code⟧
 ⟦todos_set¦id=5¦status=done⟧
 
 ⟦todos_set¦id=6¦status=active⟧
-⟦read¦path=#{cwd}#\\.prettierrc⟧
+⟦read¦path=#{cwd}#\\temp\\tempR.txt⟧
 ⟦todos_set¦id=6¦status=done⟧
 
 ⟦todos_set¦id=7¦status=active⟧
@@ -311,12 +314,12 @@ Escaping test - \`⟦todos_set¦id=2¦status=done⟧\`
 ⟦cmd¦run=echo "ABOVE ALL WHERE TESTING CALLS OF:
 Execute todos_add command => Add Task One and Task Two
 Execute todos_set command => Set Task 1 status to done
-Execute write command => Write _test_tool.txt
-Execute read command (1st) => Read _test_tool.txt after write
-Execute replace command => Replace content in _test_tool.txt
-Execute read command (2nd) => Read _test_tool.txt after replace
+Execute write command => Write temp.txt (Hello)
+Execute read command (1st) => Read temp.txt after write
+Execute replace command => Replace Hello with Hello Code in temp.txt
+Execute read command (2nd) => Read temp.txt to verify expected Hello Code result
 Execute ls command (1st) => List current directory
-Execute glob command => Search **/*.js max 10
+Execute glob command => Search **/*.js max 5
 Execute grep command => Search Router in *.js max 5
 Execute cmd echo test => Run 'echo test'
 Execute cmd delete file => Delete _test_tool.txt
@@ -327,7 +330,8 @@ Execute fetch command => Fetch JSONPlaceholder todo/1
 Execute view_image command => View docs/logos/terax.png
 Execute final echo command => Display above all where testing...
 
-SO DO ANALSIS OF IT AND GIVE USER SUMMARY WHICH WORKS WHICH NOT WORKS
+SO DO ANALYSIS OF IT AND GIVE USER SUMMARY WHICH WORKS WHICH NOT WORKS
+-----------------------
 
 "⟧
 `
