@@ -3,7 +3,7 @@ const instructions = require('../../engine/instructions')
 async function setQwenInstructions(qwenApi, userData, toolCalling = true) {
   if (!userData) return false
 
-  const { content, hash } = instructions.getFull()
+  const { content, hash } = instructions.getUnlimited()
   if (userData.instructionsHash === hash) return false
 
   const finalContent = toolCalling ? content : ''

@@ -1,212 +1,98 @@
-# ZeroKey
+# PROJECT
+ZeroKey — OpenAI-compatible AI proxy. Drives real browser/session-based chat accounts (DeepSeek, Claude, ChatGPT, Qwen — no API keys) and exposes them as an OpenAI `/v1/chat/completions` endpoint for IDE agents (VS Code, Terax, OpenCode). Node.js, CommonJS, single-process, Express 5.
 
-## PROJECT
- OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT & Qwen — no API keys, real browser sessions
- Node.js >= 18, Express 5, pnpm, SSE streaming
- Auth: user pastes a browser fetch() capture; proxy replays real session cookies
- Session model: one server process pinned to the session selected at startup
+# ENTRY-POINTS
+server.js — boots Express, runs interactive SessionSelector wizard (temp/users.json), finds free port, syncs IDE config, mounts routers, global error handler, graceful shutdown (SIGINT/TERM/HUP, uncaughtException/unhandledRejection → temp error log).
+zerokey.bat / zerokey.sh — OS launch scripts (pnpm start wrappers, not read in full).
 
-## DIRECTORY
- config/
-  constants.js # CONFIG only (PORT); model/reasoning/prompt-limit data lives in providers/<name>/config.js
- core/
-  chat-router.js # buildRouter(selected) → registry.get(selected.provider).buildRouter(...)
-  session-selector.js # SessionSelector — TUI wizard; provider-agnostic via registry.get(provider)
- engine/
-  syntax.js # SYNTAX tokens (OPEN/CLOSE/SEP/ESC) + findClose, splitPayload
-  compiler.js # ToolCompiler — singleton per IDE×provider; uploadAndGetMessages, uploadAndFormatPrompt, uploadAndFormatPromptForRaw, buildPrompt, compile/parse/emit, matchSkill
-  instructions.js # Instructions — lazy-loads instructions.md + skills-extra.md, hash for change detection
-  instructions.md # Base system prompt (agent rules, MHI syntax, execution model, output contract)
-  skills-extra.md # Extra prompt appends (tool grammar, dynamic-tools listing)
-  pipeline.js # StreamPipeline — SSE head: scanning, emitting, MCP injection, skill handling, error formatting
-  tool-defs.js # TOOLS — generic tool grammar + per-IDE mappings (vscode, terax, opencode), output shorteners
-  triggers.js # Skills + MCP auto-registration/passthrough/restore
-  mcp/
-   browser.js # BROWSER_MCP — built-in browser MCP alias map
-   playwright.js # PLAYWRIGHT_MCP — Playwright MCP alias map
-   inject.js # injectMcpAliases — registers MCP tools into compiler.tools
-   auto.js # buildAutoAliasMaps, hashTools — auto-registration from mcp_<server>_<tool> naming
-  templates/
-   vscode.json # VS Code tool schemas (source for engine/tool-defs.js)
-   terax.json # Terax tool schemas
-   opencode.json # OpenCode tool schemas
- providers/
-  registry.js # ProviderRegistry — auto-discovers providers/<name>/index.js; get/getAll/getNames/getModels (flattened {id:model} map)
-  base/
-   BaseAPI.js # shared provider API base class (used by claude/deepseek)
-  deepseek/
-   index.js # provider def: {name,displayName,models,reasoning,promptLimit,setupSteps,defaultVision,createAPI,validateCredentials,validateFetch,buildRouter}
-   router.js # buildDeepSeekRouter — picks transport via env DEEPSEEK_TRANSPORT (default 'browser', alt 'api')
-   browser-transport.js # DeepSeekBrowserTransport — drives chat.deepseek.com via persistent-profile Chromium per user (temp/profiles/deepseek/<username>); page-side fetch/XHR tee; CDP Input.insertText for prompt delivery
-   config.js # models, reasoning, promptLimit, setupSteps
-   api.js # DeepSeekAPI — direct-fetch transport (PoW, cookie jar)
-   pow.js # DeepSeekPOW — WASM sha3 solver
-   stream-handler.js # SSE fragment router (THINK→reasoning_content, RESPONSE→scan)
-   api.md # upstream endpoints, POW flow, SSE event table, session shape
-   wasm/ # sha3 wasm asset
-  claude/
-   index.js # provider def
-   api.js # ClaudeAPI extends BaseAPI
-   router.js # buildClaudeRouter
-   set-instructions.js # writes conversation_preferences via /api/account_profile (hash-gated)
-   stream-handler.js # SSE (thinking_delta→reasoning_content, text_delta→scan)
-   config.js # models, reasoning, promptLimit, setupSteps
-   api.md # internal reference (HAR header order, usage-limit handling, SSE format)
-  chatgpt/
-   index.js # provider def
-   api.js # ChatGPTAPI — standalone (sentinel POW, conduit token)
-   pow.js # ChatGPTProofOfWork — SHA3-512 sentinel solver
-   router.js # buildChatGPTRouter
-   stream-handler.js # SSE (o/p/v patch stream)
-   config.js # models, reasoning, promptLimit, setupSteps
-   api.md # internal reference
-  qwen/
-   index.js # provider def
-   api.js # QwenAPI — standalone (cookie token=JWT)
-   router.js # buildQwenRouter
-   set-instructions.js # writes personalization.instruction via /api/v2/users/user/settings/update (hash-gated)
-   stream-handler.js # SSE (phase=think/answer, say-tool unwrap)
-   config.js # models, reasoning, promptLimit, setupSteps
-   api.md # internal reference
- routes/
-  docs.js # GET /openapi.json (serves repo-root openapi.json), GET /docs (Swagger UI via unpkg CDN)
-  info.js # GET / — API info
-  health.js # GET /health — uptime, user, provider, model
-  models.js # GET /v1/models, GET /v1/models/:model
- utils/
-  cookie-jar.js # CookieJar — seed/capture/serialize
-  errors.js # classifyError, toOpenAIError
-  extract-files.js # decodeContentParts — base64 data-URI → Buffer[]
-  find-port.js # findPort, isPortActive
-  capture-request.js # captureRequest — dumps req.body to temp/captures/*.json ($req skill)
-  ephemeral-session.js # ephemeralSession — clone with chatSessionId/parentMessageId nulled
-  sequential-queue.js # sequentialQueue — serializes every /v1/chat/completions request app-wide
-  human-delay.js # humanDelay — randomized 3-9s delay before provider chatCompletion
-  session-classifier.js # isRealChatSession — per-IDE system-prompt prefix match
-  logger.js # console color wrappers; tickWait(label,ms)
-  log-saver.js # LogSaver (rotating file logger); serializeError
-  rate-limiter.js # acquireSlot, setProviderCooldown — 15 req/60s window per label
-  route-helpers.js # validateMessages
-  sse-reader.js # readSSE — handles both node-fetch (Node Readable) and native fetch (WHATWG stream)
-  sync-ide-config.js # syncIdeConfig — writes ZeroKey model entry into VS Code chatLanguageModels.json
- scripts/
-  check-modules.js # require-loads every .js under core/ engine/ routes/ utils/
- docs/ # published landing page (eslint-ignored)
- temp/ # runtime: users.json, captures/, profiles/, logs (gitignored)
- zerokey.bat # Windows launcher: portable toolchain into .zerokey-tools\, clone/update/run
- zerokey.sh # Unix launcher: apt/dnf/yum/pacman/apk/brew, --prod installs
+# DIRECTORY
+config/ — static app config
+core/ — request routing + interactive session selection (CLI wizard)
+engine/ — the MHI-tool compiler/pipeline: parses model output, converts to IDE-native tool calls, streams SSE, skill/trigger system, prompt instructions
+engine/extra/ — markdown fragments injected as system/skill prompts ($tools, $agent, $R, $S, $test, etc.)
+engine/mcp/ — MCP (Model Context Protocol) passthrough/auto-registration support
+engine/templates/ — per-IDE config templates (opencode.json, terax.json, vscode.json) synced into the IDE's own settings
+providers/ — one folder per upstream chat provider (claude, chatgpt, deepseek, qwen), each self-registering via providers/registry.js
+providers/base/ — shared BaseAPI (HTTP, cookies, fetch wrapper)
+routes/ — small stateless Express routers (docs, health, info, models)
+utils/ — cross-cutting helpers (cookies, SSE parsing, rate limiting, logging, file capture, port-finding)
+docs/ — static GitHub Pages site (unrelated to runtime)
+temp/ — runtime state: users.json (accounts+sessions), profiles/<provider>/<username>/ (browser profile dirs), captures/, logs — gitignored working dir
+scripts/check-modules.js — pre-commit consistency check (not read in full)
 
-## ENTRY-POINTS
- server.js # node server.js / pnpm start
- zerokey.bat / zerokey.sh # bootstrap wrapper around server.js
+# MODULES
+config/constants.js — CONFIG.PORT (env PORT, default 7250)
+core/chat-router.js — buildRouter(selected): looks up provider in registry, delegates to provider.buildRouter
+core/session-selector.js — SessionSelector class: interactive `prompts`-based CLI wizard for provider→user→session selection; persists to temp/users.json; handles waitPolicy (rate-limit/suspension) backoff across users; new-user flow opens Notepad/$EDITOR for pasting a browser fetch() call, parses+validates it, live-checks credentials
+engine/syntax.js — MHI token constants (OPEN=⟦ CLOSE=⟧ SEP=¦ ESC=\\, NAME='MHI'); findClose/splitPayload — escape-aware raw-string scanning, mirrors the MHI syntax used by this very chat protocol
+`tool-defs.js` — TOOLS registry: generic tool name → per-IDE (vscode/terax/opencode) mapping (real tool name, param mapping, defaults, transform fn); IDES_PROMPT_OPTIMIZER: per-IDE system/user/tool message formatting + rawUser (skill-trigger extraction) + tool-output shorteners (SHORTENERS); getIDEMapper(ide) is the single entry point consumed by ToolCompiler
+`compiler.js` — ToolCompiler (cached per ideName+provider): uploadAndFormatPrompt (turns OpenAI messages[] into a single flat prompt string, runs skill-trigger detection via ToolCompiler.matchSkill), buildPrompt (prepends full instructions.md on new tool-calling sessions), parse/emit (compact "tool¦k=v" string ⇄ internal JSON ⇄ IDE-native tool-call JSON), inferType (bool/number/JSON coercion)
+`pipeline.js` — StreamPipeline: per-request SSE emitter; scan() is a streaming state machine that detects ⟦tool¦...⟧ blocks character-by-character in model output and buffers them until closed, then emits them as OpenAI tool_calls deltas (emitToolCalls, grouping repeated todos_add/todos_set into one call); rawMode (ephemeral calls or non-tool-calling sessions) bypasses all of this and streams text through unmodified; setup() orchestrates registerAutoMcpServers → restoreMcpInjections → uploadAndFormatPrompt → skill short-circuit → buildPrompt
+`instructions.js` — Instructions singleton: lazy sha256-cached loader for engine/extra/*.md; getFull()=instructions.md; getUnlimited()=instructions.md with <memory> replaced by agent.md's content (used by no-prompt-limit providers)
+`triggers.js` — skill/trigger table: static triggers ($req captures raw HTTP request, $browser/$playwright inject MCP tool grammar via passthrough, $mcp lists tags, $mcp-dump, $test seeds temp/ scratch files) + auto-generated ones (one per engine/extra/*.md, tag = $<filename> unless overridden in EXTRA_OVERRIDES); matchMcpTrigger — fallback matcher for dynamically auto-registered MCP servers (see engine/mcp/auto.js, not read); registerAutoMcpServers/restoreMcpInjections sync req.body.tools[] MCP tool defs into the compiler's tool table per-session
+engine/mcp/inject.js, engine/mcp/auto.js, engine/mcp/browser.js, `playwright.js` — MCP alias-map construction/injection (not fully read; referenced via `triggers.js`)
+`registry.js` — ProviderRegistry: auto-discovers providers/<name>/index.js (skips 'base'), exposes get/getAll/getNames/getModels()
+`BaseAPI.js` — shared HTTP client base: cookie jar wiring, _buildHeaders, _fetch (AbortController timeout→504, optional JSON parse + cookie capture), initializeFromJSON stub
+providers/<provider>/index.js — provider manifest: name, models, promptLimit, waitPolicy (optional), createAPI, validateCredentials (live-checks pasted session), validateFetch (static header/URL shape check), buildRouter
+providers/<provider>/config.js — models{}, reasoning{labels,map}, promptLimit, setupSteps (browser URL + DevTools capture instructions)
+providers/<provider>/api.js — provider-specific HTTP client extending BaseAPI: chatCompletion, uploadFile, deleteSession, getCurrentUser, full header reconstruction (Cloudflare-sensitive header order)
+providers/<provider>/router.js — builds the /v1/chat/completions sub-router: validates messages, constructs StreamPipeline, resolves reasoning_effort→provider tier via config.reasoning.map, calls pipeline.setup(), acquireSlot() (rate limit), calls api.chatCompletion(), pipes result through stream-handler.js, maps rate-limit/quota errors onto userData.waitUntil
+providers/<provider>/stream-handler.js — parses provider SSE event types → pipeline.scan()/emit() calls; detects rate-limit/quota signals mid-stream and reports back via callback
+providers/claude/set-instructions.js, `set-instructions.js` — push system instructions to provider-side conversation preferences on new tool-calling sessions
+`browser-transport.js` — Playwright-driven browser automation transport (alternative to direct-fetch API transport, selected via DEEPSEEK_TRANSPORT env, default 'browser'); getSharedTransport keyed by local username → profile dir
+providers/deepseek/pow.js, providers/deepseek/wasm/* — proof-of-work solving for DeepSeek's direct-API transport
+`docs.js` — GET `openapi.json` (serves `openapi.json`), GET /docs (Swagger UI HTML shell)
+`health.js` — GET /health (uptime, active user/provider/model)
+`info.js` — GET / (API metadata + model list)
+`models.js` — GET /v1/models, GET /v1/models/:model (OpenAI-shaped model list from registry.getModels())
+`cookie-jar.js` — CookieJar: Map-based cookie store; parse/seed/capture (fetch-Headers or raw Node headers)/serialize
+`ephemeral-session.js` — ephemeralSession(session): shallow clone with chatSessionId/parentMessageId nulled, used for ephemeral/utility calls so mutations never persist
+`session-classifier.js` — isRealChatSession(ide, messages): fingerprints the first system message against REAL_SESSION_SIGNATURES per IDE to distinguish a real chat turn from an ephemeral utility call (title-gen etc.)
+`extract-files.js` — decodeContentParts: pulls base64 data-URI images/files out of OpenAI content-parts array for upload
+`sse-reader.js` — readSSE(stream, {onData,onDone,onError}): generic SSE line-parser working over both WHATWG ReadableStream and Node Readable
+`rate-limiter.js` — acquireSlot(label): 15 req/60s sliding window per label; setProviderCooldown(label, ms): provider-imposed 429 cooldown overriding the window
+`errors.js` — toOpenAIError(error, provider, type?, code?): classifyError() maps provider-specific error shapes (session expired, suspended, device-flagged, rate limited, quota exhausted, network, etc.) to {message, action, status} → OpenAI-shaped error JSON
+`find-port.js` — findPort(start, range): scans for a free TCP port; isPortActive checker
+utils/logger.js — console.{warn,error,debug,success,info} colorize output (ANSI codes); console.debug.mix for pre-colored mixed strings; tickWait(label,ms) — live \r-updating countdown, used by rate-limiter and human-delay
+utils/sync-ide-config.js — syncIdeConfig(preSelected, port): writes/merges a 'ZeroKey' vendor entry into VS Code's chatLanguageModels.json (~/AppData/Roaming/Code/User/), one model id 'ZK-<port>' per running instance; prunes dead ports via /health probe + isPortActive; resolves reasoning-effort labels per model into supportsReasoningEffort; non-fatal on any error (VS Code-only, silently skipped elsewhere)
+utils/sequential-queue.js — sequentialQueue(): Express middleware serializing ALL requests through one instance — each waits for the prior response's finish/close before proceeding; mounted in front of chat-router
+utils/human-delay.js — humanDelay(minMs=3000,maxMs=9000): randomized await + tickWait countdown, used before provider calls to mimic human timing against bot detection
+utils/har-to-capture.js — harToCapture(harPath): dev/debug tool converting browser HAR exports into the network-capture JSON shape (not wired into runtime request path)
+utils/capture-request.js — captureRequest(req): writes req.body to temp/captures/req_<timestamp>.json; backs the $req trigger
+utils/route-helpers.js — validateMessages(messages, res): 400s via toOpenAIError if messages[] is empty/missing; used by every provider router
+utils/prompts.js — SUMMARIZE_CONVERSATION constant, shared between Claude/other routers' limit-summary flow and any skill needing the same text
+utils/log-saver.js — LogSaver class + serializeError (referenced by pipeline.js/stream-handler for capped error logs; not fully read — file content not covered by this scan)
 
-## SKILLS
- Triggers (engine/triggers.js): $cwd, $save, $req, $browser($B), $mcp, $mcp-dump, $test, $tools($T), $R, $summary($S)
- Aliases share one entry via skill.aliases[], registered in compiler.js skillsByTrigger
- $tools re-emits instructions.md; $browser/$playwright are passthrough (vscode-only)
+# MCP INTERNALS
+engine/mcp/auto.js — hashTools(tools): sha256 of tools[] for change detection; groupToolsByServer: splits req.body.tools[] by mcp_<server>_<toolname> convention (non-matching → 'native' group, prefixed native_); buildParamSyntax: JSON-schema → MHI grammar fragment; buildAutoAliasMaps: produces {'$server': aliasMap} per discovered MCP server, consumed by triggers.js/pipeline.js
+engine/mcp/inject.js — injectMcpAliases(aliasMap, compilerTools): registers each aliasMap entry as a `_passthrough` tool def (with `_validKeys` parsed from its grammar line) into the live compiler.tools table; returns the grammar block text for prompt injection
+engine/mcp/browser.js — BROWSER_MCP: hand-written alias map for VS Code's built-in browser tools (click_element, navigate_page, read_page, screenshot_page, type_in_page, etc.) — vscode-only, triggered via $browser/$B
+engine/mcp/playwright.js — PLAYWRIGHT_MCP: hand-written alias map for the real Playwright MCP server tool surface (browser_click, browser_snapshot, browser_evaluate, browser_navigate, etc.) — triggered via $playwright
 
-## MODULES
- server.js
-  → express
-  → routes/{docs,info,health,models}, core/chat-router
-  → core/session-selector
-  → utils/{find-port,sync-ide-config,logger,errors,sequential-queue,log-saver}
- chat-router.js
-  → providers/registry → providers/<name>/router.js
- session-selector.js
-  → prompts (TUI)
-  → providers/registry (createAPI/validateCredentials/setupSteps/models/reasoning/waitPolicy/defaultVision)
- registry.js
-  → providers/<name>/index.js (auto-discovered)
- providers/<name>/router.js
-  → engine/pipeline (StreamPipeline)
-  → providers/<name>/api, providers/<name>/stream-handler
-  → providers/<name>/set-instructions (claude/qwen only)
-  → utils/{rate-limiter,route-helpers}
- pipeline.js
-  → engine/compiler (ToolCompiler)
-  → engine/syntax
-  → engine/triggers (restoreMcpInjections, showAvailableMcpTags, handleSkill)
-  → utils/{errors,session-classifier,ephemeral-session}
- compiler.js
-  → engine/{instructions,tool-defs,syntax}
-  → engine/triggers (matchMcpTrigger)
-  → utils/extract-files
+# SKILL/EXTRA FILES
+engine/extra/instructions.md — base system prompt injected on new tool-calling sessions (compiler.buildPrompt); documents full MHI syntax + all 15 tools + memory/AGENTS.md workflow + save workflow; this file IS the prompt shown to the driven LLM, structurally identical to the MHI protocol governing this session
+engine/extra/agent.md — fuller agent-mode variant of instructions.md (adds explicit tree-read-before-AGENTS.md rule); spliced in in place of instructions.md's <memory> stub for no-prompt-limit providers via instructions.getUnlimited(); triggered standalone via $agent/$X
+engine/extra/reminder.md — short reusable reminder text ('emit MHI as literal text...'); triggered via $R
+engine/extra/summary.md — SUMMARIZE_CONVERSATION-equivalent skill text; triggered via $S
+engine/extra/test.md — $test skill: seeds temp/temp.txt + temp/tempR.txt scratch files, returns a scripted end-to-end exercise of all 15 tools (todos_add/set, write, read, replace, ls, glob, grep, cmd, cmd_bg, fetch, view_image, ask) for smoke-testing a new IDE/provider integration
+scripts/check-modules.js — require()'s every .js file under core/, engine/, routes/, utils/ to catch load-time errors (syntax/missing-dep); run via `pnpm check`, part of precommit
 
-## RUNTIME-GRAPH
- startup:
-  server.js → findPort → SessionSelector.select (TUI wizard)
-  → syncIdeConfig (VS Code chatLanguageModels.json)
-  → buildRouter(selected) mounted at /v1/chat/completions
- per-request (POST /v1/chat/completions):
-  sequentialQueue middleware serializes all requests (one in flight at a time)
-  → new StreamPipeline(res, session, provider, ide, messages)
-   → isRealChatSession(ide, messages) classifies real vs ephemeral utility call
-    → real: pipeline.session = session, rawMode = !toolCalling
-    → ephemeral: pipeline.session = ephemeralSession(session), rawMode = true
-   → route sets pipeline.onFinalChunk (ephemeral only) to delete the provider-side session
-  → pipeline.setup(messages, tools, req):
-   ephemeralMode → uploadAndFormatPromptForRaw(..., false)
-   rawMode      → uploadAndFormatPromptForRaw(..., true)
-   else         → registerAutoMcpServers + restoreMcpInjections + uploadAndFormatPrompt + buildPrompt
-  → acquireSlot(label)
-  → providerApi.chatCompletion → stream
-  → streamHandler → pipeline.scan → emit (MHI tool-call parsing or raw passthrough)
-  → pipeline.sendFinalChunk → session.lastUsed updated → onFinalChunk fires if set
+# ARCHITECTURE
+Startup: `server.js` → SessionSelector wizard picks {provider, user, session} → syncIdeConfig writes IDE-specific settings → mounts `/v1/chat/completions` behind sequentialQueue() + the resolved provider's router.
+Auth model: no API keys. Each provider account = a pasted browser fetch() call (cookies + headers), stored in temp/users.json, replayed with reconstructed headers (exact order matters — Cloudflare fingerprinting).
+Request flow (per provider router): validate messages → new StreamPipeline (wraps res, classifies ephemeral vs real session, resolves tool-calling/raw mode) → pipeline.setup() (MCP registration, skill-trigger matching, prompt building via ToolCompiler) → acquireSlot (rate limit) → provider api.chatCompletion() → provider stream-handler parses upstream SSE → pipeline.scan()/emit() converts to OpenAI SSE chunks, detecting ⟦tool¦...⟧ blocks and emitting them as tool_calls.
+IDE abstraction: `tool-defs.js` is the single source of truth mapping ZeroKey's own generic MHI-style tool grammar to each IDE's native tool schema (vscode/terax/opencode); ToolCompiler is cached per (ideName, provider) pair.
+Session persistence: `session` objects (chatSessionId, parentMessageId, model, toolCalling, vision, todos, mcpInjected, dynamicToolsHash, lastUsed) live in `users.json` under providers[user].sessions[]; ephemeral/utility calls get a throwaway clone (ephemeralSession) whose mutations are discarded.
+Rate/quota handling: providers surface rate-limit/suspension info via userData.waitUntil + waitPolicy (declared per-provider in index.js); SessionSelector loops user selection until a non-limited account is found.
 
-## SCHEMA
- POST /v1/chat/completions
-  body: { model, messages[], tools?, reasoning_effort? }
-  content parts: { type:"image_url", image_url:{ url:"data:mime;base64,..." } } | { type:"file", file:{ file_data:"data:mime;base64,...", filename } }
-  response: SSE of OpenAI chunk { id, object:"chat.completion.chunk", created, model, choices:[{ delta, finish_reason }] }
- GET /v1/models → { object:"list", data:Model[], activeModel }
- GET /health → { status, uptime, timestamp, username, provider, model }
- Auth header: Authorization: Bearer <vscode|terax|opencode> (default: vscode)
- temp/users.json:
-  { <provider>: { <username>: { username, parsedFetch, sessions[], instructionsHash?, waitUntil?, waitReason?, dynamicToolsHash?, mcpInjected?, todos? } } }
+# SCHEMA
+temp/users.json: `{ [provider]: { [username]: { username, parsedFetch:{headers,body,url}, sessions:[{name, chatSessionId, parentMessageId, createdAt, lastUsed, toolCalling, vision, model, todos?, mcpInjected?, dynamicToolsHash?}], waitUntil?, waitReason? } } }`
 
-## ENV
- PORT # default 7250
- DEEPSEEK_TRANSPORT # 'browser' (default) | 'api'
- EDITOR # used by SessionSelector._openEditor on non-Windows
+# ENV
+PORT — server port (default 7250)
+DEEPSEEK_TRANSPORT — 'browser' (default, Playwright automation) | 'api' (direct fetch + PoW)
 
-## DEPENDENCIES
- runtime: express ^5.2.1, node-fetch ^2.7.0, playwright ^1.63.0, prompts ^2.4.2
- dev: @eslint/js ^10, eslint ^10, prettier ^3.9.6
- pnpm 10.13.1 (packageManager); overrides qs >=6.16.0
-
-## CONFIG
- .prettierrc — singleQuote, no semi, trailingComma=all, LF, width 100, tab 2
- eslint.config.js — flat config, ignores node_modules/temp/worktemp/docs
- .githooks/pre-commit — format:fix + git add + lint + check (wired via core.hooksPath; postinstall re-wires on clone)
- config/constants.js — CONFIG.PORT (env PORT or 7250)
- providers/<name>/config.js — models, reasoning, promptLimit, setupSteps (single source per provider)
- providers/registry.js — getModels() flattens all providers into { id: Model }
-
-## BUILD
- none (runs from source)
- start: node server.js
-
-## TESTING
- pnpm check → scripts/check-modules.js
- pnpm lint, pnpm format
-
-## KNOWN-INVARIANTS
- registry.getModels() keyed by meta.id (slug), not display name; id = canonical slug, name = display label
- DeepSeek uses a single unified model `default` (model_type: default) — thinking + search + vision; PoW per request (WASM sha3); retries on SSE error exactly once
- DeepSeek browser transport: getSharedTransport({username}) lazy singleton; profile dir single-instance (cannot share with Playwright MCP or run two server processes concurrently); uploadFile drives hidden <input type=file> and polls Send re-enable; parent_message_id server-assigned (transport drops it); DeepThink/Search toggles best-effort via div.ds-toggle-button
- Claude auth: cookie; body uses completion_request_id (UUID) + effort + thinking_mode (not thinking_enabled); thinking blocks → reasoning_content deltas
- Claude reasoning: provider labels ['Low','Low Think','Medium','Medium Think','High','High Think','Max','Max Think']; Haiku override reasoning:['No Think','Think'] → thinking_mode:'extended'|'off', no effort tier; per-model enforcement in router
- Qwen auth via cookie `token=<jwt>` (authorization Bearer optional); validated by throwaway chat create+delete in QwenAPI.getCurrentUser()
- Qwen reasoning labels ['Auto','Think','Fast']; O(1) map → feature_config (thinking_enabled, auto_thinking, thinking_mode, thinking_format, auto_search); Fast omits thinking_format; per-model restrictions enforced in router (qwen3.7-max ['Think','Fast'], qwen3.5-omni-plus []); unsupported → first allowed
- Qwen selectMessage POST /api/v2/chats/:chatId/messages/select after stream finishes (non-critical, failures ignored)
- sync-ide-config.js: reads modelConfig.reasoning first (per-model), falls back to providerDef.reasoning.labels; writes thinking:true when supportsReasoning; seeds model.defaultReasoning into settings[modelId].reasoningEffort
- ToolCompiler is a singleton per IDE×provider (cached in ToolCompiler.objects)
- Session state (chatSessionId, parentMessageId, lastUsed, todos) mutated in-memory; persisted to users.json only on shutdown via selector.flush()
- SessionSelector is provider-agnostic (no provider-name string comparisons); delegates validateFetch/validateCredentials/waitPolicy/defaultVision to registry
- StreamPipeline defers tool-call emission for terax/opencode (batched at flush), emits immediately for vscode; rawMode skips MHI parser entirely
- Rate limiter: 15 req/60s per label; provider 429 → setProviderCooldown(label, ms); ChatGPT default cooldown = time to next UTC hour
- ChatGPT 403 with "unusual activity" → device/IP flagged (category device_flagged), 1-min cooldown; distinct from 401/403 session_expired
- Error logs: temp/errors.log (1MB rotation); temp/{deepseek,claude,chatgpt,qwen}-error.log (100KB rotation)
- sequentialQueue serializes every /v1/chat/completions request app-wide; no concurrent handling
- Ephemeral chat sessions deleted provider-side via pipeline.onFinalChunk, fired from sendFinalChunk
+# CONFIG
+.prettierrc / `eslint.config.js` — single quotes, LF line endings (per project style)
+`pnpm-workspace.yaml` — pnpm workspace root (single package)
+.githooks/pre-commit — runs `pnpm precommit` (format + lint + check-modules) 
