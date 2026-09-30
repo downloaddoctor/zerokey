@@ -80,13 +80,14 @@ function registerAutoMcpServers(reqTools, session) {
  */
 function makePassthroughMcpCall(tag) {
   return ({ messages, index, compilerTools, parser }) => {
-    // vscode-only: $browser/$playwright rely on VS Code's own MCP tool
-    // surface — silently no-op on other IDEs rather than injecting grammar
-    // they have no way to execute.
-    if (parser?.compiler?.ideName !== 'vscode') return
+    // vscode-family only: $browser/$playwright rely on VS Code's own MCP/browser
+    // tool surface — silently no-op on other IDEs rather than injecting grammar
+    // they have no way to execute. 'vscode-sdk' uses the SDK's native tool names.
+    const ideName = parser?.compiler?.ideName
+    if (ideName !== 'vscode' && ideName !== 'vscode-sdk') return
 
     const aliasMap = MCP_ALIAS_MAPS[tag]
-    const grammar = injectMcpAliases(aliasMap, compilerTools)
+    const grammar = injectMcpAliases(aliasMap, compilerTools, ideName)
     // const message = messages[index]
     // message.content = message.content.replace(tag, '').trim()
     messages.splice(index, 1, {
@@ -193,7 +194,7 @@ const staticTriggers = [
 
       const { content } = instructions.getExtra('test')
       return content.split('#{cwd}#').join(TEST_ROOT)
-    }
+    },
   },
 ]
 
@@ -223,7 +224,6 @@ function buildExtraTriggers() {
 }
 
 const triggers = [...staticTriggers, ...buildExtraTriggers()]
-
 
 function showAvailableMcpTags(reqTools, parser) {
   const autoMaps = buildAutoAliasMaps(reqTools || [])
