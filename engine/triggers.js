@@ -152,10 +152,10 @@ function restoreMcpInjections(session, compilerTools, reqTools = {}) {
 // auto-registers as $<basename>. Hand-written triggers below always win —
 // this map only controls the *name*/aliases an auto-generated entry gets.
 const EXTRA_OVERRIDES = {
-  agent: { trigger: '$agent', aliases: ['$X'] },
-  instructions: { trigger: '$tools', aliases: ['$T', '$I'] },
-  reminder: { trigger: '$R' },
-  summary: { trigger: '$S' },
+  agent: { trigger: '$agent', aliases: ['$x', '$save'] },
+  instructions: { trigger: '$tools', aliases: ['$t', '$i'] },
+  reminder: { trigger: '$reminder', aliases: ['$r'] },
+  summary: { trigger: '$summary', aliases: ['$s'] },
 }
 
 // Hand-written triggers — these take precedence over auto-generated ones with
@@ -169,7 +169,7 @@ const staticTriggers = [
   },
   {
     trigger: '$browser',
-    aliases: ['$B'],
+    aliases: ['$b'],
     template: '',
     passthrough: true, // does not end the stream — splices an INTERNAL message into the array, request continues to the provider
     call: makePassthroughMcpCall('$browser'),

@@ -6,6 +6,7 @@ const { getSharedTransport } = require('./browser-transport')
 const { streamHandler } = require('./stream-handler')
 const { acquireSlot } = require('../../utils/rate-limiter')
 const { validateMessages } = require('../../utils/route-helpers')
+const { resolveIde } = require('../../utils/session-classifier')
 const { reasoning } = require('./config')
 
 // Transport selection: 'browser' (default) drives the real web UI; 'api' keeps
@@ -53,7 +54,13 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
     if (!validateMessages(messages, res)) return
 
     StreamPipeline.setSSEHeaders(res)
-    const pipeline = new StreamPipeline(res, session, 'deepseek', req.ide, messages)
+    const pipeline = new StreamPipeline(
+      res,
+      session,
+      'deepseek',
+      resolveIde(req.ide, messages),
+      messages,
+    )
 
     if (pipeline.ephemeralMode) {
       pipeline.sendFinalChunk()

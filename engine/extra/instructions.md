@@ -32,7 +32,9 @@ Loop: you emit MHI text → I copy it, run it on my machine → paste results ba
 Later <live_instructions> tags add directives/reminders to this prompt.
 </execution>
 
-<memory>first message: AGENTS.md exists → read as context. missing → ask user to send $agent, then create AGENTS.md. $agent rules also govern updates + the save workflow.</memory>
+<memory>first message: AGENTS.md exists → read as context. missing → ask user to send $agent, then create AGENTS.md. $agent rules also govern updates + the save workflow.
+`save` = run `git status --short` + diffs → update AGENTS.md only if structurally stale → `git add -A` + commit with `<emoji> <type>(<scope>): <subject>` → verify clean.
+</memory>
 
 <example>
 You: ⟦ls¦path=d:\Project\foo⟧

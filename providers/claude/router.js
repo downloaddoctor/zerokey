@@ -7,6 +7,7 @@ const { setClaudeInstructions } = require('./set-instructions')
 const { acquireSlot } = require('../../utils/rate-limiter')
 const { validateMessages } = require('../../utils/route-helpers')
 const { SUMMARIZE_CONVERSATION } = require('../../utils/prompts')
+const { resolveIde } = require('../../utils/session-classifier')
 const { models, reasoning } = require('./config')
 
 const CLAUDE_MODELS = models.models
@@ -26,7 +27,13 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
     if (!validateMessages(messages, res)) return
 
     StreamPipeline.setSSEHeaders(res)
-    const pipeline = new StreamPipeline(res, session, 'claude', req.ide, messages)
+    const pipeline = new StreamPipeline(
+      res,
+      session,
+      'claude',
+      resolveIde(req.ide, messages),
+      messages,
+    )
     const activeSession = pipeline.session
     const model = activeSession.model
 

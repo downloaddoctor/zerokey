@@ -5,6 +5,7 @@ const { ChatGPTAPI } = require('./api')
 const { chatgptStreamHandler } = require('./stream-handler')
 const { acquireSlot } = require('../../utils/rate-limiter')
 const { validateMessages } = require('../../utils/route-helpers')
+const { resolveIde } = require('../../utils/session-classifier')
 const chatgptApi = new ChatGPTAPI()
 
 async function buildChatGPTRouter(parsedFetch, session, _userData = null) {
@@ -19,7 +20,13 @@ async function buildChatGPTRouter(parsedFetch, session, _userData = null) {
     if (!validateMessages(messages, res)) return
 
     StreamPipeline.setSSEHeaders(res)
-    const pipeline = new StreamPipeline(res, session, 'chatgpt', req.ide, messages)
+    const pipeline = new StreamPipeline(
+      res,
+      session,
+      'chatgpt',
+      resolveIde(req.ide, messages),
+      messages,
+    )
     const activeSession = pipeline.session
     const model = activeSession.model || 'auto'
 

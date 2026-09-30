@@ -45,6 +45,7 @@ app.use((req, res, next) => {
 
 app.use('/', docsRouter)
 app.use('/', infoRouter)
+
 ;(async () => {
   const selector = new SessionSelector()
   const preSelected = await selector.select(true)

@@ -3,6 +3,7 @@ const fs = require('fs')
 const NEW_SESSION_START_LENGTH = {
   terax: 2,
   vscode: 3,
+  'vscode-sdk': 2,
   opencode: 2,
 }
 
@@ -36,61 +37,109 @@ function* parseTags(htmlString) {
   }
 }
 
-const IDES_PROMPT_OPTIMIZER = {
-  vscode: {
-    rawUser: (content) => {
-      const tags = getAllTags(content?.[0]?.text || content)
-      return tags._len ? tags.userRequest?.content || '' : content
-    },
-    system: () => '',
-    user: (content, messages, isNewSession) => {
-      const tags = getAllTags(content?.[0].text || content)
-      let userText = tags._len ? tags.userRequest?.content || '' : content
-      const mes = []
+const VSCODE_PROMPT_OPTIMIZER = {
+  rawUser: (content) => {
+    const tags = getAllTags(content?.[0]?.text || content)
+    return tags._len ? tags.userRequest?.content || '' : content
+  },
+  system: () => '',
+  user: (content, messages, isNewSession) => {
+    const tags = getAllTags(content?.[0].text || content)
+    let userText = tags._len ? tags.userRequest?.content || '' : content
+    const mes = []
 
-      if (tags.workspace_info) {
-        console.info('\n\n[SESSION] NEW STARTED!')
-        const [, , cwd, , , ..._struct] = tags.workspace_info.full.split('\n')
+    if (tags.workspace_info) {
+      console.info('\n\n[SESSION] NEW STARTED!')
+      const [, , cwd, , , ..._struct] = tags.workspace_info.full.split('\n')
 
-        // const hasWorkspace = userText.includes('$workspace')
-        // if (hasWorkspace) {
-        //   userText = userText.replace('$workspace ', '')
-        //   struct.pop()
-        //   struct.pop()
-        //   struct.pop()
-        //   mes.push(`<WORKSPACE>${struct.join('\n')}</WORKSPACE>`)
-        // }
+      // const hasWorkspace = userText.includes('$workspace')
+      // if (hasWorkspace) {
+      //   userText = userText.replace('$workspace ', '')
+      //   struct.pop()
+      //   struct.pop()
+      //   struct.pop()
+      //   mes.push(`<WORKSPACE>${struct.join('\n')}</WORKSPACE>`)
+      // }
 
-        mes.push(`<cwd>${cwd.split(' ')[1]}</cwd>`)
-
-        return mes.filter((e) => e).join('\n\n')
-      }
-
-      if (tags.attachments?.content?.length) {
-        mes.push(filterAttachments(tags.attachments.content))
-      }
-
-      mes.push('USER: ' + (isNewSession ? 'FIRST MESSAGE - ' : '') + userText)
+      mes.push(`<cwd>${cwd.split(' ')[1]}</cwd>`)
 
       return mes.filter((e) => e).join('\n\n')
-    },
-    tool: (name, result) => {
-      try {
-        const parsed = JSON.parse(result)
-        if (Array.isArray(parsed)) {
-          return (
-            parsed
-              .filter((item) => !item.mimeType)
-              .map((item) => item.value || item.data || '')
-              .filter((item) => item)
-              .map((item) => shortenToolOutput(name, item))
-              .join('') || shortenToolOutput(name, result)
-          )
-        }
-      } catch {}
-      return shortenToolOutput(name, result)
-    },
+    }
+
+    if (tags.attachments?.content?.length) {
+      mes.push(filterAttachments(tags.attachments.content))
+    }
+
+    mes.push('USER: ' + (isNewSession ? 'FIRST MESSAGE - ' : '') + userText)
+
+    return mes.filter((e) => e).join('\n\n')
   },
+  tool: (name, result) => {
+    try {
+      const parsed = JSON.parse(result)
+      if (Array.isArray(parsed)) {
+        return (
+          parsed
+            .filter((item) => !item.mimeType)
+            .map((item) => item.value || item.data || '')
+            .filter((item) => item)
+            .map((item) => shortenToolOutput(name, item))
+            .join('') || shortenToolOutput(name, result)
+        )
+      }
+    } catch {}
+    return shortenToolOutput(name, result)
+  },
+}
+
+// VS Code Copilot SDK turns send plain text wrapped in <current_datetime> and
+// <system_reminder> tags (no <userRequest> wrapper like classic Copilot Chat),
+// so the vscode extractor would strip everything. This variant keeps the text
+// between the wrapper tags.
+const VSCODE_SDK_PROMPT_OPTIMIZER = {
+  rawUser: (content) => {
+    const text = typeof content === 'string' ? content : content?.[0]?.text || ''
+    return extractSdkUserText(text)
+  },
+  system: (content) => {
+    const cwd = extractSdkCwd(content)
+    return cwd ? `<cwd>${cwd}</cwd>` : ''
+  },
+  user: (content, messages, isNewSession) => {
+    const text = typeof content === 'string' ? content : content?.[0]?.text || ''
+    const userText = extractSdkUserText(text)
+    return 'USER: ' + (isNewSession ? 'FIRST MESSAGE - ' : '') + userText
+  },
+  tool: VSCODE_PROMPT_OPTIMIZER.tool,
+}
+
+/**
+ * Pull the working directory from the SDK system prompt's <environment_context>
+ * block ("* Current working directory: <path>"). Returns '' when absent.
+ */
+function extractSdkCwd(content) {
+  if (typeof content !== 'string') return ''
+  const m = content.match(/Current working directory:\s*(.+)/)
+  return m ? m[1].trim() : ''
+}
+
+/**
+ * Strip the SDK's <current_datetime>…</current_datetime> prefix and any
+ * <system_reminder>…</system_reminder> block, returning the remaining user text.
+ */
+function extractSdkUserText(text) {
+  if (typeof text !== 'string') return text
+
+  let s = text
+  s = s.replace(/<current_datetime>[\s\S]*?<\/current_datetime>\s*/g, '')
+  s = s.replace(/<system_reminder>[\s\S]*?<\/system_reminder>\s*/g, '')
+
+  return s.trim()
+}
+
+const IDES_PROMPT_OPTIMIZER = {
+  vscode: VSCODE_PROMPT_OPTIMIZER,
+  'vscode-sdk': VSCODE_SDK_PROMPT_OPTIMIZER,
   terax: {
     rawUser: (content) => {
       const envClose = content.indexOf('</env>\n\n')
@@ -168,6 +217,51 @@ const TODO = () => ({
     },
     default: { todoList: [] },
   },
+  'vscode-sdk': {
+    tool: 'sql',
+    params: {},
+    array: {
+      key: 'todos',
+      fields: {
+        id: 'id',
+        title: 'title',
+        status: {
+          wait: 'pending',
+          active: 'in_progress',
+          done: 'done',
+        },
+        desc: 'description',
+      },
+    },
+    default: { todos: [] },
+    transform: (values) => {
+      const rows = (values.todos || []).map((t) => ({
+        id: t.id,
+        title: (t.title || '').replace(/'/g, "''"),
+        status: t.status || 'pending',
+        description: (t.description || '').replace(/'/g, "''"),
+      }))
+
+      values.description = 'Sync todos'
+
+      if (!rows.length) {
+        delete values.todos
+        values.query = 'SELECT 1;'
+        return
+      }
+
+      // Create-or-update each row so add/set both converge on the merged list.
+      values.query = rows
+        .map(
+          (r) =>
+            `INSERT INTO todos (id, title, status, description) VALUES (${r.id}, '${r.title}', '${r.status}', '${r.description}') ` +
+            `ON CONFLICT(id) DO UPDATE SET title=excluded.title, status=excluded.status, description=excluded.description;`,
+        )
+        .join(' ')
+
+      delete values.todos
+    },
+  },
   terax: {
     tool: 'todo_write',
     params: {},
@@ -231,6 +325,15 @@ const EDIT = () => ({
     },
     default: { replacements: [], explanation: 'Multiple string replacement in the file' },
   },
+  'vscode-sdk': {
+    split: true,
+    tool: 'edit',
+    params: {
+      path: 'path',
+      old: 'old_str',
+      new: 'new_str',
+    },
+  },
   terax: {
     split: true,
     tool: 'edit',
@@ -271,6 +374,16 @@ const TOOLS = {
       params: { path: 'filePath', from: 'startLine', to: 'endLine' },
       default: { filePath: ' ', startLine: 1, endLine: 9007199254740991 },
     },
+    'vscode-sdk': {
+      tool: 'view',
+      params: { path: 'path' },
+      default: { path: ' ' },
+      transform: (values, internal) => {
+        if (internal.from) {
+          values.view_range = [internal.from, internal.to ?? -1]
+        }
+      },
+    },
     terax: {
       tool: 'read_file',
       params: { path: 'path', offset: 'offset', limit: 'limit' },
@@ -287,6 +400,18 @@ const TOOLS = {
     vscode: {
       tool: 'create_file',
       params: { path: 'filePath', content: 'content' },
+      transform: (values, internal) => {
+        try {
+          if (fs.existsSync(internal.path)) {
+            console.warn('[WRITE] DELETE:', internal.path)
+            fs.unlinkSync(internal.path)
+          }
+        } catch {}
+      },
+    },
+    'vscode-sdk': {
+      tool: 'create',
+      params: { path: 'path', content: 'file_text' },
       transform: (values, internal) => {
         try {
           if (fs.existsSync(internal.path)) {
@@ -349,6 +474,25 @@ const TOOLS = {
         delete values.options
       },
     },
+    'vscode-sdk': {
+      tool: 'ask_user',
+      params: { question: 'question' },
+      array: {
+        key: 'choices',
+        fields: {
+          option: 'label',
+        },
+        transform: (options) => options.map((op) => op.label),
+      },
+      default: { question: '' },
+      transform: (values, _internal) => {
+        if (Array.isArray(values.choices) && values.choices.length) {
+          values.choices = values.choices.map((c) => c.label ?? c)
+        } else {
+          delete values.choices
+        }
+      },
+    },
     terax: {
       tool: 'bash_run',
       params: { run: 'command' },
@@ -387,6 +531,11 @@ const TOOLS = {
     eg: [{ path: '/path/to/directory' }],
     vscode: {
       tool: 'list_dir',
+      params: { path: 'path' },
+      default: { path: true },
+    },
+    'vscode-sdk': {
+      tool: 'view',
       params: { path: 'path' },
       default: { path: true },
     },
@@ -434,6 +583,11 @@ const TOOLS = {
       params: { pattern: 'query', max: 'maxResults' },
       default: { query: ' ' },
     },
+    'vscode-sdk': {
+      tool: 'glob',
+      params: { pattern: 'pattern' },
+      default: { pattern: ' ' },
+    },
     terax: {
       tool: 'glob',
       params: { pattern: 'pattern' },
@@ -479,6 +633,11 @@ const TOOLS = {
       },
       default: { query: ' ', isRegexp: true },
     },
+    'vscode-sdk': {
+      tool: 'grep',
+      params: { query: 'pattern', glob: 'glob', path: 'paths' },
+      default: { pattern: ' ' },
+    },
     terax: {
       tool: 'grep',
       params: { query: 'pattern' },
@@ -516,6 +675,15 @@ const TOOLS = {
           values.timeout = internal.till * 1000
         }
       },
+    },
+    'vscode-sdk': {
+      split: true,
+      tool: 'powershell',
+      params: {
+        run: 'command',
+        goal: 'description',
+      },
+      default: { command: ' ', description: ' ', mode: 'sync' },
     },
     terax: {
       split: true,
@@ -557,6 +725,11 @@ const TOOLS = {
         explanation: 'Run in background',
       },
     },
+    'vscode-sdk': {
+      tool: 'powershell',
+      params: { run: 'command' },
+      default: { command: ' ', description: 'Run in background', mode: 'async' },
+    },
     terax: {
       tool: 'bash_background',
       params: { run: 'command' },
@@ -580,6 +753,15 @@ const TOOLS = {
       tool: 'get_terminal_output',
       params: { termId: 'id' },
       default: { id: ' ' },
+    },
+    'vscode-sdk': {
+      tool: 'read_powershell',
+      params: { termId: 'shellId', tail: 'delay' },
+      default: { shellId: ' ', delay: 0 },
+      transform: (values, internal) => {
+        values.shellId = String(internal.termId ?? '')
+        values.delay = 0
+      },
     },
     terax: {
       tool: 'bash_logs',
@@ -625,6 +807,11 @@ const TOOLS = {
         values.urls = [internal.url]
       },
     },
+    'vscode-sdk': {
+      tool: 'web_fetch',
+      params: { url: 'url' },
+      default: { url: ' ' },
+    },
     terax: {
       tool: 'bash_run',
       params: { url: 'command' },
@@ -647,6 +834,14 @@ const TOOLS = {
       tool: 'kill_terminal',
       params: { termId: 'id' },
       default: { id: ' ' },
+    },
+    'vscode-sdk': {
+      tool: 'stop_powershell',
+      params: { termId: 'shellId' },
+      default: { shellId: ' ' },
+      transform: (values, internal) => {
+        values.shellId = String(internal.termId ?? '')
+      },
     },
     terax: {
       tool: 'bash_kill',
@@ -674,6 +869,11 @@ const TOOLS = {
     vscode: {
       tool: 'view_image',
       params: { path: 'filePath' },
+    },
+    'vscode-sdk': {
+      tool: 'view',
+      params: { path: 'path' },
+      default: { path: ' ' },
     },
   },
 
