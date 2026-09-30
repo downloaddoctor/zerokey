@@ -1,7 +1,7 @@
 // Hand-written alias map for the IDE's built-in browser tools.
 // Entry format: toolName: [realName, syntaxLine, sdkName?]
 //   realName — classic VS Code tool name
-//   sdkName  — VS Code Copilot SDK native name (used when ideName='vscode-sdk')
+//   sdkName  — VS Code Copilot SDK native name (used when ideName='copilot')
 const BROWSER_MCP = {
   click_element: [
     'click_element',

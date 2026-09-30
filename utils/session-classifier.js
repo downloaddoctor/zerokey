@@ -1,66 +1,52 @@
-// Known system-prompt prefixes each IDE sends on a real conversational turn.
-// Fingerprinted from live captures. Anything arriving with a system-first
-// message that does NOT start with one of the matching prefixes is not a real
-// chat turn — treat it as an ephemeral/utility call (title-gen, tool-optimizer,
-// or any other short-lived request not yet individually fingerprinted).
-// VS Code sends two distinct prompts: the classic Copilot Chat turn ("You are
-// an expert AI programming assistant") and the newer Copilot SDK/agent turn
-// ("Follow Microsoft content policies."). Both are real sessions.
-const REAL_SESSION_SIGNATURES = {
-  opencode: ['You are opencode'],
-  terax: ['You are Terax, an AI agent'],
-  vscode: ['You are an expert AI programming assistant', 'Follow Microsoft content policies.'],
-}
+// Session classification — thin wrapper over engine/tools, which is the single
+// source of truth for IDE tool surfaces. Each surface declares its own
+// system-prompt fingerprint (realSessionPrefix → IDEToolSurface#isRealSession),
+// so adding a surface automatically registers its signature; nothing here needs
+// updating.
+//
+// The Bearer header (req.ide) names an IDE, but it cannot distinguish the two
+// VS Code surfaces (classic Copilot Chat vs Copilot SDK) — both arrive as
+// 'vscode'. So the surface is resolved purely from the system prompt.
 
-// VS Code Copilot SDK (agent) turns use a distinct system prompt and a
-// different native tool surface than classic Copilot Chat (see
-// engine/tool-defs.js TOOLS entries under the 'vscode-sdk' key). The Bearer
-// header cannot distinguish the two, so resolveIde upgrades req.ide from
-// 'vscode' to 'vscode-sdk' when the SDK prompt is detected.
-const VSCODE_SDK_SIGNATURE = 'Follow Microsoft content policies.'
+const { resolveSurface } = require('../engine/tools')
 
 /**
- * Shared classifier: decides whether this is a real conversational turn and,
- * for VS Code, whether it is the Copilot SDK variant.
+ * Classify a request: which tool surface does it belong to, and is it a real
+ * conversational turn?
  *
- * @param {string} ide - req.ide from the Bearer header
+ * @param {string} ide - req.ide from the Bearer header (fallback only)
  * @param {Array} messages - req.body.messages
- * @returns {{ isReal: boolean, isVscodeSdk: boolean }}
+ * @returns {{ isReal: boolean, surface: string, matched: string|null }}
  */
 function classifySession(ide, messages) {
-  const first = messages && messages[0]
-  if (!first || first.role !== 'system' || typeof first.content !== 'string') {
-    return { isReal: true, isVscodeSdk: false }
-  }
+  const surface = resolveSurface(messages)
+  if (surface) return { isReal: true, surface, matched: surface }
 
-  const isVscodeSdk = ide === 'vscode' && first.content.startsWith(VSCODE_SDK_SIGNATURE)
-
-  const sigs = REAL_SESSION_SIGNATURES[ide]
-  if (!sigs) return { isReal: true, isVscodeSdk }
-
-  return { isReal: sigs.some((sig) => first.content.startsWith(sig)), isVscodeSdk }
+  // No surface recognized this system prompt: treat as an ephemeral/utility
+  // call (title-gen, tool-optimizer, …) and keep the header's IDE as surface.
+  return { isReal: false, surface: ide, matched: null }
 }
 
 /**
  * @param {string} ide - req.ide
  * @param {Array} messages - req.body.messages
  * @returns {boolean} true if this looks like a real conversational turn for
- *   the given IDE, false if it should be treated as an ephemeral utility call
+ *   a known IDE surface, false if it should be treated as an ephemeral call
  */
 function isRealChatSession(ide, messages) {
   return classifySession(ide, messages).isReal
 }
 
 /**
- * Upgrade req.ide for a VS Code Copilot SDK turn: 'vscode' → 'vscode-sdk'.
- * No-op for any other IDE or when messages don't match the SDK prompt.
+ * Resolve the exact tool surface for a request, falling back to `ide` when no
+ * known surface matches.
  *
  * @param {string} ide - req.ide from the Bearer header
  * @param {Array} messages - req.body.messages
- * @returns {string} the resolved IDE key ('vscode-sdk' for SDK turns)
+ * @returns {string} the resolved IDE/tool-surface key
  */
 function resolveIde(ide, messages) {
-  return classifySession(ide, messages).isVscodeSdk ? 'vscode-sdk' : ide
+  return classifySession(ide, messages).surface
 }
 
-module.exports = { isRealChatSession, resolveIde, classifySession, REAL_SESSION_SIGNATURES }
+module.exports = { isRealChatSession, resolveIde, classifySession }

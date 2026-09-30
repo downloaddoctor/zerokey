@@ -1,6 +1,6 @@
 const instructions = require('./instructions')
 const SYNTAX = require('./syntax')
-const { getIDEMapper } = require('./tool-defs')
+const { getIDEMapper } = require('./tools')
 const registry = require('../providers/registry')
 const { matchMcpTrigger } = require('./triggers')
 const { decodeContentParts } = require('../utils/extract-files')
@@ -35,9 +35,9 @@ class ToolCompiler {
 
     this.tools = tools
 
-    if (ideName === 'vscode-sdk') {
+    if (ideName === 'copilot') {
       const { injectMcpAliases } = require('./mcp/inject')
-      injectMcpAliases(require('./mcp/browser'), this.tools, 'vscode-sdk')
+      injectMcpAliases(require('./mcp/browser'), this.tools, 'copilot')
     }
 
     this._handlers = {

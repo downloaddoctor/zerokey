@@ -17,18 +17,18 @@ function extractValidKeys(syntax) {
  * Alias-map format: { toolName: [realName, syntaxLine] }
  *
  * Entry format: toolName: [realName, syntaxLine, sdkName?]. When ideName is
- * 'vscode-sdk' and sdkName is present, sdkName is used as the emitted tool.
+ * 'copilot' and sdkName is present, sdkName is used as the emitted tool.
  *
  * @param {object} aliasMap - e.g. BROWSER_MCP from ./browser.js
  * @param {object} compilerTools - compiler.tools (mutated in-place)
- * @param {string} [ideName] - compiler IDE ('vscode' | 'vscode-sdk' | ...)
+ * @param {string} [ideName] - compiler IDE ('vscode' | 'copilot' | ...)
  * @returns {string} newline-joined grammar block
  */
 function injectMcpAliases(aliasMap, compilerTools, ideName) {
   const grammarLines = []
 
   for (const [toolName, [realName, syntax, sdkName]] of Object.entries(aliasMap)) {
-    const emitted = ideName === 'vscode-sdk' && sdkName ? sdkName : realName
+    const emitted = ideName === 'copilot' && sdkName ? sdkName : realName
     if (!compilerTools[toolName]) {
       compilerTools[toolName] = {
         _passthrough: true,
