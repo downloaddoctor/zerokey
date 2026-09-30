@@ -34,6 +34,12 @@ class ToolCompiler {
     this._promptLimit = (registry.get(provider)?.promptLimit ?? 64_000) - 64
 
     this.tools = tools
+
+    if (ideName === 'vscode-sdk') {
+      const { injectMcpAliases } = require('./mcp/inject')
+      injectMcpAliases(require('./mcp/browser'), this.tools, 'vscode-sdk')
+    }
+
     this._handlers = {
       system: (mes) => system(mes.content),
       agent: (mes) => `AGENT: ${mes.content}`,

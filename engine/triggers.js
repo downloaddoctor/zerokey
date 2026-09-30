@@ -132,8 +132,9 @@ function matchMcpTrigger(word) {
  * @param {object} session
  * @param {object} compilerTools - compiler.tools (mutated in-place)
  * @param {Array}  [reqTools]    - req.body.tools[] from the current request
+ * @param {string} [ideName]     - compiler IDE, selects SDK vs classic tool names
  */
-function restoreMcpInjections(session, compilerTools, reqTools = {}) {
+function restoreMcpInjections(session, compilerTools, reqTools = {}, ideName) {
   const autoMaps = reqTools ? buildAutoAliasMaps(reqTools) : {}
   const wanted = new Set([...Object.keys(MCP_ALIAS_MAPS), ...Object.keys(autoMaps)])
 
@@ -145,7 +146,7 @@ function restoreMcpInjections(session, compilerTools, reqTools = {}) {
     if (probeKey && compilerTools[probeKey]) continue
 
     console.info('[SKILL]', tag, 'injected')
-    injectMcpAliases(aliasMap, compilerTools)
+    injectMcpAliases(aliasMap, compilerTools, ideName)
   }
 }
 

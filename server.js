@@ -44,9 +44,9 @@ app.use((req, res, next) => {
 })
 
 app.use('/', docsRouter)
-app.use('/', infoRouter)
+app.use('/', infoRouter);
 
-;(async () => {
+(async () => {
   const selector = new SessionSelector()
   const preSelected = await selector.select(true)
 
@@ -94,7 +94,7 @@ app.use('/', infoRouter)
           `Body: ${JSON.stringify(body, null, 2)}`,
         ].join('\n'),
       )
-    } catch {}
+    } catch { }
     if (!res.headersSent) res.status(status).json(openaiErr)
     else res.end()
   })
@@ -133,7 +133,7 @@ app.use('/', infoRouter)
           (err && err.stack) || '',
         ].join('\n'),
       )
-    } catch {}
+    } catch { }
     console.error('[Server] uncaughtException:', (err && (err.stack || err.message)) || err)
     selector.flush()
     process.exit(1)
@@ -149,7 +149,7 @@ app.use('/', infoRouter)
           err.stack || '',
         ].join('\n'),
       )
-    } catch {}
+    } catch { }
     console.error('[Server] unhandledRejection:', err.stack || err.message)
   })
 })()

@@ -148,10 +148,10 @@ class StreamPipeline {
     }
   }
 
-  upload(_file) {}
+  upload(_file) { }
 
   // ── public emit methods ────────────────────────────────────────────────
-  emit(delta, _finishReason = null, _usage = null) {}
+  emit(delta, _finishReason = null, _usage = null) { }
 
   emitText(content, role = 'assistant') {
     this.emit({ role, content })
@@ -217,7 +217,7 @@ class StreamPipeline {
     }
 
     registerAutoMcpServers(tools, this.session)
-    restoreMcpInjections(this.session, this.compiler.tools, tools)
+    restoreMcpInjections(this.session, this.compiler.tools, tools, this.compiler.ideName)
 
     const { prompt, skill } = await this.compiler.uploadAndFormatPrompt(messages, this)
 
