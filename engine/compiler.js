@@ -35,9 +35,11 @@ class ToolCompiler {
 
     this.tools = tools
 
-    if (ideName === 'copilot') {
+    const surfaceRegistry = require('../surfaces/registry')
+    this.surfaceDef = surfaceRegistry.getSurface(ideName)
+    if (this.surfaceDef?.browserTools) {
       const { injectMcpAliases } = require('./mcp/inject')
-      injectMcpAliases(require('./mcp/browser'), this.tools, 'copilot')
+      injectMcpAliases(require('./mcp/browser'), this.tools, this.surfaceDef.browserNameMap)
     }
 
     this._handlers = {

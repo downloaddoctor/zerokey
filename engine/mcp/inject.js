@@ -21,14 +21,14 @@ function extractValidKeys(syntax) {
  *
  * @param {object} aliasMap - e.g. BROWSER_MCP from ./browser.js
  * @param {object} compilerTools - compiler.tools (mutated in-place)
- * @param {string} [ideName] - compiler IDE ('vscode' | 'copilot' | ...)
+ * @param {object} [nameMap] - genericKey → native name override for this surface
  * @returns {string} newline-joined grammar block
  */
-function injectMcpAliases(aliasMap, compilerTools, ideName) {
+function injectMcpAliases(aliasMap, compilerTools, nameMap = {}) {
   const grammarLines = []
 
-  for (const [toolName, [realName, syntax, sdkName]] of Object.entries(aliasMap)) {
-    const emitted = ideName === 'copilot' && sdkName ? sdkName : realName
+  for (const [toolName, [realName, syntax]] of Object.entries(aliasMap)) {
+    const emitted = nameMap[toolName] ?? realName
     if (!compilerTools[toolName]) {
       compilerTools[toolName] = {
         _passthrough: true,

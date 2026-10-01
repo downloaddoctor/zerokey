@@ -32,21 +32,10 @@ app.use((req, res, next) => {
   next()
 })
 
-const VALID_IDES = new Set(['vscode', 'terax', 'opencode'])
-
-app.use((req, res, next) => {
-  const authHeader = req.headers.authorization || ''
-  const rawIde = authHeader.startsWith('Bearer ')
-    ? authHeader.slice(7).trim().toLowerCase()
-    : 'vscode'
-  req.ide = VALID_IDES.has(rawIde) ? rawIde : 'vscode'
-  next()
-})
-
 app.use('/', docsRouter)
-app.use('/', infoRouter);
+app.use('/', infoRouter)
 
-(async () => {
+async function start() {
   const selector = new SessionSelector()
   const preSelected = await selector.select(true)
 
@@ -152,4 +141,6 @@ app.use('/', infoRouter);
     } catch { }
     console.error('[Server] unhandledRejection:', err.stack || err.message)
   })
-})()
+}
+
+start()

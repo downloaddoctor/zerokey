@@ -23,6 +23,19 @@ module.exports = (t) => {
   t.ideName = 'copilot'
   t.newSessionStartLength = 2
   t.realSessionPrefix = 'Follow Microsoft content policies.'
+  t.browserTools = true
+  t.browserNameMap = {
+    click_element: 'clickElement',
+    drag_element: 'dragElement',
+    hover_element: 'hoverElement',
+    handle_dialog: 'handleDialog',
+    navigate_page: 'navigatePage',
+    open_browser_page: 'openBrowserPage',
+    read_page: 'readPage',
+    run_playwright_code: 'runPlaywrightCode',
+    screenshot_page: 'screenshotPage',
+    type_in_page: 'typeInPage',
+  }
 
   t.tool('read', 'view', {
     params: { path: 'path' },
@@ -40,7 +53,7 @@ module.exports = (t) => {
           console.warn('[WRITE] DELETE:', internal.path)
           fs.unlinkSync(internal.path)
         }
-      } catch {}
+      } catch { }
     },
   })
 

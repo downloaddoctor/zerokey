@@ -78,6 +78,22 @@ class SurfaceRegistry {
   }
 
   /**
+   * Flags a configured surface declares (browserTools, toolNameVariant, …).
+   * Used by server.js (valid IDE names) and engine/triggers.js (browser tools).
+   * @param {string} name
+   * @returns {IDEToolSurface|null}
+   */
+  getSurface(name) {
+    this._ensureDiscovered()
+    const configure = this.surfaces.get(name)
+    if (!configure) return null
+
+    const surface = new IDEToolSurface()
+    configure(surface)
+    return surface
+  }
+
+  /**
    * Decide which surface a request belongs to by asking every surface whether
    * the system prompt is its own (realSessionPrefix → isRealSession). The
    * Bearer header cannot distinguish surfaces that share one IDE (vscode vs
@@ -103,9 +119,6 @@ class SurfaceRegistry {
 
 const registry = new SurfaceRegistry()
 
-module.exports = {
-  registry,
-  getIDEMapper: (ide) => registry.get(ide),
-  resolveSurface: (messages) => registry.resolveSurface(messages),
-  SurfaceRegistry,
-}
+module.exports = registry
+module.exports.getIDEMapper = (ide) => registry.get(ide)
+module.exports.SurfaceRegistry = SurfaceRegistry

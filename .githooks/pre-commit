@@ -2,4 +2,4 @@
 files=$(git diff --name-only --diff-filter=ACM)
 pnpm prettier --write $files
 git add $files
-pnpm lint && pnpm check
+pnpm lint && pnpm check && pnpm test

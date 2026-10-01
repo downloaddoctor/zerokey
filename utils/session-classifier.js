@@ -8,7 +8,7 @@
 // VS Code surfaces (classic Copilot Chat vs Copilot SDK) — both arrive as
 // 'vscode'. So the surface is resolved purely from the system prompt.
 
-const { resolveSurface } = require('../surfaces/registry')
+const surfaceRegistry = require('../surfaces/registry')
 
 /**
  * Classify a request: which tool surface does it belong to, and is it a real
@@ -19,7 +19,7 @@ const { resolveSurface } = require('../surfaces/registry')
  * @returns {{ isReal: boolean, surface: string, matched: string|null }}
  */
 function classifySession(ide, messages) {
-  const surface = resolveSurface(messages)
+  const surface = surfaceRegistry.resolveSurface(messages)
   if (surface) return { isReal: true, surface, matched: surface }
 
   // No surface recognized this system prompt: treat as an ephemeral/utility

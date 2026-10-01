@@ -77,6 +77,7 @@ engine/extra/reminder.md — short reusable reminder text ('emit MHI as literal 
 engine/extra/summary.md — SUMMARIZE_CONVERSATION-equivalent skill text; triggered via $S
 engine/extra/test.md — $test skill: seeds temp/temp.txt + temp/tempR.txt scratch files, returns a scripted end-to-end exercise of all 15 tools (todos_add/set, write, read, replace, ls, glob, grep, cmd, cmd_bg, fetch, view_image, ask) for smoke-testing a new IDE/provider integration
 scripts/check-modules.js — require()'s every .js file under core/, engine/, routes/, utils/ to catch load-time errors (syntax/missing-dep); run via `pnpm check`, part of precommit
+test/*.test.js — node:test suite (modules load, surface discovery/native names/formatters, session-classifier surface resolution, compiler parse→emit incl. copilot view_range + browser pre-registration + todos SQL); run via `pnpm test`, part of precommit
 
 # ARCHITECTURE
 Startup: `server.js` → SessionSelector wizard picks {provider, user, session} → syncIdeConfig writes IDE-specific settings → mounts `/v1/chat/completions` behind sequentialQueue() + the resolved provider's router.
@@ -96,4 +97,4 @@ DEEPSEEK_TRANSPORT — 'browser' (default, Playwright automation) | 'api' (direc
 # CONFIG
 .prettierrc / `eslint.config.js` — single quotes, LF line endings (per project style)
 `pnpm-workspace.yaml` — pnpm workspace root (single package)
-.githooks/pre-commit — runs `pnpm precommit` (format + lint + check-modules) 
+.githooks/pre-commit — runs `pnpm precommit` (format + lint + check-modules + test) 

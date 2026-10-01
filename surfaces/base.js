@@ -6,106 +6,9 @@
 // getIDEMapper(ide) (see ./index.js) creates the instance, applies the IDE's
 // config function, and returns resolve() — the exact { tools, reverseMap,
 // rawUser, system, user, tool } shape consumed by engine/compiler.js.
-
-const fs = require('fs')
 const { specs } = require('./specs')
 
 const zero = () => null
-
-function editToolOutputFormatter(s) {
-  s = s.replaceAll(
-    'String replacement failed: Could not find matching text to replace. Try making your search string more specific or checking for whitespace/formatting differences.',
-    'ERROR: No matching text found in file.',
-  )
-  s = s.replaceAll(
-    'String replacement failed: Input and output are identical',
-    'ERROR: Input and output are identical',
-  )
-  s = s.replaceAll(/The following files were successfully edited:\n([^\n]*)/gm, 'UPDATED: $1')
-  s = s.replaceAll(
-    /ERROR: Your input to the tool was invalid \(must have required property '([^']+)'\)\n Please check your input and try again\./gm,
-    'ERROR: Invalid parameters — missing required field.',
-  )
-  s = s.replaceAll(/File does not exist: ([^.]+).*\n/gm, 'ERROR: File not exist - $1')
-  return s
-}
-
-const DEFAULT_FORMATTERS = {
-  replace: editToolOutputFormatter,
-  write: (s) =>
-    s.replaceAll(/The following files were successfully edited:\n([^\n]*)/gm, 'WRITTEN: $1'),
-  grep: (s) => (s.startsWith('No matches found') ? 'No matches.' : s),
-  todos_add: (s) => (s.startsWith('Successfully wrote todo list') ? 'UPDATED' : s),
-  todos_set: (s) => (s.startsWith('Successfully wrote todo list') ? 'UPDATED' : s),
-  read: (s) => {
-    if (s.startsWith('ERROR while calling tool: cannot open file')) {
-      const fileLoc = s.match(/Detail: Unable to read file '([^']+)/)
-      return `ERROR: File not exist - ${fileLoc[1]}`
-    }
-    return s
-  },
-  ask: (s) => {
-    try {
-      const answers = JSON.parse(s).answers.question
-      return answers.skipped
-        ? 'NO ANSWER'
-        : [answers.selected[0], answers.freeText].filter(Boolean).join('\n')
-    } catch {
-      return s
-    }
-  },
-  cmd: (s) => {
-    if (s.endsWith('Command produced no output')) return '[OUTPUT: empty]'
-    if (s.startsWith('[Output too large')) {
-      const nl = s.indexOf('\n')
-      const firstLine = nl === -1 ? s : s.slice(0, nl)
-      const filePath = firstLine.match(/Full output saved to: (.*)\]/i)
-      if (filePath) {
-        try {
-          return fs.readFileSync(filePath[1], 'utf-8')
-        } catch {
-          return `[LARGE OUTPUT] read → ${filePath[1]}`
-        }
-      }
-    }
-    if (s.startsWith('Large tool result ')) {
-      const nl = s.indexOf('\n')
-      const firstLine = nl === -1 ? s : s.slice(0, nl)
-      const filePath = firstLine.match(/access the content at: (.*)/i)
-      if (filePath) {
-        try {
-          return fs.readFileSync(filePath[1], 'utf-8')
-        } catch {
-          return `[LARGE OUTPUT] read → ${filePath[1]}`
-        }
-      }
-    }
-    s = s.replace(
-      /Note: The tool simplified the command to `(.*)` \(terminal ID=.*\n/m,
-      '[RAN] $1\n',
-    )
-    s = s.replace(
-      /Note: The user manually edited the command to `(.*)` \(terminal ID=.*\n/m,
-      '[RAN][MODIFIED] $1\n',
-    )
-    if (s.startsWith('[Output compressed'))
-      return s.replace(/\[Output compressed[^\]]*\]/, '[OUTPUT COMPRESSED]').trim()
-    s = s.replace(
-      /Note: This terminal execution was moved to the background using the ID (.*)\n[\S\s]+/m,
-      '[BACKGROUND] RUNNING IN [$1], will notify on completion.',
-    )
-    s = s.replace(
-      /Note: The command is running in terminal ID (.*)\n[\S\s]+/m,
-      '[BACKGROUND] RUNNING IN [$1], will notify on completion.',
-    )
-    return s
-  },
-  cmd_bg: (s) =>
-    s.replace(
-      /Command is running in terminal with ID=(.*)\n[\S\s]+/m,
-      '[BACKGROUND] RUNNING IN [$1], will notify on completion.',
-    ),
-}
 
 function* parseTags(htmlString) {
   const re = /<(\w+)[^>]*>[ \r\n]*([\s\S]*?)[ \r\n]*<\/\1>/g
@@ -142,8 +45,14 @@ class IDEToolSurface {
     this.ideName = null
     this.newSessionStartLength = 0
     this.realSessionPrefix = null
+    // Declarative flags consumed by engine/compiler, engine/triggers and
+    // engine/mcp/inject so they never name a specific surface:
+    //   browserTools     — this surface exposes the $browser/$playwright families
+    //   browserNameMap   — genericKey → native browser-tool name for this surface
+    this.browserTools = false
+    this.browserNameMap = {}
     this.tools = {}
-    this.formatters = { ...DEFAULT_FORMATTERS }
+    this.formatters = {}
 
     // Prompt handlers — overridable per surface. Note: the tool *output*
     // handler is `formatToolOutput`; the `tool()` method is the registrar.
@@ -236,6 +145,5 @@ module.exports = {
   parseTags,
   getAllTags,
   filterAttachments,
-  editToolOutputFormatter,
   zero,
 }

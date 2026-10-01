@@ -80,14 +80,14 @@ function registerAutoMcpServers(reqTools, session) {
  */
 function makePassthroughMcpCall(tag) {
   return ({ messages, index, compilerTools, parser }) => {
-    // vscode-family only: $browser/$playwright rely on VS Code's own MCP/browser
-    // tool surface — silently no-op on other IDEs rather than injecting grammar
-    // they have no way to execute. 'copilot' uses the SDK's native tool names.
-    const ideName = parser?.compiler?.ideName
-    if (ideName !== 'vscode' && ideName !== 'copilot') return
+    // Only surfaces that declare browserTools get $browser/$playwright — others
+    // silently no-op rather than injecting grammar they cannot execute. The
+    // surface also declares which tool-name variant to emit.
+    const surfaceDef = parser?.compiler?.surfaceDef
+    if (!surfaceDef?.browserTools) return
 
     const aliasMap = MCP_ALIAS_MAPS[tag]
-    const grammar = injectMcpAliases(aliasMap, compilerTools, ideName)
+    const grammar = injectMcpAliases(aliasMap, compilerTools, surfaceDef.browserNameMap)
     // const message = messages[index]
     // message.content = message.content.replace(tag, '').trim()
     messages.splice(index, 1, {
