@@ -7,4 +7,6 @@ module.exports = (t) => {
   t.ideName = 'api'
   t.newSessionStartLength = 0
   t.realSessionPrefix = null
+
+  t.system = (content) => content
 }
