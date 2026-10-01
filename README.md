@@ -64,7 +64,7 @@ OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, **ChatGPT**, and 
 - **OpenAI-compatible** — drop-in replacement for `/v1/models` and `/v1/chat/completions`
 - **Four providers** — DeepSeek, Claude, ChatGPT, and Qwen — switch at startup
 - **Streaming** — SSE response streaming for all providers
-- **Multi-IDE** — per-request IDE selection via `Authorization: Bearer <vscode|terax|opencode>`
+- **Multi-IDE** — VS Code, Terax, OpenCode; the tool surface is auto-detected per request from the IDE's system prompt (no auth/API key required)
 - **Session persistence** — in-memory session tracking; flushed to disk on graceful shutdown
 - **Tool call support** — integrated ToolCompiler translates OpenAI-style function calling into provider-compatible prompt grammar
 
@@ -154,17 +154,7 @@ through the real web UI — no further captures needed.
 
 ## IDE Integration
 
-VS Code (actively tested), Terax, and OpenCode are all tested and working.
-
-### Bearer Tokens
-
-The `Authorization: Bearer <ide>` header maps the request to the correct IDE's tool definitions. Default is `vscode` if omitted.
-
-| IDE      | Bearer Token      | Purpose              |
-| -------- | ----------------- | -------------------- |
-| VS Code  | `Bearer vscode`   | Loads VS Code tools  |
-| Terax    | `Bearer terax`    | Loads Terax tools    |
-| OpenCode | `Bearer opencode` | Loads OpenCode tools |
+VS Code (actively tested), Terax, and OpenCode are all tested and working. There is no auth — the tool surface (VS Code, Terax, OpenCode) is detected per request from the system prompt, so just point any OpenAI-compatible client at the server. Where a client requires an "API key" field, any non-empty placeholder works.
 
 ### VS Code — Built-in
 

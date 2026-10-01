@@ -11,6 +11,9 @@ const { toOpenAIError } = require('./utils/errors')
 const { findPort } = require('./utils/find-port')
 const { syncIdeConfig } = require('./utils/sync-ide-config')
 const { sequentialQueue } = require('./utils/sequential-queue')
+const { classifySession } = require('./utils/session-classifier')
+const { validateMessages } = require('./utils/route-helpers')
+const { StreamPipeline } = require('./engine/pipeline')
 const { LogSaver } = require('./utils/log-saver')
 
 const errorLog = new LogSaver({ name: 'errors', maxSize: 1024 * 1024 })
@@ -20,6 +23,23 @@ require('./utils/logger')
 const app = express()
 
 app.use(express.json({ limit: '50mb' }))
+
+// Shared chat-request prep, run once per request for every provider:
+//   1. validate messages[]                (400 otherwise)
+//   2. set SSE headers                    (before any router writes)
+//   3. classify the tool surface from the system-prompt fingerprint and expose
+//      the real-vs-ephemeral verdict on req — nothing downstream re-classifies.
+const prepareChatRequest = (req, res, next) => {
+  if (!validateMessages(req.body?.messages, res)) return
+
+  StreamPipeline.setSSEHeaders(res)
+
+  const { isReal, surface, matched } = classifySession(req.body?.messages)
+  req.surface = surface
+  req.isRealSession = isReal
+  req.matchedSurface = matched
+  next()
+}
 
 app.use((req, res, next) => {
   const start = Date.now()
@@ -61,7 +81,7 @@ async function start() {
 
   try {
     const router = await buildRouter(preSelected)
-    app.use('/v1/chat/completions', sequentialQueue(), router)
+    app.use('/v1/chat/completions', sequentialQueue(), prepareChatRequest, router)
   } catch (error) {
     console.error('Failed to build initial router:', error)
     process.exit(1)
@@ -93,7 +113,6 @@ async function start() {
     console.log(`  POST  http://localhost:${port}/v1/chat/completions   Chat (SSE)`)
     console.log(`  GET   http://localhost:${port}/v1/models             List models`)
     console.log(`  GET   http://localhost:${port}/docs                  Swagger UI`)
-    console.log(`\n  IDE: Authorization: Bearer <vscode|terax|opencode> (default: vscode)\n`)
   })
 
   const shutdown = (signal) => {

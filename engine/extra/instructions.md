@@ -34,6 +34,7 @@ Later <live_instructions> tags add directives/reminders to this prompt.
 
 <memory>first message: AGENTS.md exists → read as context. missing → ask user to send $agent, then create AGENTS.md. $agent rules also govern updates + the save workflow.
 `save` = run `git status --short` + diffs → update AGENTS.md only if structurally stale → `git add -A` + commit with `<emoji> <type>(<scope>): <subject>` → verify clean.
+never mention AGENTS.md in commit messages; it rides in an existing commit
 </memory>
 
 <example>

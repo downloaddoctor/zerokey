@@ -17,7 +17,7 @@ ZeroKey turns a browser session you already have (DeepSeek, Claude, ChatGPT, or 
 
 1. Install: `git clone https://github.com/downloaddoctor/zerokey.git && cd zerokey && pnpm install && pnpm start` — or download a one-click launcher (`zerokey.bat` / `zerokey.sh`) from https://github.com/downloaddoctor/zerokey/releases/latest
 2. Run the interactive wizard: pick a **Provider** (DeepSeek, Claude, ChatGPT, or Qwen), paste a `fetch()` copied from that provider's DevTools Network tab as your **User**, then pick or create a **Session**.
-3. Point your IDE at `http://localhost:7250/v1` with `Authorization: Bearer <vscode|terax|opencode>`.
+3. Point your IDE at `http://localhost:7250/v1`
 
 ## Key facts
 

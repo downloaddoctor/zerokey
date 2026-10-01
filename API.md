@@ -225,13 +225,9 @@ Singleton that loads and caches system prompts:
 
 ## IDE Support
 
-The server detects the IDE from the `Authorization: Bearer <ide>` header. Supported values:
+The tool surface is resolved per request from the system prompt fingerprint (`surfaces/registry.js` `resolveSurface` → `getIDEMapper(surface)` → `{tools, reverseMap, user, system, user, tool}`). Known surfaces: `vscode`, `copilot`, `terax`, `opencode`.
 
-- `vscode` (default if absent or unknown)
-- `terax`
-- `opencode`
-
-The IDE value is used by the Tool Compiler to select the correct IDE-specific tool mapping (`getIDEMapper(ide)` → `{tools, reverseMap, user, tool}`).
+A request with no recognizable surface (e.g. an ephemeral title-generation call) defaults to `vscode` and is treated as a non-tool-calling utility call.
 
 ---
 

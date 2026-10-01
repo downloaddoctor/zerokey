@@ -5,8 +5,6 @@ const { QwenAPI } = require('./api')
 const { streamHandler } = require('./stream-handler')
 const { setQwenInstructions } = require('./set-instructions')
 const { acquireSlot } = require('../../utils/rate-limiter')
-const { validateMessages } = require('../../utils/route-helpers')
-const { resolveIde } = require('../../utils/session-classifier')
 const { models } = require('./config')
 
 const QWEN_MODELS = models.models
@@ -28,16 +26,7 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
 
   router.post('/', async (req, res) => {
     const { messages = [], tools, reasoning_effort: rawReasoningEffort = null } = req.body
-    if (!validateMessages(messages, res)) return
-
-    StreamPipeline.setSSEHeaders(res)
-    const pipeline = new StreamPipeline(
-      res,
-      session,
-      'qwen',
-      resolveIde(req.ide, messages),
-      messages,
-    )
+    const pipeline = new StreamPipeline(res, session, 'qwen', req.surface, req.isRealSession)
     const activeSession = pipeline.session
 
     // Enforce per-model allowed reasoning modes; fall back to first allowed

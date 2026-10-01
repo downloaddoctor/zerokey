@@ -1,38 +1,45 @@
 const { test } = require('node:test')
 const assert = require('node:assert')
 
-const { classifySession, isRealChatSession, resolveIde } = require('../utils/session-classifier')
+const {
+  classifySession,
+  isRealChatSession,
+  resolveIde,
+  DEFAULT_SURFACE,
+} = require('../utils/session-classifier')
 
 const sys = (content) => [{ role: 'system', content }]
 
 test('resolveIde maps each known prompt to its surface', () => {
-  assert.strictEqual(resolveIde('vscode', sys('Follow Microsoft content policies. x')), 'copilot')
-  assert.strictEqual(
-    resolveIde('vscode', sys('You are an expert AI programming assistant')),
-    'vscode',
-  )
-  assert.strictEqual(resolveIde('terax', sys('You are Terax, an AI agent')), 'terax')
-  assert.strictEqual(resolveIde('opencode', sys('You are opencode')), 'opencode')
+  assert.strictEqual(resolveIde(sys('Follow Microsoft content policies. x')), 'copilot')
+  assert.strictEqual(resolveIde(sys('You are an expert AI programming assistant')), 'vscode')
+  assert.strictEqual(resolveIde(sys('You are Terax, an AI agent')), 'terax')
+  assert.strictEqual(resolveIde(sys('You are opencode')), 'opencode')
 })
 
-test('unknown prompt falls back to the header ide and is not a real session', () => {
+test('unknown prompt falls back to the default surface and is not a real session', () => {
   const messages = sys('Generate a short title for this conversation')
-  assert.strictEqual(resolveIde('vscode', messages), 'vscode')
-  assert.strictEqual(isRealChatSession('vscode', messages), false)
-  assert.deepStrictEqual(classifySession('vscode', messages), {
+  assert.strictEqual(resolveIde(messages), DEFAULT_SURFACE)
+  assert.strictEqual(isRealChatSession(messages), false)
+  assert.deepStrictEqual(classifySession(messages), {
     isReal: false,
-    surface: 'vscode',
+    surface: DEFAULT_SURFACE,
     matched: null,
   })
 })
 
-test('missing/non-system first message is treated as not-real and keeps the header ide', () => {
-  assert.strictEqual(isRealChatSession('vscode', []), false)
-  assert.strictEqual(resolveIde('vscode', []), 'vscode')
-  assert.strictEqual(isRealChatSession('vscode', [{ role: 'user', content: 'hi' }]), false)
+test('an explicit fallback overrides the default for unmatched requests', () => {
+  const messages = sys('Generate a short title for this conversation')
+  assert.strictEqual(resolveIde(messages, 'terax'), 'terax')
+})
+
+test('missing/non-system first message is treated as not-real and uses the default surface', () => {
+  assert.strictEqual(isRealChatSession([]), false)
+  assert.strictEqual(resolveIde([]), DEFAULT_SURFACE)
+  assert.strictEqual(isRealChatSession([{ role: 'user', content: 'hi' }]), false)
 })
 
 test('classifySession reports the matched surface for a real turn', () => {
-  const result = classifySession('vscode', sys('Follow Microsoft content policies. x'))
+  const result = classifySession(sys('Follow Microsoft content policies. x'))
   assert.deepStrictEqual(result, { isReal: true, surface: 'copilot', matched: 'copilot' })
 })

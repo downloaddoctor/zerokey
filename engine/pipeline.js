@@ -10,7 +10,6 @@ const {
   handleSkill,
   registerAutoMcpServers,
 } = require('./triggers')
-const { isRealChatSession } = require('../utils/session-classifier')
 const { ephemeralSession } = require('../utils/ephemeral-session')
 
 let callCounter = 0
@@ -98,10 +97,8 @@ class StreamPipeline {
    *   the title-gen short-circuit itself, which is already ephemeral by
    *   construction).
    */
-  constructor(res, session, provider, ideName, messages = []) {
+  constructor(res, session, provider, ideName, isReal = true) {
     this.compiler = new ToolCompiler(ideName, provider)
-
-    const isReal = isRealChatSession(ideName, messages)
 
     this.res = res
     this.provider = provider

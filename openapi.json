@@ -131,18 +131,6 @@
         "tags": ["Chat"],
         "summary": "OpenAI-compatible chat completions (SSE streaming)",
         "operationId": "createChatCompletion",
-        "parameters": [
-          {
-            "name": "Authorization",
-            "in": "header",
-            "required": false,
-            "description": "Bearer <ide-name> — valid values: vscode, terax, opencode. Defaults to vscode.",
-            "schema": {
-              "type": "string",
-              "enum": ["Bearer vscode", "Bearer terax", "Bearer opencode"]
-            }
-          }
-        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -509,10 +497,10 @@
     }
   },
   "x-ide-support": {
-    "header": "Authorization",
-    "format": "Bearer <ide>",
-    "values": ["vscode", "terax", "opencode"],
-    "default": "vscode"
+    "autoDetected": true,
+    "from": "system prompt fingerprint",
+    "surfaces": ["vscode", "copilot", "terax", "opencode"],
+    "auth": "none"
   },
   "x-reasoning-labels": {
     "deepseek": ["Off", "DeepThink"],
