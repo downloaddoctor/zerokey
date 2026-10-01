@@ -132,10 +132,10 @@ class IDEToolSurface {
     return {
       tools: this.tools,
       reverseMap,
-      rawUser: this.rawUser,
-      system: this.system,
-      user: this.user,
-      tool: this.formatToolOutput,
+      rawUser: this.rawUser.bind(this),
+      system: this.system.bind(this),
+      user: this.user.bind(this),
+      tool: this.formatToolOutput.bind(this),
     }
   }
 }

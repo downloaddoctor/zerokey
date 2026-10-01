@@ -26,7 +26,7 @@ app.use((req, res, next) => {
   res.on('finish', () => {
     const duration = Date.now() - start
     console.debug(
-      `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} → ${res.statusCode} (${duration}ms) | IDE: ${req.ide || '?'}\n`,
+      `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} → ${res.statusCode} (${duration}ms)\n`,
     )
   })
   next()
@@ -83,7 +83,7 @@ async function start() {
           `Body: ${JSON.stringify(body, null, 2)}`,
         ].join('\n'),
       )
-    } catch { }
+    } catch {}
     if (!res.headersSent) res.status(status).json(openaiErr)
     else res.end()
   })
@@ -122,7 +122,7 @@ async function start() {
           (err && err.stack) || '',
         ].join('\n'),
       )
-    } catch { }
+    } catch {}
     console.error('[Server] uncaughtException:', (err && (err.stack || err.message)) || err)
     selector.flush()
     process.exit(1)
@@ -138,7 +138,7 @@ async function start() {
           err.stack || '',
         ].join('\n'),
       )
-    } catch { }
+    } catch {}
     console.error('[Server] unhandledRejection:', err.stack || err.message)
   })
 }

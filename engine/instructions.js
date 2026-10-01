@@ -13,14 +13,9 @@ class Instructions {
     return crypto.createHash('sha256').update(content).digest('hex')
   }
 
-  /** Base system prompt (extra/instructions.md). Alias over getExtra. */
-  getBase() {
-    return this.getExtra('instructions')
-  }
-
-  /** Alias of getBase, kept so existing callers (compiler.buildPrompt) need no changes. */
+  /** Base system prompt (extra/instructions.md). */
   getFull() {
-    return this.getBase()
+    return this.getExtra('instructions')
   }
 
   /**
@@ -30,7 +25,10 @@ class Instructions {
    */
   getUnlimited() {
     const memory = this.getExtra('agent').content
-    const content = this.getExtra('instructions').content.replace(/<memory>.*?<\/memory>\n?/s, memory)
+    const content = this.getExtra('instructions').content.replace(
+      /<memory>.*?<\/memory>\n?/s,
+      memory,
+    )
     return { content, hash: this._sha(content) }
   }
 

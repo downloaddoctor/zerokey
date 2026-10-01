@@ -6,7 +6,7 @@ const { claudeStreamHandler } = require('./stream-handler')
 const { setClaudeInstructions } = require('./set-instructions')
 const { acquireSlot } = require('../../utils/rate-limiter')
 const { validateMessages } = require('../../utils/route-helpers')
-const { SUMMARIZE_CONVERSATION } = require('../../utils/prompts')
+const instructions = require('../../engine/instructions')
 const { resolveIde } = require('../../utils/session-classifier')
 const { models, reasoning } = require('./config')
 
@@ -114,7 +114,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
 
           try {
             const { stream: summaryStream } = await claudeApi.chatCompletion(
-              SUMMARIZE_CONVERSATION,
+              instructions.getExtra('summary').content.trim(),
               activeSession.chatSessionId,
               activeSession.parentMessageId,
               model,

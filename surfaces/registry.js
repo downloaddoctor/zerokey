@@ -63,7 +63,11 @@ class SurfaceRegistry {
     if (this._resolved.has(name)) return this._resolved.get(name)
 
     const configure = this.surfaces.get(name)
-    if (!configure) return null
+    if (!configure) {
+      throw new Error(
+        `Unknown IDE surface: "${name}". Known surfaces: ${this.getNames().join(', ')}`,
+      )
+    }
 
     const surface = new IDEToolSurface()
     configure(surface)

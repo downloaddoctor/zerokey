@@ -61,7 +61,6 @@ utils/human-delay.js — humanDelay(minMs=3000,maxMs=9000): randomized await + t
 utils/har-to-capture.js — harToCapture(harPath): dev/debug tool converting browser HAR exports into the network-capture JSON shape (not wired into runtime request path)
 utils/capture-request.js — captureRequest(req): writes req.body to temp/captures/req_<timestamp>.json; backs the $req trigger
 utils/route-helpers.js — validateMessages(messages, res): 400s via toOpenAIError if messages[] is empty/missing; used by every provider router
-utils/prompts.js — SUMMARIZE_CONVERSATION constant, shared between Claude/other routers' limit-summary flow and any skill needing the same text
 utils/log-saver.js — LogSaver class + serializeError (referenced by pipeline.js/stream-handler for capped error logs; not fully read — file content not covered by this scan)
 
 # MCP INTERNALS
@@ -74,7 +73,7 @@ engine/mcp/playwright.js — PLAYWRIGHT_MCP: hand-written alias map for the real
 engine/extra/instructions.md — base system prompt injected on new tool-calling sessions (compiler.buildPrompt); documents full MHI syntax + all 15 tools + memory/AGENTS.md workflow + save workflow; this file IS the prompt shown to the driven LLM, structurally identical to the MHI protocol governing this session
 engine/extra/agent.md — fuller agent-mode variant of instructions.md (adds explicit tree-read-before-AGENTS.md rule); spliced in in place of instructions.md's <memory> stub for no-prompt-limit providers via instructions.getUnlimited(); triggered standalone via $agent/$X
 engine/extra/reminder.md — short reusable reminder text ('emit MHI as literal text...'); triggered via $R
-engine/extra/summary.md — SUMMARIZE_CONVERSATION-equivalent skill text; triggered via $S
+engine/extra/summary.md — conversation-summary prompt; single source of truth, read both by the $summary skill and by providers/claude/router.js's limit-summary flow (instructions.getExtra('summary')) so the two can never drift
 engine/extra/test.md — $test skill: seeds temp/temp.txt + temp/tempR.txt scratch files, returns a scripted end-to-end exercise of all 15 tools (todos_add/set, write, read, replace, ls, glob, grep, cmd, cmd_bg, fetch, view_image, ask) for smoke-testing a new IDE/provider integration
 scripts/check-modules.js — require()'s every .js file under core/, engine/, routes/, utils/ to catch load-time errors (syntax/missing-dep); run via `pnpm check`, part of precommit
 test/*.test.js — node:test suite (modules load, surface discovery/native names/formatters, session-classifier surface resolution, compiler parse→emit incl. copilot view_range + browser pre-registration + todos SQL); run via `pnpm test`, part of precommit
