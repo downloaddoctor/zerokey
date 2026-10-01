@@ -1,6 +1,6 @@
 const instructions = require('./instructions')
 const SYNTAX = require('./syntax')
-const { getIDEMapper } = require('./tools')
+const { getIDEMapper } = require('../surfaces/registry')
 const registry = require('../providers/registry')
 const { matchMcpTrigger } = require('./triggers')
 const { decodeContentParts } = require('../utils/extract-files')

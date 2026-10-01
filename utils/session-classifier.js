@@ -1,4 +1,4 @@
-// Session classification — thin wrapper over engine/tools, which is the single
+// Session classification — thin wrapper over surfaces/, which is the single
 // source of truth for IDE tool surfaces. Each surface declares its own
 // system-prompt fingerprint (realSessionPrefix → IDEToolSurface#isRealSession),
 // so adding a surface automatically registers its signature; nothing here needs
@@ -8,7 +8,7 @@
 // VS Code surfaces (classic Copilot Chat vs Copilot SDK) — both arrive as
 // 'vscode'. So the surface is resolved purely from the system prompt.
 
-const { resolveSurface } = require('../engine/tools')
+const { resolveSurface } = require('../surfaces/registry')
 
 /**
  * Classify a request: which tool surface does it belong to, and is it a real
