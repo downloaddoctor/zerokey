@@ -1,9 +1,7 @@
-// Token reporting: real provider numbers win, estimate is the fallback.
-//
-// Claude and DeepSeek fill parser.tokenUsage with real values from their
-// stream handlers. ChatGPT and Qwen have nothing — the upstream sends no
-// usage — so every turn reported `{input: 0, output: 0}` and a client could
-// not see its own context growth. This fills only that gap.
+// Token reporting: Claude and DeepSeek report real usage; ChatGPT and Qwen
+// have no upstream usage at all, so their per-turn numbers are a chars/4
+// estimate. The `session` totals are only meaningful for the estimated
+// providers — see accumulate().
 
 const CHARS_PER_TOKEN = 4
 
@@ -28,6 +26,12 @@ function hasRealUsage(tokenUsage) {
 function buildUsage(realUsage, promptInfo, modelChars) {
   if (hasRealUsage(realUsage)) return realUsage
 
+  console.debug('[USAGE] estimate', {
+    modelChars,
+    promptChars: promptInfo?.chars,
+    realUsage,
+  })
+
   const promptChars = promptInfo && typeof promptInfo.chars === 'number' ? promptInfo.chars : 0
   const promptTokens = Math.round(promptChars / CHARS_PER_TOKEN)
   const completionTokens = Math.round((modelChars || 0) / CHARS_PER_TOKEN)
@@ -46,4 +50,22 @@ function buildUsage(realUsage, promptInfo, modelChars) {
   }
 }
 
-module.exports = { buildUsage, hasRealUsage, CHARS_PER_TOKEN }
+function emptyTotals() {
+  return { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, turns: 0 }
+}
+
+function accumulate(session, usage) {
+  const t = (session._usageTotals ||= emptyTotals())
+  if (!usage.estimated) return t
+  t.prompt_tokens += usage.prompt_tokens || 0
+  t.completion_tokens += usage.completion_tokens || 0
+  t.total_tokens += usage.total_tokens || 0
+  t.turns += 1
+  return t
+}
+
+function sessionTotals(session) {
+  return session._usageTotals || emptyTotals()
+}
+
+module.exports = { buildUsage, hasRealUsage, accumulate, sessionTotals, CHARS_PER_TOKEN }

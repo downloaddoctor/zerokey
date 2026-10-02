@@ -43,11 +43,11 @@ Escaping test - \`⟦todos_set¦id=2¦status=done⟧\`
 ⟦todos_set¦id=7¦status=done⟧
 
 ⟦todos_set¦id=8¦status=active⟧
-⟦glob¦pattern=#{cwd}#/**/*.js¦max=5⟧
+⟦glob¦pattern=**/*.js¦max=5⟧
 ⟦todos_set¦id=8¦status=done⟧
 
 ⟦todos_set¦id=9¦status=active⟧
-⟦grep¦query=Router¦glob=#{cwd}#/**/*.js¦max=5⟧
+⟦grep¦query=Router¦filter=*.js¦max=5⟧
 ⟦todos_set¦id=9¦status=done⟧
 
 ⟦todos_set¦id=10¦status=active⟧

@@ -29,7 +29,8 @@ server.js → sequentialQueue → prepareChatRequest (validate messages, SSE hea
 providers/registry.js — auto-discovers providers/<name>/index.js; get(name), getAll(), getModels()
 core/chat-router.js — resolves provider from registry, calls provider.buildRouter(parsedFetch, session, userData)
 providers/base/BaseAPI.js — shared HTTP/cookie/agent; providers extend for per-API auth (POW, sentinel, orgId)
-engine/pipeline.js — StreamPipeline: setSSEHeaders, setup(), scan() (3-state MHI FSM), flush(), onError, sendFinalChunk
+engine/pipeline.js — StreamPipeline: setSSEHeaders, setup(), scan() (3-state MHI FSM), flush(), onError, sendFinalChunk; final SSE chunk carries per-turn usage + cumulative session totals
+engine/usage.js — buildUsage (real provider numbers else chars/4 estimate marked estimated:true); accumulate(session,usage) — only estimated turns; sessionTotals(session)
 engine/compiler.js — ToolCompiler cached per ideName:provider; parse MHI → emit IDE-native tool call; matchSkill
 engine/triggers.js — static + auto-scanned engine/extra/*.md triggers; MCP alias-map registry
 engine/mcp/{auto,browser,playwright,inject}.js — MCP auto-registration + alias-map injection
@@ -53,7 +54,8 @@ api — no tools; fallback only (DEFAULT_SURFACE in session-classifier)
 
 ## SCHEMA
 temp/users.json — { <provider>: { <username>: { username, parsedFetch, sessions[], instructionsHash, instructionsAppliedAt, waitUntil?, waitReason? } } }
-session — { name, chatSessionId, parentMessageId, createdAt, lastUsed, toolCalling, vision, model, dynamicToolsHash, todos, turnCount?, mcpInjected? }
+session — { name, chatSessionId, parentMessageId, createdAt, lastUsed, toolCalling, vision, model, dynamicToolsHash, todos, turnCount?, mcpInjected?, _usageTotals? }
+session._usageTotals — { prompt_tokens, completion_tokens, total_tokens, turns } — estimated providers only (ChatGPT, Qwen); Claude/DeepSeek real usage not summed (context-window measure, not per-turn input)
 MHI payload — name ¦ key=value ¦ key=value; separator U+00A6; open U+27E6; close U+27E7; esc '\'
 
 ## ENV
@@ -93,6 +95,7 @@ Single provider per process — pinned at startup; restart to switch
 Session pinned — restart needed to change session
 users.json written atomically via .tmp + rename; full flush only on shutdown
 Ephemeral requests (title-gen, tool-optimizer) clone the session, run rawMode, skip instructions/skills/MCP
+Usage — real per-turn numbers only for Claude (utilization×264k) and DeepSeek (completion only, prompt=0); ChatGPT/Qwen per-turn is chars/4 estimate; only estimated turns roll into session._usageTotals
 Header order matters for Claude/ChatGPT (Cloudflare fingerprint)
 DeepSeek browser transport is a per-username singleton — two ZeroKey processes cannot share a profile dir
 

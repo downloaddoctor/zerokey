@@ -11,7 +11,7 @@ const {
   registerAutoMcpServers,
 } = require('./triggers')
 const { ephemeralSession } = require('../utils/ephemeral-session')
-const { buildUsage } = require('./usage')
+const { buildUsage, accumulate } = require('./usage')
 const { inspectBatch, MAX_BATCH } = require('./loop-guard')
 
 let callCounter = 0
@@ -160,7 +160,9 @@ class StreamPipeline {
   emitAndEnd(text) {
     this.scan(text)
     this.flush()
-    this.emit({}, 'stop', buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars))
+    const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
+    const totals = accumulate(this.session, turnUsage)
+    this.emit({}, 'stop', { ...turnUsage, session: totals })
     this.res.write('data: [DONE]\n\n')
     this.res.end()
   }
@@ -170,7 +172,9 @@ class StreamPipeline {
     this._finished = true
     this.flush()
     // Real provider numbers win; estimate is the fallback. See engine/usage.js.
-    this.emit({}, 'stop', buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars))
+    const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
+    const totals = accumulate(this.session, turnUsage)
+    this.emit({}, 'stop', { ...turnUsage, session: totals })
     this.res.write('data: [DONE]\n\n')
     this.res.end()
     this.session.lastUsed = new Date().toISOString()
