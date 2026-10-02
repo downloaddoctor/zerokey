@@ -81,19 +81,14 @@ const specs = {
   },
 
   grep: {
-    desc: 'Search file contents. query=text|regex. ?regex=true for regex. ?glob=file glob filter. ?max caps.',
-    grammar: 'query={str|regex}|(regex={bool})?|(glob={regex})?|(max={0-200})?',
-    eg: [{ query: 'search*', regex: true, glob: 'src/**', max: 20 }],
-    keys: { query: ' ', queryR: ' ', regex: true, glob: ' ', path: ' ', max: 200 },
+    desc: 'Search file contents with a regex. ?dir scopes the search. ?filter narrows files. ?max caps results.',
+    grammar: '(query={regex})|(dir={str})?|(filter={glob})?|(max={0-200})?',
+    eg: [{ query: 'TODO|FIXME' }, { query: 'function\\s+\\w+', dir: 'src', filter: '*.js' }],
+    keys: { query: ' ', dir: ' ', filter: ' ', max: 200 },
     transformer: (params) => {
-      if (params.path) params.glob = params.path
-      if (params.query) params.regex = false
-      if (params.queryR) {
-        params.query = params.queryR
-        params.regex = true
-        delete params.queryR
-      }
-      delete params.path
+      // Always regex — every surface searches with regex; VS Code is the only
+      // one that requires the flag to be set explicitly.
+      params.regex = true
     },
   },
 

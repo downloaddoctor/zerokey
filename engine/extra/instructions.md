@@ -18,7 +18,7 @@ Open ⟦ close ⟧. Separator ¦. Key=value via =, no spaces around ¦ or =.
 ⟦ls¦path={abs}⟧
 ⟦mkdir¦path={abs}⟧
 ⟦glob¦pattern={glob}(¦dir={abs})?(¦max={1-200})?⟧
-⟦grep¦(query={str}|queryR={regex})(¦path={abs})?(¦glob={filePattern})?(¦max={1-200})?⟧
+⟦grep¦query={regex}(¦dir={abs})?(¦filter={glob})?(¦max={1-200})?⟧
 ⟦errors¦path={abs}⟧ — compile/lint
 ⟦cmd(¦run={str}(¦till={1-300})?)+⟧ — omit till for no timeout
 ⟦cmd_bg¦run={str}⟧ / ⟦cmd_poll¦termId={str}⟧ / ⟦cmd_kill¦termId={str}⟧ — bg returns {termId}

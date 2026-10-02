@@ -160,10 +160,19 @@ module.exports = (t) => {
       query: 'query',
       regex: 'isRegexp',
       max: 'maxResults',
-      glob: 'includePattern',
-      path: 'includePattern',
+      filter: 'includePattern',
+      dir: 'includePattern',
     },
     default: { query: ' ', isRegexp: true },
+    transform: (values, internal) => {
+      // VS Code folds both the directory scope and the file filter into a
+      // single includePattern. Compose them: '<dir>/<filter>' or just one.
+      const dir = internal.dir ? internal.dir.replace(/\/$/, '') : ''
+      const filter = internal.filter || ''
+      if (dir && filter) values.includePattern = `${dir}/${filter}`
+      else if (dir) values.includePattern = `${dir}/**`
+      else if (filter) values.includePattern = filter
+    },
   })
   t.tool('cmd', 'run_in_terminal', {
     split: true,

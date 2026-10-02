@@ -85,7 +85,7 @@ module.exports = (t) => {
     default: { pattern: ' ' },
   })
   t.tool('grep', 'grep', {
-    params: { query: 'pattern', glob: 'glob', path: 'paths' },
+    params: { query: 'pattern', filter: 'glob', dir: 'paths' },
     default: { pattern: ' ' },
   })
   t.tool('cmd', 'powershell', {

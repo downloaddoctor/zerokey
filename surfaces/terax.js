@@ -22,10 +22,13 @@ module.exports = (t) => {
   t.tool('ls', 'list_directory', { params: { path: 'path' }, default: { path: true } })
   t.tool('mkdir', 'create_directory', { params: { path: 'path' }, default: { path: ' ' } })
   t.tool('glob', 'glob', {
-    params: { pattern: 'pattern', dir: 'root' },
+    params: { pattern: 'pattern', dir: 'root', max: 'max_results' },
     default: { pattern: ' ' },
   })
-  t.tool('grep', 'grep', { params: { query: 'pattern' }, default: { pattern: ' ' } })
+  t.tool('grep', 'grep', {
+    params: { query: 'pattern', dir: 'root', filter: 'glob', max: 'max_results' },
+    default: { pattern: ' ' },
+  })
   t.tool('cmd', 'bash_run', {
     split: true,
     params: { run: 'command', till: 'timeout_secs', goal: 'goal', desc: 'desc' },
