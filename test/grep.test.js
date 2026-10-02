@@ -1,8 +1,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert')
 const ToolCompiler = require('../engine/compiler')
-
-const SEP = '\u00A6' // ¦
+const { SEP } = require('../engine/syntax')
 
 function compile(ide, str) {
   const c = new ToolCompiler(ide, 'chatgpt')
@@ -33,7 +32,7 @@ test('grep dir= folds into vscode includePattern', () => {
   assert.strictEqual(out.arguments.includePattern, 'src/**')
 })
 
-test('grep dir= + glob= folds into vscode includePattern', () => {
+test('grep dir= + filter= folds into vscode includePattern', () => {
   const out = compile('vscode', `grep${SEP}query=TODO${SEP}dir=src${SEP}filter=*.js`)
   assert.strictEqual(out.arguments.includePattern, 'src/*.js')
 })
@@ -67,7 +66,7 @@ test('grep without dir sends no scope field (opencode)', () => {
   assert.strictEqual(out.arguments.path, undefined)
 })
 
-test('grep without dir/glob sends no includePattern (vscode)', () => {
+test('grep without dir/filter sends no includePattern (vscode)', () => {
   const out = compile('vscode', `grep${SEP}query=TODO`)
   assert.strictEqual(out.arguments.includePattern, undefined)
 })

@@ -12,6 +12,7 @@ const {
 } = require('./triggers')
 const { ephemeralSession } = require('../utils/ephemeral-session')
 const { buildUsage } = require('./usage')
+const { inspectBatch, MAX_BATCH } = require('./loop-guard')
 
 let callCounter = 0
 
@@ -231,6 +232,18 @@ class StreamPipeline {
       return { prompt: '', handled: true }
     }
 
+    // Drift reminder — set by the previous turn's flush(), delivered as a
+    // one-shot live_instructions message on this request.
+    if (this.session._driftWarning) {
+      this.session._driftWarning = false
+      messages.push({
+        role: 'live_instructions',
+        content:
+          'Your previous response emitted duplicate or too many tool calls. Those results are already in the conversation. Do not repeat them. Take the single next unfinished step of the task.',
+      })
+      console.debug('[LOOP] drift reminder injected')
+    }
+
     if (this.isNewSession) showAvailableMcpTags(tools, this)
 
     const built = this.compiler.buildPrompt(prompt, this)
@@ -356,7 +369,22 @@ class StreamPipeline {
   flush() {
     if (this.inTool) this.scan(SYNTAX.CLOSE)
 
-    emitToolCalls(this.compiler, this.session, this.toolBuffers, this.emit)
+    // Inspect the batch before it reaches the IDE: drop self-duplicates and
+    // flag the session if the model is repeating itself or emitting too many
+    // calls in one response.
+    const { deduped, selfDuplicates, oversized, drifting } = inspectBatch(this.toolBuffers)
+
+    if (selfDuplicates) {
+      console.warn(`[LOOP] dropped ${selfDuplicates} self-duplicate(s) in one response`)
+    }
+    if (oversized) {
+      console.warn(`[LOOP] oversized batch: ${deduped.length} calls (cap ${MAX_BATCH})`)
+    }
+    if (drifting) {
+      this.session._driftWarning = true
+    }
+
+    emitToolCalls(this.compiler, this.session, deduped, this.emit)
 
     if (!this.toolStartFound || !this.buffer) return
 
