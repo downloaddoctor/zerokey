@@ -147,6 +147,13 @@ module.exports = (t) => {
   t.tool('glob', 'file_search', {
     params: { pattern: 'query', max: 'maxResults' },
     default: { query: ' ' },
+    transform: (values, internal) => {
+      // VS Code's file_search has no directory argument — it scopes by making
+      // the query itself absolute. Fold dir + pattern into one query.
+      if (internal.dir) {
+        values.query = `${internal.dir}/${internal.pattern || '**/*'}`
+      }
+    },
   })
   t.tool('grep', 'grep_search', {
     params: {

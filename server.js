@@ -57,11 +57,30 @@ app.use('/', infoRouter)
 
 async function start() {
   const selector = new SessionSelector()
-  const preSelected = await selector.select(true)
+  const provider = process.env.ZEROKEY_PROVIDER || process.argv[2]
+  const user = process.env.ZEROKEY_USER || process.argv[3]
+  const session = process.env.ZEROKEY_SESSION || process.argv[4]
 
-  if (!preSelected) {
-    console.error('No session selected. Exiting.')
-    process.exit(0)
+  const headless = Boolean(provider && user && session)
+
+  let preSelected
+  if (headless) {
+    preSelected = await selector.select(false, provider, user, session)
+    if (!preSelected) {
+      // Do NOT exit(0): a start script must be able to tell that the proxy
+      // did not come up. Silent success on a dead port is the worst failure.
+      console.error(
+        `[Server] Session "${session}" for user "${user}" under provider "${provider}" not found.`,
+      )
+      console.error(`[Server] Check temp/users.json — or run without args to use the wizard.`)
+      process.exit(2)
+    }
+  } else {
+    preSelected = await selector.select(true)
+    if (!preSelected) {
+      console.error('No session selected. Exiting.')
+      process.exit(0)
+    }
   }
 
   const _tags = [

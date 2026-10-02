@@ -36,7 +36,10 @@ module.exports = (t) => {
       values.command = `New-Item -ItemType Directory -Force -Path "${internal.path}"`
     },
   })
-  t.tool('glob', 'glob', { params: { pattern: 'pattern' }, default: { pattern: ' ' } })
+  t.tool('glob', 'glob', {
+    params: { pattern: 'pattern', dir: 'path' },
+    default: { pattern: ' ' },
+  })
   t.tool('grep', 'grep', {
     params: { query: 'pattern', glob: 'include', path: 'include' },
     default: { pattern: ' ' },

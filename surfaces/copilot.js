@@ -80,7 +80,10 @@ module.exports = (t) => {
   })
 
   t.tool('ls', 'view', { params: { path: 'path' }, default: { path: true } })
-  t.tool('glob', 'glob', { params: { pattern: 'pattern' }, default: { pattern: ' ' } })
+  t.tool('glob', 'glob', {
+    params: { pattern: 'pattern', dir: 'paths' },
+    default: { pattern: ' ' },
+  })
   t.tool('grep', 'grep', {
     params: { query: 'pattern', glob: 'glob', path: 'paths' },
     default: { pattern: ' ' },

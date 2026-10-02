@@ -155,22 +155,41 @@ class ToolCompiler {
         limit,
         truncated: false,
       })
+      // Full truncation picture for usage reporting (see engine/usage.js):
+      // `headroom` answers "how close was this turn to the limit", `dropped`
+      // is what the provider limit threw away. Both in characters.
+      this.lastPrompt = {
+        chars: prompt.length,
+        limit,
+        headroom: limit - prompt.length,
+        dropped: 0,
+        truncated: false,
+      }
       return prompt
     }
 
     console.warn(`[PROMPT] Final prompt exceeded ${limit} chars: ${prompt.length}`)
 
-    const truncated =
-      prompt.slice(0, limit - 64) +
-      '\n\n[TRUNCATED: final prompt exceeded the provider prompt limit]'
+    const approxDropped = prompt.length - (limit - 64)
+    const marker = `\n\n[TRUNCATED: final prompt exceeded the provider prompt limit. ≈ ${approxDropped} chars dropped]`
+    const truncated = prompt.slice(0, limit - marker.length) + marker
+    const dropped = prompt.length - truncated.length
 
     console.debug('[PROMPT] FINAL', {
       chars: truncated.length,
       bytes: Buffer.byteLength(truncated, 'utf8'),
       limit,
       truncated: true,
+      dropped,
     })
 
+    this.lastPrompt = {
+      chars: truncated.length,
+      limit,
+      headroom: 0,
+      dropped,
+      truncated: true,
+    }
     return truncated
   }
 

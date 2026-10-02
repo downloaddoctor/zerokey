@@ -64,10 +64,20 @@ const specs = {
   },
 
   glob: {
-    desc: 'Find files by glob pattern. ?max caps results (0-200).',
-    grammar: 'pattern={str}|(max={0-200})?',
-    eg: [{ pattern: '**/*.js' }],
-    keys: { pattern: ' ', max: 200 },
+    desc: 'Find files by glob pattern. ?dir scopes the search (a directory). ?max caps results (0-200). If pattern has no glob metacharacters it is used as the directory.',
+    grammar: '(dir={str})?|pattern={str}|(max={0-200})?',
+    eg: [{ pattern: '**/*.js' }, { dir: 'src', pattern: '*.js' }],
+    keys: { pattern: ' ', dir: ' ', max: 200 },
+    transformer: (params) => {
+      // "pattern becomes the dir" fallback: if no dir is given and pattern has
+      // no glob metacharacters (e.g. "src/utils"), treat it as the directory
+      // and search everything under it.
+      const hasGlobChars = /[*?[\]{}]/.test(params.pattern || '')
+      if (!params.dir && params.pattern && !hasGlobChars) {
+        params.dir = params.pattern
+        params.pattern = '**/*'
+      }
+    },
   },
 
   grep: {

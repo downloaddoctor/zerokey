@@ -11,6 +11,7 @@ const {
   registerAutoMcpServers,
 } = require('./triggers')
 const { ephemeralSession } = require('../utils/ephemeral-session')
+const { buildUsage } = require('./usage')
 
 let callCounter = 0
 
@@ -137,6 +138,7 @@ class StreamPipeline {
     }
 
     this.tokenUsage = {}
+    this._modelChars = 0
     this._finished = false
 
     // bindUploader curries the API's uploadFile — must be set per-request.
@@ -157,7 +159,7 @@ class StreamPipeline {
   emitAndEnd(text) {
     this.scan(text)
     this.flush()
-    this.emit({}, 'stop', {})
+    this.emit({}, 'stop', buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars))
     this.res.write('data: [DONE]\n\n')
     this.res.end()
   }
@@ -166,7 +168,8 @@ class StreamPipeline {
     if (this._finished) return
     this._finished = true
     this.flush()
-    this.emit({}, 'stop', this.tokenUsage)
+    // Real provider numbers win; estimate is the fallback. See engine/usage.js.
+    this.emit({}, 'stop', buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars))
     this.res.write('data: [DONE]\n\n')
     this.res.end()
     this.session.lastUsed = new Date().toISOString()
@@ -280,6 +283,8 @@ class StreamPipeline {
   // ── block scanning ───────────────────────────────────────────────────────
 
   scan(text) {
+    // Counted for the usage estimate (see engine/usage.js).
+    this._modelChars += text ? text.length : 0
     if (this.rawMode) {
       this.emitText(text)
       return

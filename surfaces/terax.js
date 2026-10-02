@@ -21,7 +21,10 @@ module.exports = (t) => {
   })
   t.tool('ls', 'list_directory', { params: { path: 'path' }, default: { path: true } })
   t.tool('mkdir', 'create_directory', { params: { path: 'path' }, default: { path: ' ' } })
-  t.tool('glob', 'glob', { params: { pattern: 'pattern' }, default: { pattern: ' ' } })
+  t.tool('glob', 'glob', {
+    params: { pattern: 'pattern', dir: 'root' },
+    default: { pattern: ' ' },
+  })
   t.tool('grep', 'grep', { params: { query: 'pattern' }, default: { pattern: ' ' } })
   t.tool('cmd', 'bash_run', {
     split: true,
