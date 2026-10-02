@@ -8,6 +8,7 @@ function buildHealthRouter(preSelected) {
   // Per-provider prompt limit, in characters (not tokens). Clients that
   // auto-compact need this to configure their threshold correctly.
   const promptLimit = registry.get(preSelected?.provider)?.promptLimit ?? null
+  const reinjectEvery = registry.get(preSelected?.provider)?.reinjectEvery ?? 0
 
   // GET /health - Health check endpoint
   router.get('/health', (req, res) => {
@@ -27,12 +28,14 @@ function buildHealthRouter(preSelected) {
             // call will ever reach the IDE — silently. Surface it.
             toolCalling: session.toolCalling ?? false,
             vision: session.vision ?? false,
+            turnCount: session.turnCount ?? 0,
           }
         : null,
       sessionTags: preSelected?.sessionTags || null,
       promptLimit: promptLimit
         ? { chars: promptLimit, unit: 'characters', approxTokens: Math.round(promptLimit / 4) }
         : null,
+      reinjectEvery,
       usageMode: 'real-when-available',
     })
   })

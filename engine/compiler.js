@@ -32,6 +32,7 @@ class ToolCompiler {
     }
 
     this._promptLimit = (registry.get(provider)?.promptLimit ?? 64_000) - 64
+    this.reinjectEvery = registry.get(provider)?.reinjectEvery ?? 0
 
     this.tools = tools
 
@@ -270,7 +271,7 @@ class ToolCompiler {
 
       // No '=' — this segment is a continuation
       if (pairs.length) {
-        pairs[pairs.length - 1].value += `¦${parts[i]}`
+        pairs[pairs.length - 1].value += `${SYNTAX.SEP}${parts[i]}`
       }
     }
 

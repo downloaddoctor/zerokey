@@ -2,11 +2,9 @@
 <step1>
 AGENTS.md exists → read as context
 missing → git ls-files; read every file fully, never infer; write AGENTS.md only after full tree read</step1>
-
 <step2>
 update only for structure, entrypoint/runtime, module/dependency, API/schema/config/env, integration/extension changes
 edit affected sections only; never regenerate</step2>
-
 <format>
 1 fact/line
 1-space indent = hierarchy
@@ -19,13 +17,11 @@ example:
 core/
  db.js — THE write path _writeBill; catalogs; people projection
 </format>
-
 <sections>
 required: PROJECT DIRECTORY ENTRY-POINTS MODULES ARCHITECTURE SCHEMA ENV
 optional: RUNTIME-GRAPH DEPENDENCIES API CONFIG BUILD TESTING INVARIANTS EXTENSIONS
 DIRECTORY = folder shape only; MODULES = per-file roles (no overlap)
 </sections>
-
 <content>
 current architecture only
 stable facts > refactor details
@@ -34,7 +30,6 @@ replace stale facts; no history
 cut obvious/generic/temporary detail
 verify facts; never guess
 </content>
-
 <rules>
 optimize for one-read LLM comprehension
 capture only facts that prevent re-exploration

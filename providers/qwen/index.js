@@ -10,6 +10,7 @@ module.exports = {
   promptLimit,
   setupSteps,
   defaultVision: false,
+  reinjectEvery: 15,
   waitPolicy: {
     label: 'daily_limit',
     userMessage: (username, resetsAt, mins) =>

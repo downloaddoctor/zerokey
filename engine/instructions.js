@@ -15,7 +15,7 @@ class Instructions {
 
   /** Base system prompt (extra/instructions.md). */
   getFull() {
-    return this.getExtra('instructions')
+    return this.getUnlimited()
   }
 
   /**

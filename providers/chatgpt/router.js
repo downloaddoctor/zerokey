@@ -6,7 +6,7 @@ const { chatgptStreamHandler } = require('./stream-handler')
 const { acquireSlot } = require('../../utils/rate-limiter')
 const chatgptApi = new ChatGPTAPI()
 
-async function buildChatGPTRouter(parsedFetch, session, _userData = null) {
+async function buildChatGPTRouter(parsedFetch, session) {
   console.debug('[ChatGPT] Initializing from parsed capture JSON')
   await chatgptApi.initializeFromJSON(parsedFetch)
 

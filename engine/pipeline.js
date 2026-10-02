@@ -225,11 +225,17 @@ class StreamPipeline {
       this.compiler.surfaceDef?.browserNameMap,
     )
 
-    const { prompt, skill } = await this.compiler.uploadAndFormatPrompt(messages, this)
-
-    if (skill) {
-      handleSkill(skill, req, this)
-      return { prompt: '', handled: true }
+    const reinjectEvery = this.compiler.reinjectEvery || 0
+    if (reinjectEvery > 0) {
+      this.session.turnCount = (this.session.turnCount || 0) + 1
+      if (this.session.turnCount > 1 && this.session.turnCount % reinjectEvery === 0) {
+        const { content } = require('./instructions').getExtra('reminder')
+        messages.push({
+          role: 'live_instructions',
+          content: content,
+        })
+        console.debug(`[REINJECT] turn ${this.session.turnCount} — instructions re-injected`)
+      }
     }
 
     // Drift reminder — set by the previous turn's flush(), delivered as a
@@ -242,6 +248,13 @@ class StreamPipeline {
           'Your previous response emitted duplicate or too many tool calls. Those results are already in the conversation. Do not repeat them. Take the single next unfinished step of the task.',
       })
       console.debug('[LOOP] drift reminder injected')
+    }
+
+    const { prompt, skill } = await this.compiler.uploadAndFormatPrompt(messages, this)
+
+    if (skill) {
+      handleSkill(skill, req, this)
+      return { prompt: '', handled: true }
     }
 
     if (this.isNewSession) showAvailableMcpTags(tools, this)
