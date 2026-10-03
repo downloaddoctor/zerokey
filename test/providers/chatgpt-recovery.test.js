@@ -2,7 +2,7 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const recovery = require('../providers/chatgpt/recovery')
+const recovery = require('../../providers/chatgpt/recovery')
 
 test('isUnauthorized is true for 401 status', () => {
   assert.equal(recovery.isUnauthorized({ status: 401 }), true)

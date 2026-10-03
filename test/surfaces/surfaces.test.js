@@ -1,7 +1,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert')
 
-const registry = require('../surfaces/registry')
+const registry = require('../../surfaces/registry')
 
 test('registry auto-discovers the known surfaces', () => {
   const names = registry.getNames()

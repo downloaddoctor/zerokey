@@ -6,7 +6,7 @@ const {
   isRealChatSession,
   resolveIde,
   DEFAULT_SURFACE,
-} = require('../utils/session-classifier')
+} = require('../../utils/session-classifier')
 
 const sys = (content) => [{ role: 'system', content }]
 

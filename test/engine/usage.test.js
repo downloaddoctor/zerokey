@@ -2,7 +2,7 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const usage = require('../engine/usage')
+const usage = require('../../engine/usage')
 
 test('normalizeUsage collapses all prompt-side spellings', () => {
   for (const key of [

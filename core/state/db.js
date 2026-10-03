@@ -75,6 +75,7 @@ function migrate(db) {
     columns.add(name)
   }
   add('metadata_json', 'TEXT')
+  add('compaction_generation', 'INTEGER NOT NULL DEFAULT 0')
 }
 
 function setMeta(db, key, value) {

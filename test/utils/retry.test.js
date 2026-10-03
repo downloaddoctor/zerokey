@@ -2,7 +2,7 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const retry = require('../utils/retry')
+const retry = require('../../utils/retry')
 
 test('401 is never retried', () => {
   const result = retry.classify({ status: 401 })

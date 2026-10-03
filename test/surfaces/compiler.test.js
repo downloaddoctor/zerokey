@@ -1,8 +1,8 @@
 const { test } = require('node:test')
 const assert = require('node:assert')
 
-const ToolCompiler = require('../engine/compiler')
-const SYNTAX = require('../engine/syntax')
+const ToolCompiler = require('../../engine/compiler')
+const SYNTAX = require('../../engine/syntax')
 
 const SEP = SYNTAX.SEP
 

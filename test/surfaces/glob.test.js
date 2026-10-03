@@ -1,7 +1,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert')
-const ToolCompiler = require('../engine/compiler')
-const { SEP } = require('../engine/syntax')
+const ToolCompiler = require('../../engine/compiler')
+const { SEP } = require('../../engine/syntax')
 
 function compile(ide, str) {
   const c = new ToolCompiler(ide, 'chatgpt')

@@ -1,7 +1,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert')
-const { inspectBatch, signature, MAX_BATCH } = require('../engine/loop-guard')
-const { SEP } = require('../engine/syntax')
+const { inspectBatch, signature, MAX_BATCH } = require('../../engine/loop-guard')
+const { SEP } = require('../../engine/syntax')
 
 // ── signature ────────────────────────────────────────────────────────────
 

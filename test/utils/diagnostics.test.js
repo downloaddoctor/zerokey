@@ -2,7 +2,7 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const diagnostics = require('../utils/diagnostics')
+const diagnostics = require('../../utils/diagnostics')
 
 test('sanitize redacts bearer tokens in strings', () => {
   const out = diagnostics.sanitize('Authorization: Bearer abcdefghijklmnopqrstuvwxyz012345')
