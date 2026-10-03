@@ -24,11 +24,9 @@ const { sequentialQueue } = require('./utils/sequential-queue')
 const { classifySession } = require('./utils/session-classifier')
 const { validateMessages } = require('./utils/route-helpers')
 const { StreamPipeline } = require('./engine/pipeline')
-const { LogSaver } = require('./utils/log-saver')
+const { LogSaver } = require('./utils/log')
 
 const errorLog = new LogSaver({ name: 'errors', maxSize: 1024 * 1024 })
-
-require('./utils/logger')
 
 let httpServer = null
 

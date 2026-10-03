@@ -15,7 +15,7 @@ const fs = require('fs')
 const path = require('path')
 
 const root = path.join(__dirname, '..')
-const DIRS = ['core', 'engine', 'routes', 'utils']
+const DIRS = ['core', 'engine', 'routes', 'utils', 'config', 'scripts', 'surfaces', 'providers']
 
 function walk(dir) {
   const out = []
@@ -27,7 +27,10 @@ function walk(dir) {
   return out
 }
 
-const modules = DIRS.flatMap((d) => walk(path.join(root, d)))
+const modules = DIRS.flatMap((d) => {
+  const dir = path.join(root, d)
+  return fs.existsSync(dir) ? walk(dir) : []
+})
 
 let failed = 0
 for (const mod of modules) {
@@ -38,6 +41,23 @@ for (const mod of modules) {
     console.error(`FAIL: ${rel} — ${err.message}`)
     failed++
   }
+}
+
+// The root entrypoint is loaded explicitly: it is not under any scanned dir,
+// and it holds the only require of the server module graph. A deleted module
+// that only server.js imports was missed twice this session for that reason.
+try {
+  const server = require('../server')
+  if (
+    typeof server !== 'object' ||
+    typeof server.start !== 'function' ||
+    typeof server.stop !== 'function'
+  ) {
+    throw new Error('server.js must export { app, start, stop }')
+  }
+} catch (err) {
+  console.error(`FAIL: ./server.js — ${err.message}`)
+  failed++
 }
 
 const { CONFIG } = require('../config/constants')
