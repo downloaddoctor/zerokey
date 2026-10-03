@@ -285,18 +285,15 @@ function write(level, message) {
   if (level === 'error') process.stderr.write(line + '\n')
 }
 
-function close() {}
-
 module.exports = {
   LogSaver,
-  close,
-  debug: (m) => write('debug', m),
-  error: (m) => write('error', m),
-  info: (m) => write('info', m),
+  debug: (...m) => write('debug', m.join(' ')),
+  error: (...m) => write('error', m.join(' ')),
+  info: (...m) => write('info', m.join(' ')),
+  warn: (...m) => write('warn', m.join(' ')),
   isSecretKey,
   redact,
   serializeError,
   text,
   tickWait,
-  warn: (m) => write('warn', m),
 }

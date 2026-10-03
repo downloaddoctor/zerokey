@@ -8,7 +8,7 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "start": "node scripts/start.js",
+    "start": "node server.js",
     "lint": "eslint .",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",

@@ -1,15 +1,15 @@
 'use strict'
 
 /**
- * Authoritative starter. server.js is loaded from here, never run directly.
+ * Startup hygiene: single-instance lock and duplicate-listener probing.
  *
- * Three stages of duplicate-listener defence, because each alone has a gap:
+ * Three stages of defence, because each alone has a gap:
  *
- *   1. Pre-flight /health probe — catches a running listener even if the
+ *   1. Pre-flight /health probe - catches a running listener even if the
  *      lock file was lost (hard crash, manual delete).
- *   2. PID lock via exclusive create ('wx') — catches a start that has not
+ *   2. PID lock via exclusive create ('wx') - catches a start that has not
  *      yet reached the listening state, which the probe cannot see.
- *   3. Post-lock /health probe — catches the race where another process
+ *   3. Post-lock /health probe - catches the race where another process
  *      finished between (1) and the lock claim.
  *
  * A second invocation exits with code 0 and no noise. That is the normal
@@ -20,8 +20,7 @@ const fs = require('fs')
 const path = require('path')
 const http = require('http')
 const { CONFIG } = require('../config/constants')
-const log = require('../utils/log')
-const db = require('../core/state/db')
+const log = require('./log')
 
 const PROBE_TIMEOUT_MS = 2000
 
@@ -122,7 +121,14 @@ function release() {
   } catch {}
 }
 
-async function main() {
+/**
+ * Full pre-flight. Returns one of:
+ *   { ok: true, claimed: true }   - lock held by this process; caller proceeds
+ *   { ok: true, claimed: false, running: <health> } - this instance already up
+ *   { ok: true, claimed: false, busy: true }        - another start holds the lock
+ * Throws on a foreign listener.
+ */
+async function preflight() {
   const running = await probeHealth()
   if (running !== null) {
     if (!healthBelongsToThisInstance(running)) {
@@ -138,12 +144,12 @@ async function main() {
         running.status +
         '). This start has no effect.',
     )
-    return 0
+    return { ok: true, claimed: false, running }
   }
 
   if (acquire() === 'busy') {
     log.info('Another start holds the lock. This start has no effect.')
-    return 0
+    return { ok: true, claimed: false, busy: true }
   }
 
   const raced = await probeHealth()
@@ -157,119 +163,16 @@ async function main() {
     )
   }
 
-  const store = db.open()
-
-  // Wizard runs only at a real terminal. Headless startup uses env vars
-  // (ZEROKEY_PROVIDER / ZEROKEY_USER / ZEROKEY_SESSION) and skips the prompts.
-  const { SessionSelector } = require('../core/session-selector')
-  const selector = new SessionSelector({ db: store })
-  const provider = process.env.ZEROKEY_PROVIDER || process.argv[2]
-  const user = process.env.ZEROKEY_USER || process.argv[3]
-  const session = process.env.ZEROKEY_SESSION || process.argv[4]
-  const headless = Boolean(provider && user && session)
-
-  let preSelected = null
-  if (headless) {
-    preSelected = await selector.select(false, provider, user, session)
-    if (!preSelected) {
-      log.error(
-        'Session "' +
-          session +
-          '" for user "' +
-          user +
-          '" under provider "' +
-          provider +
-          '" not found.',
-      )
-      log.error('Check the SQLite users/sessions tables, or run without args for the wizard.')
-      release()
-      try {
-        store.close()
-      } catch {}
-      process.exit(2)
-    }
-  } else if (process.stdin.isTTY && process.stdout.isTTY) {
-    preSelected = await selector.select(true)
-    if (!preSelected) {
-      log.info('No session selected. Exiting.')
-      release()
-      try {
-        store.close()
-      } catch {}
-      release()
-      try {
-        store.close()
-      } catch {}
-      process.exit(0)
-    }
-  } else {
-    log.error('No session selected and no TTY available for the wizard.')
-    log.error('Set ZEROKEY_PROVIDER, ZEROKEY_USER and ZEROKEY_SESSION, or run at a terminal.')
-    release()
-    try {
-      store.close()
-    } catch {}
-    process.exit(2)
-  }
-
-  log.info(
-    'Session: ' +
-      preSelected.user +
-      ' / ' +
-      preSelected.provider +
-      ' / ' +
-      preSelected.sessionName +
-      ' (' +
-      preSelected.sessionTags +
-      ')',
-  )
-
-  const server = require('../server')
-  await server.start({ db: store, preSelected })
-
-  const shutdown = (signal) => {
-    try {
-      selector.flush()
-    } catch {}
-    log.info('Signal ' + signal + ' received, shutting down.')
-    server.stop().then(
-      () => {
-        release()
-        try {
-          store.close()
-        } catch {}
-        log.close()
-        process.exit(0)
-      },
-      (err) => {
-        log.error('Shutdown failed: ' + err.message)
-        release()
-        process.exit(1)
-      },
-    )
-  }
-
-  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-    try {
-      process.on(signal, () => shutdown(signal))
-    } catch {}
-  }
-
-  process.on('exit', release)
-  return null
+  return { ok: true, claimed: true }
 }
 
-if (require.main === module) {
-  main().then(
-    (code) => {
-      if (code !== null) process.exit(code)
-    },
-    (err) => {
-      log.error('Start failed: ' + (err && err.stack ? err.stack : String(err)))
-      release()
-      process.exit(1)
-    },
-  )
+module.exports = {
+  acquire,
+  healthBelongsToThisInstance,
+  pidAlive,
+  preflight,
+  probeHealth,
+  readLock,
+  release,
+  PROBE_TIMEOUT_MS,
 }
-
-module.exports = { main }

@@ -24,7 +24,7 @@ const COLUMN_MAP = {
   todos: 'todos_json',
   turnCount: 'turn_count',
   dynamicToolsHash: 'dynamic_tools_hash',
-  mcpInjected: 'mcp_injected',
+  mcpInjected: 'mcp_injected_json',
   state: 'state',
   metadata: 'metadata_json',
   lastUsed: 'last_used',
@@ -32,12 +32,12 @@ const COLUMN_MAP = {
   updatedAt: 'updated_at',
 }
 
-const BLOB_KEYS = new Set(['todos', 'metadata'])
+const BLOB_KEYS = new Set(['todos', 'metadata', 'mcpInjected'])
 const FLUSH_MS = 50
 const MAX_GENERATION = Number.MAX_SAFE_INTEGER
 const SELECT_COLUMNS =
   'user_id, name, id, parent_id, generation, tool_calling, vision, model, ' +
-  'todos_json, turn_count, dynamic_tools_hash, mcp_injected, state, metadata_json, ' +
+  'todos_json, turn_count, dynamic_tools_hash, mcp_injected_json, state, metadata_json, ' +
   'last_used, created_at, state_json, updated_at'
 
 const pending = new Map()
@@ -72,8 +72,7 @@ function rowToSession(row) {
     todos: parseBlob(row.todos_json, null),
     turnCount: row.turn_count ?? null,
     dynamicToolsHash: row.dynamic_tools_hash ?? null,
-    mcpInjected:
-      row.mcp_injected === null || row.mcp_injected === undefined ? null : row.mcp_injected === 1,
+    mcpInjected: parseBlob(row.mcp_injected_json, null),
     state: row.state ?? null,
     metadata: parseBlob(row.metadata_json, {}),
     lastUsed: row.last_used ?? null,
@@ -99,8 +98,10 @@ function columnProjection(session) {
       columns[column] = value === null || value === undefined ? null : JSON.stringify(value)
     } else if (typeof value === 'boolean') {
       columns[column] = value ? 1 : 0
+    } else if (value === undefined) {
+      columns[column] = null
     } else {
-      columns[column] = value === undefined ? null : value
+      columns[column] = value
     }
   }
   return {
@@ -215,7 +216,7 @@ function create(db, userId, fields = {}) {
     todos: fields.todos ?? null,
     turnCount: fields.turnCount ?? 0,
     dynamicToolsHash: fields.dynamicToolsHash ?? null,
-    mcpInjected: fields.mcpInjected ?? false,
+    mcpInjected: fields.mcpInjected ?? null,
     state: fields.state ?? 'idle',
     metadata: fields.metadata ?? {},
     lastUsed: fields.lastUsed ?? now,

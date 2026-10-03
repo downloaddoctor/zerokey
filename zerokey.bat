@@ -119,7 +119,7 @@ call :ok "Dependencies installed."
 
 :start
 call :section "Start - node server.js"
-node scripts/start.js
+node server.js
 pause
 endlocal
 exit /b 0

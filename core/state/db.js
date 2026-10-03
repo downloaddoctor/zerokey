@@ -9,6 +9,10 @@
  *
  * Fail-closed contract: a database whose schema_version is newer than the
  * code refuses to open. Silent downgrades are how data loss happens.
+ *
+ * On open, if migrateUsers is not explicitly false, the one-shot importer
+ * in core/state/migrate-users.js moves any legacy temp/users.json into the
+ * users and sessions tables.
  */
 
 const fs = require('fs')
@@ -17,7 +21,7 @@ const { DatabaseSync } = require('node:sqlite')
 const { CONFIG } = require('../../config/constants')
 
 const SCHEMA_FILE = path.join(__dirname, 'schema.sql')
-const SCHEMA_VERSION = 1
+const SCHEMA_VERSION = 2
 
 function open(options = {}) {
   const file = options.file || CONFIG.DB_FILE
@@ -29,8 +33,30 @@ function open(options = {}) {
 
   assertSupportedSchema(db)
   db.exec(fs.readFileSync(SCHEMA_FILE, 'utf8'))
-  migrate(db)
   setMeta(db, 'schema_version', SCHEMA_VERSION)
+
+  if (options.migrateUsers !== false) {
+    const users = require('./users')
+    const sessions = require('./sessions')
+    const { migrate } = require('./migrate-users')
+    try {
+      const result = migrate(db, users, sessions)
+      if (!result.skipped) {
+        console.info(
+          'users.json migrated: ' +
+            result.usersImported +
+            ' user(s), ' +
+            result.sessionsImported +
+            ' session(s), skipped ' +
+            result.skippedExisting +
+            ' existing row(s).',
+        )
+      }
+    } catch (error) {
+      console.error('users.json migration failed: ' + (error.message || error))
+    }
+  }
+
   return db
 }
 
@@ -60,22 +86,6 @@ function assertSupportedSchema(db) {
         '. Refusing to open.',
     )
   }
-}
-
-function migrate(db) {
-  const columns = new Set(
-    db
-      .prepare('PRAGMA table_info(sessions)')
-      .all()
-      .map((row) => row.name),
-  )
-  const add = (name, definition) => {
-    if (columns.has(name)) return
-    db.exec('ALTER TABLE sessions ADD COLUMN ' + name + ' ' + definition)
-    columns.add(name)
-  }
-  add('metadata_json', 'TEXT')
-  add('compaction_generation', 'INTEGER NOT NULL DEFAULT 0')
 }
 
 function setMeta(db, key, value) {

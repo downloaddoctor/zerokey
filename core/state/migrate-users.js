@@ -105,7 +105,7 @@ function migrate(db, usersModule, sessionsModule) {
             todos: entry.todos ?? null,
             turnCount: entry.turnCount ?? 0,
             dynamicToolsHash: entry.dynamicToolsHash ?? null,
-            mcpInjected: entry.mcpInjected ?? false,
+            mcpInjected: entry.mcpInjected ?? null,
             state: entry.chatSessionId ? 'idle' : 'unbound',
             metadata: {},
             lastUsed: toMs(entry.lastUsed) ?? Date.now(),

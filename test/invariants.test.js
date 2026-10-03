@@ -122,8 +122,8 @@ test('sessions.resolve creates a row for a new (userId, name)', () => {
   }
 })
 
-test('start.js emits a PID lock with wx semantics', () => {
-  const src = fs.readFileSync(path.join(ROOT, 'scripts', 'start.js'), 'utf8')
+test('startup.js emits a PID lock with wx semantics', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'utils', 'startup.js'), 'utf8')
   assert.match(src, /fs\.openSync\(CONFIG\.LOCK_FILE, 'wx'\)/)
   assert.match(src, /healthBelongsToThisInstance/)
 })

@@ -74,8 +74,12 @@ function columnProjection(user) {
     }
     if (BLOB_KEYS.has(key)) {
       columns[column] = value === null || value === undefined ? null : JSON.stringify(value)
+    } else if (typeof value === 'boolean') {
+      columns[column] = value ? 1 : 0
+    } else if (value === undefined) {
+      columns[column] = null
     } else {
-      columns[column] = value === undefined ? null : value
+      columns[column] = value
     }
   }
   return {

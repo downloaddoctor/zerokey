@@ -43,20 +43,20 @@ for (const mod of modules) {
   }
 }
 
-// The root entrypoint is loaded explicitly: it is not under any scanned dir,
-// and it holds the only require of the server module graph. A deleted module
-// that only server.js imports was missed twice this session for that reason.
+// app.js is the pure module the tests and this gate depend on. It is loaded
+// explicitly because it sits at the repo root, outside every scanned dir.
 try {
-  const server = require('../server')
+  const appModule = require('../app')
   if (
-    typeof server !== 'object' ||
-    typeof server.start !== 'function' ||
-    typeof server.stop !== 'function'
+    typeof appModule !== 'object' ||
+    typeof appModule.start !== 'function' ||
+    typeof appModule.stop !== 'function' ||
+    typeof appModule.app !== 'function'
   ) {
-    throw new Error('server.js must export { app, start, stop }')
+    throw new Error('app.js must export { app, start, stop }')
   }
 } catch (err) {
-  console.error(`FAIL: ./server.js — ${err.message}`)
+  console.error(`FAIL: ./app.js — ${err.message}`)
   failed++
 }
 
@@ -112,13 +112,22 @@ ok('SAS query stays diagnosable', sas.includes('sig=<redacted>'), sas)
 
 // --- startup hygiene -----------------------------------------------------
 
-const startSource = fs.readFileSync(path.join(root, 'scripts', 'start.js'), 'utf8')
-ok('start uses wx lock acquisition', /fs\.openSync\(CONFIG\.LOCK_FILE, 'wx'\)/.test(startSource))
+const startupSource = fs.readFileSync(path.join(root, 'utils', 'startup.js'), 'utf8')
 ok(
-  'start verifies listener ownership before adopting health',
-  startSource.includes('healthBelongsToThisInstance'),
+  'startup uses wx lock acquisition',
+  /fs\.openSync\(CONFIG\.LOCK_FILE, 'wx'\)/.test(startupSource),
 )
-
+ok(
+  'startup verifies listener ownership before adopting health',
+  startupSource.includes('healthBelongsToThisInstance'),
+)
+const appModule = require('../app')
+ok(
+  'app.js exports { app, start, stop }',
+  typeof appModule.app === 'function' &&
+    typeof appModule.start === 'function' &&
+    typeof appModule.stop === 'function',
+)
 // --- Unix-only assumptions in active code --------------------------------
 
 const PATTERNS = [

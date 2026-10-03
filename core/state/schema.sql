@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   todos_json         TEXT,
   turn_count         INTEGER,
   dynamic_tools_hash TEXT,
-  mcp_injected       INTEGER,
+  mcp_injected_json  TEXT,
   state              TEXT,
   metadata_json      TEXT,
   last_used          INTEGER,
