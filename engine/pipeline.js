@@ -1,7 +1,10 @@
+'use strict'
+
 const SYNTAX = require('./syntax')
 const ToolCompiler = require('./compiler')
 const { toOpenAIError } = require('../utils/errors')
 const { LogSaver, serializeError } = require('../utils/log-saver')
+const { createWriter } = require('../utils/sse-writer')
 
 const routeErrorLog = new LogSaver({ name: 'errors', maxSize: 1024 * 1024 })
 const {
@@ -65,7 +68,6 @@ function emitToolCalls(compiler, session, payloads, emit) {
       ordered.push(f)
     }
   }
-  // Flush any remaining todo group at the end.
   if (todoGroup.length) ordered.push(todoGroup.pop())
 
   const tool_calls = ordered.map((f, i) => buildCall(i, f.tool, f.name, f.arguments))
@@ -85,20 +87,6 @@ class StreamPipeline {
     res.setHeader('Access-Control-Allow-Origin', '*')
   }
 
-  /**
-   * @param {import('express').Response} res
-   * @param {object} session
-   * @param {string} provider - 'deepseek' | 'claude' | 'chatgpt'
-   * @param {string} ideName - 'vscode' | 'terax' | 'opencode'
-   * @param {Array} [messages] - req.body.messages; when supplied, classifies
-   *   this request as a real chat turn vs an ephemeral utility call
-   *   (title-gen, tool-optimizer, etc.) via isRealChatSession. Ephemeral
-   *   calls get a disposable session clone and rawMode=true (skips
-   *   instructions/skill/MCP-tag setup and the block tool-parser — see setup()
-   *   and scan()). Omit `messages` to always use the real session (e.g. for
-   *   the title-gen short-circuit itself, which is already ephemeral by
-   *   construction).
-   */
   constructor(res, session, provider, ideName, isReal = true) {
     this.compiler = new ToolCompiler(ideName, provider)
 
@@ -120,22 +108,36 @@ class StreamPipeline {
     this.lastChar = ''
     this._maxToolLen = Math.max(...Object.keys(this.compiler.tools).map((k) => k.length)) + 3
 
-    const chunk = {
-      id: `chatcmpl-${Date.now()}${Math.random().toString(36).slice(2, 8)}`,
-      object: 'chat.completion.chunk',
-      created: Math.floor(Date.now() / 1000),
-      model: this.compiler.provider,
-      choices: [],
-    }
+    // SSE writer with backpressure. Every chunk leaves through writer.text /
+    // writer.reasoning / writer.toolCalls / writer.finish. The [DONE] frame is
+    // written by writer.finish itself.
+    const writerModel = this.compiler.provider || provider || 'unknown'
+    this.writer = createWriter(res, { model: writerModel })
 
     this.emit = (delta, finishReason = null, usage = null) => {
-      chunk.choices = [{ index: 0, delta, finish_reason: finishReason, logprobs: null }]
-
-      if (usage != null) {
-        chunk.usage = usage
+      if (delta && delta.reasoning_content !== undefined) {
+        this.writer.reasoning(delta.reasoning_content)
+        return
       }
-
-      res.write(`data: ${JSON.stringify(chunk)}\n\n`)
+      if (delta && Array.isArray(delta.tool_calls)) {
+        this.writer.toolCalls(delta.tool_calls)
+        if (finishReason === 'stop' && usage != null) {
+          this.writer.finish('stop', usage, false)
+        }
+        return
+      }
+      if (delta && typeof delta.content === 'string' && delta.content !== '') {
+        this.writer.text(delta.content)
+        if (finishReason === 'stop' && usage != null) {
+          this.writer.finish('stop', usage, false)
+        }
+        return
+      }
+      // Stop-only frame (empty content, empty tool_calls) — the pipeline is
+      // finishing. Hand off to writer.finish with the usage payload.
+      if (finishReason === 'stop' || finishReason === null) {
+        this.writer.finish(finishReason || 'stop', usage, false)
+      }
     }
 
     this.tokenUsage = {}
@@ -157,14 +159,43 @@ class StreamPipeline {
     this.emit({ role, content })
   }
 
+  /**
+   * Raw chunk writer used by provider stream handlers (e.g. Qwen) that emit
+   * their own OpenAI-shaped deltas. Runs through the writer's backpressure
+   * path; a chunk carrying a `finish_reason` closes the stream.
+   */
+  writeChunk(chunk) {
+    if (!chunk || !Array.isArray(chunk.choices) || chunk.choices.length === 0) return
+    const delta = chunk.choices[0].delta || {}
+    const finishReason = chunk.choices[0].finish_reason
+    if (delta.reasoning_content !== undefined) {
+      this.writer.reasoning(delta.reasoning_content)
+    } else if (Array.isArray(delta.tool_calls)) {
+      this.writer.toolCalls(delta.tool_calls)
+    } else if (typeof delta.content === 'string' && delta.content !== '') {
+      this.writer.text(delta.content)
+    } else if (delta.role === 'assistant' && !delta.content) {
+      // Role-only frame — writer.text emits the role implicitly on first text.
+    }
+    if (finishReason === 'stop' || finishReason === 'length') {
+      const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
+      const totals = accumulate(this.session, turnUsage)
+      this.writer.finish(finishReason, { ...turnUsage, session: totals }, false)
+      this._finished = true
+      this.session.lastUsed = new Date().toISOString()
+      if (this.onFinalChunk) this.onFinalChunk()
+    }
+  }
+
   emitAndEnd(text) {
     this.scan(text)
     this.flush()
     const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
     const totals = accumulate(this.session, turnUsage)
-    this.emit({}, 'stop', { ...turnUsage, session: totals })
-    this.res.write('data: [DONE]\n\n')
-    this.res.end()
+    this.writer.finish('stop', { ...turnUsage, session: totals }, false)
+    this._finished = true
+    this.session.lastUsed = new Date().toISOString()
+    if (this.onFinalChunk) this.onFinalChunk()
   }
 
   sendFinalChunk() {
@@ -174,9 +205,7 @@ class StreamPipeline {
     // Real provider numbers win; estimate is the fallback. See engine/usage.js.
     const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
     const totals = accumulate(this.session, turnUsage)
-    this.emit({}, 'stop', { ...turnUsage, session: totals })
-    this.res.write('data: [DONE]\n\n')
-    this.res.end()
+    this.writer.finish('stop', { ...turnUsage, session: totals }, false)
     this.session.lastUsed = new Date().toISOString()
     if (this.onFinalChunk) this.onFinalChunk()
   }
@@ -193,22 +222,6 @@ class StreamPipeline {
 
   // ── pipeline setup ─────────────────────────────────────────────────────
 
-  /**
-   * Shared pipeline: restore MCP injections, format prompt, build prompt,
-   * show available MCP tags on new sessions, and handle skills.
-   * Returns { prompt } — if a skill was triggered the response is already
-   * ended by handleSkill and the caller should return early.
-   *
-   * When this.rawMode is set (ephemeral/non-real-session calls), all of the
-   * above is skipped entirely — no instructions injection, no skill
-   * matching, no MCP tag scanning. Just a flat role-tagged prompt built
-   * straight from the raw messages.
-   *
-   * @param {Array}  messages
-   * @param {Array}  tools
-   * @param {object} req
-   * @returns {Promise<{prompt: string, handled: boolean}>}
-   */
   async setup(messages, tools, req) {
     if (this.ephemeralMode) {
       console.warn('[SERVER] EPHEMERAL CALL')
@@ -242,8 +255,6 @@ class StreamPipeline {
       }
     }
 
-    // Drift reminder — set by the previous turn's flush(), delivered as a
-    // one-shot live_instructions message on this request.
     if (this.session._driftWarning) {
       this.session._driftWarning = false
       messages.push({
@@ -270,10 +281,6 @@ class StreamPipeline {
 
   // ── error handling ─────────────────────────────────────────────────────
 
-  /**
-   * Emit an error through the stream in OpenAI-compatible format.
-   * @param {Error} error
-   */
   onError(error, ctx = {}) {
     const source = ctx.source || 'route'
     const responseClosed = this._finished
@@ -313,7 +320,6 @@ class StreamPipeline {
   // ── block scanning ───────────────────────────────────────────────────────
 
   scan(text) {
-    // Counted for the usage estimate (see engine/usage.js).
     this._modelChars += text ? text.length : 0
     if (this.rawMode) {
       this.emitText(text)
@@ -386,9 +392,6 @@ class StreamPipeline {
   flush() {
     if (this.inTool) this.scan(SYNTAX.CLOSE)
 
-    // Inspect the batch before it reaches the IDE: drop self-duplicates and
-    // flag the session if the model is repeating itself or emitting too many
-    // calls in one response.
     const { deduped, selfDuplicates, oversized, drifting } = inspectBatch(this.toolBuffers)
 
     if (selfDuplicates) {

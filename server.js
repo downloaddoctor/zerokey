@@ -10,11 +10,13 @@
 const express = require('express')
 const { CONFIG } = require('./config/constants')
 const log = require('./utils/log')
+const diagnostics = require('./utils/diagnostics')
 
 const infoRouter = require('./routes/info')
 const docsRouter = require('./routes/docs')
 const buildModelsRouter = require('./routes/models')
 const buildHealthRouter = require('./routes/health')
+const buildDiagnosticsRouter = require('./routes/diagnostics')
 const buildRouter = require('./core/chat-router')
 const { toOpenAIError } = require('./utils/errors')
 const { syncIdeConfig } = require('./utils/sync-ide-config')
@@ -60,14 +62,40 @@ async function start({ db, preSelected }) {
   if (!preSelected) throw new Error('start() requires preSelected session context.')
   if (!db) throw new Error('start() requires an open SQLite handle.')
 
+  const startedAt = Date.now()
+
+  // Resolve the provider once so both /health and /v1/diagnostics can report
+  // a readiness snapshot without re-importing the registry.
+  let providerStatus = null
+  try {
+    const registry = require('./providers/registry')
+    const provider = registry.get(preSelected.provider)
+    providerStatus = diagnostics.providerStatusPayload(provider, preSelected)
+  } catch (error) {
+    providerStatus = { error: error.message }
+  }
+
   app.use('/', buildHealthRouter(preSelected, { db }))
   app.use('/v1/models', buildModelsRouter(preSelected))
+  app.use(
+    '/v1/diagnostics',
+    buildDiagnosticsRouter({
+      host: CONFIG.HOST,
+      port: CONFIG.PORT,
+      startedAt,
+      db,
+      providerStatus,
+    }),
+  )
 
   await syncIdeConfig(preSelected, CONFIG.PORT)
 
   let router
   try {
-    router = await buildRouter(preSelected)
+    router = await buildRouter(preSelected, {
+      db,
+      sessionKey: preSelected.sessionName,
+    })
   } catch (error) {
     log.error('Failed to build initial router: ' + (error.message || error))
     throw error

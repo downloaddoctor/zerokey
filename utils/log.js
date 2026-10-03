@@ -14,15 +14,26 @@ const { CONFIG } = require('../config/constants')
 
 const LEVELS = { error: 0, warn: 1, info: 2, debug: 3 }
 
+const SECRET_KEY_RE =
+  /^(?:access|refresh|access_token|accessToken|refresh_token|refreshToken|apiKey|api_key|id_token|cookie|authorization|secret|password|passwd|token|bearer|credential|private_key|privateKey)$/i
+
 const REDACTIONS = [
   [/(Bearer\s+)[A-Za-z0-9._~+/-]{8,}={0,2}/gi, '$1<redacted>'],
   [
-    /("(?:access|refresh|access_token|accessToken|refresh_token|refreshToken|apiKey|api_key|id_token|cookie|authorization)"\s*:\s*")[^"]*(")/gi,
-    '$1<redacted>$2',
+    /(["'](?:access|refresh|access_token|accessToken|refresh_token|refreshToken|apiKey|api_key|id_token|cookie|authorization|secret|password|passwd|token|bearer|credential|private_key|privateKey)["']\s*:\s*["'])([^"']*)(["'])/gi,
+    '$1<redacted>$3',
+  ],
+  [
+    /\b(?:access|refresh|access_token|accessToken|refresh_token|refreshToken|apiKey|api_key|id_token|cookie|authorization|secret|password|passwd|token|bearer|credential|private_key|privateKey)=([^\s&;]+)/gi,
+    '<redacted>',
   ],
   [/\b(sk-)[A-Za-z0-9._-]{8,}/g, '$1<redacted>'],
   [/\b(eyJ)[A-Za-z0-9._-]{20,}/g, '$1<redacted>'],
 ]
+
+function isSecretKey(name) {
+  return typeof name === 'string' && SECRET_KEY_RE.test(name)
+}
 
 function redact(value) {
   let out = typeof value === 'string' ? value : String(value)
@@ -90,6 +101,7 @@ function close() {
 }
 
 module.exports = {
+  isSecretKey,
   redact,
   close,
   file: logFile,

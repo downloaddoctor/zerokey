@@ -1,3 +1,5 @@
+'use strict'
+
 const { readSSE } = require('../../utils/sse-reader')
 const { LogSaver, serializeError } = require('../../utils/log-saver')
 
@@ -48,7 +50,7 @@ function streamHandler(stream, session, parser, retry, onFinished) {
       choices: [{ index: 0, delta, finish_reason: finishReason }],
       created: Math.floor(Date.now() / 1000),
     }
-    parser.res.write(`data: ${JSON.stringify(chunk)}\n\n`)
+    parser.writeChunk(chunk)
   }
 
   const emitReasoning = (delta) => {
@@ -61,10 +63,6 @@ function streamHandler(stream, session, parser, retry, onFinished) {
     emitChunk({ reasoning_content: delta })
   }
 
-  // Finalization is close-driven: the upstream socket's onDone is the sole
-  // trigger. `superseded` only suppresses the *outer* handler from firing
-  // onFinished (the nested retry handler owns that); sendFinalChunk is safe
-  // to call from either because StreamPipeline guards it with _finished.
   const finish = () => {
     if (finalized) return
     finalized = true
@@ -73,20 +71,22 @@ function streamHandler(stream, session, parser, retry, onFinished) {
     if (!superseded && onFinished && responseId) onFinished(responseId)
   }
 
+  const BACKSLASH = String.fromCharCode(0x5c)
+
   const extractSayText = (argsStr) => {
     const m = /"raw"\s*:\s*"/.exec(argsStr)
     if (!m) return null
     let body = argsStr.slice(m.index + m[0].length)
     let trail = 0
-    while (trail < body.length && body[body.length - 1 - trail] === '\\') trail++
+    while (trail < body.length && body[body.length - 1 - trail] === BACKSLASH) trail++
     if (trail % 2 === 1) body = body.slice(0, -1)
     try {
-      return JSON.parse(`"${body}"`)
+      return JSON.parse('"' + body + '"')
     } catch {
       for (let cut = body.length - 1; cut >= 0; cut--) {
-        if (body[cut] === '\\') continue
+        if (body[cut] === BACKSLASH) continue
         try {
-          return JSON.parse(`"${body.slice(0, cut + 1)}"`)
+          return JSON.parse('"' + body.slice(0, cut + 1) + '"')
         } catch {
           continue
         }
@@ -110,11 +110,11 @@ function streamHandler(stream, session, parser, retry, onFinished) {
         data.error.type ||
         code ||
         JSON.stringify(data.error)
-      const err = new Error(`Qwen stream error: ${reason}`)
+      const err = new Error('Qwen stream error: ' + reason)
       err.code = code
       err.status = code || 500
       err.statusCode = err.status
-      logIssue(`provider error — ${err.message}`, {
+      logIssue('provider error — ' + err.message, {
         error: serializeError(err),
         raw: data,
         retryable: !!RETRY_CODES[code] && !!retry,
@@ -122,8 +122,8 @@ function streamHandler(stream, session, parser, retry, onFinished) {
 
       if (RETRY_CODES[code] && retry) {
         superseded = true
-        parser.emitText(`\n\n⚠ Stream error: ${reason}\n`)
-        parser.emitText(`Retrying...\n`)
+        parser.emitText('\n\n⚠ Stream error: ' + reason + '\n')
+        parser.emitText('Retrying...\n')
         try {
           stream.destroy?.()
         } catch {}
@@ -132,15 +132,15 @@ function streamHandler(stream, session, parser, retry, onFinished) {
             streamHandler(newStream, session, parser, retry, onFinished)
           })
           .catch((retryErr) => {
-            logIssue(`retry failed — ${retryErr?.message || retryErr}`, {
+            logIssue('retry failed — ' + (retryErr?.message || retryErr), {
               error: serializeError(retryErr),
             })
-            parser.emitText(`\n⚠ Retry failed: ${retryErr?.message || retryErr}\n`)
+            parser.emitText('\n⚠ Retry failed: ' + (retryErr?.message || retryErr) + '\n')
           })
         return
       }
 
-      parser.emitText(`\n\n⚠ Stream error: ${reason}\n`)
+      parser.emitText('\n\n⚠ Stream error: ' + reason + '\n')
       return
     }
 
@@ -182,10 +182,10 @@ function streamHandler(stream, session, parser, retry, onFinished) {
 
       const fc = delta.function_call
       if (fc && fc.name && status === 'typing' && !delta.role) {
-        const key = `${phase}:${fc.name}`
+        const key = phase + ':' + fc.name
         if (key !== lastToolPhase) {
           lastToolPhase = key
-          emitReasoning(`\n[${fc.name}...]\n`)
+          emitReasoning('\n[' + fc.name + '...]\n')
         }
       }
       return
