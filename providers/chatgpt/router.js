@@ -1,9 +1,13 @@
+'use strict'
+
 const express = require('express')
 
 const { StreamPipeline } = require('../../engine/pipeline')
 const { ChatGPTAPI } = require('./api')
 const { chatgptStreamHandler } = require('./stream-handler')
 const { acquireSlot } = require('../../utils/rate-limiter')
+const retry = require('../../utils/retry')
+
 const chatgptApi = new ChatGPTAPI()
 
 async function buildChatGPTRouter(parsedFetch, session) {
@@ -32,17 +36,18 @@ async function buildChatGPTRouter(parsedFetch, session) {
       }
     }
 
-    await acquireSlot('ChatGPT')
-
     try {
-      const stream = await chatgptApi.chatCompletion(
-        prompt,
-        activeSession.chatSessionId,
-        activeSession.parentMessageId,
-        model,
-        attachments,
+      const stream = await withRetry(
+        () =>
+          chatgptApi.chatCompletion(
+            prompt,
+            activeSession.chatSessionId,
+            activeSession.parentMessageId,
+            model,
+            attachments,
+          ),
+        pipeline,
       )
-
       await chatgptStreamHandler(stream, activeSession, pipeline)
     } catch (error) {
       return pipeline.onError(error)
@@ -52,4 +57,30 @@ async function buildChatGPTRouter(parsedFetch, session) {
   return router
 }
 
-module.exports = { buildChatGPTRouter }
+/**
+ * Bounded retry around the initial POST only. Stream-level recovery lives in
+ * the stream handler. 429 and 403-unusual-activity are handled inside
+ * chatgptApi via the rate-limiter cooldown, and classify as terminal here so
+ * the router does not hammer a cooled-down provider.
+ */
+async function withRetry(fn, pipeline) {
+  let attempt = 0
+  for (;;) {
+    attempt += 1
+    await acquireSlot('ChatGPT')
+    try {
+      return await fn()
+    } catch (error) {
+      const policy = retry.classify(error, pipeline && pipeline.signal)
+      if (!policy.retry || attempt >= policy.maxAttempts) throw error
+      retry.discardResponse(error.response)
+      const delay = retry.delayMs(attempt, error.response)
+      console.warn(
+        `[ChatGPT] Retrying after ${policy.kind} (attempt ${attempt + 1}/${policy.maxAttempts}, wait ${delay}ms)`,
+      )
+      await retry.sleep(delay, pipeline && pipeline.signal)
+    }
+  }
+}
+
+module.exports = { buildChatGPTRouter, withRetry }

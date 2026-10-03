@@ -1,3 +1,5 @@
+'use strict'
+
 const express = require('express')
 
 const { StreamPipeline } = require('../../engine/pipeline')
@@ -5,6 +7,7 @@ const { QwenAPI } = require('./api')
 const { streamHandler } = require('./stream-handler')
 const { setQwenInstructions } = require('./set-instructions')
 const { acquireSlot } = require('../../utils/rate-limiter')
+const retry = require('../../utils/retry')
 const { models } = require('./config')
 
 const QWEN_MODELS = models.models
@@ -29,7 +32,6 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
     const pipeline = new StreamPipeline(res, session, 'qwen', req.surface, req.isRealSession)
     const activeSession = pipeline.session
 
-    // Enforce per-model allowed reasoning modes; fall back to first allowed
     const modelMeta = QWEN_MODELS[activeSession.model] || QWEN_MODELS[session.model] || {}
     const allowedModes = modelMeta.reasoning || []
     let reasoningEffort = rawReasoningEffort
@@ -65,34 +67,31 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
     }
 
     try {
-      await acquireSlot('Qwen')
-      const qwenStream = await qwenApi.chatCompletion(
-        activeSession.chatSessionId,
-        prompt,
-        activeSession.parentMessageId,
-        {
-          model: activeSession.model,
-          reasoningEffort: reasoningEffort,
-        },
+      const qwenStream = await withRetry(
+        () =>
+          qwenApi.chatCompletion(
+            activeSession.chatSessionId,
+            prompt,
+            activeSession.parentMessageId,
+            { model: activeSession.model, reasoningEffort },
+          ),
+        pipeline,
       )
 
-      const retry = async () => {
+      const retryFn = async () => {
         await acquireSlot('Qwen', true)
         return qwenApi.chatCompletion(
           activeSession.chatSessionId,
           prompt,
           activeSession.parentMessageId,
-          {
-            model: activeSession.model,
-            reasoningEffort: reasoningEffort,
-          },
+          { model: activeSession.model, reasoningEffort },
         )
       }
 
       const onFinished = (responseId) => {
         qwenApi.selectMessage(activeSession.chatSessionId, responseId).catch(() => {})
       }
-      streamHandler(qwenStream, activeSession, pipeline, retry, onFinished)
+      streamHandler(qwenStream, activeSession, pipeline, retryFn, onFinished)
     } catch (error) {
       if (error?.code === 'RateLimited' && userData) {
         const waitMs = typeof error.waitMs === 'number' ? error.waitMs : 24 * 60 * 60 * 1000
@@ -106,4 +105,25 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
   return router
 }
 
-module.exports = { buildQwenRouter }
+async function withRetry(fn, pipeline) {
+  let attempt = 0
+  for (;;) {
+    attempt += 1
+    await acquireSlot('Qwen')
+    try {
+      return await fn()
+    } catch (error) {
+      if (error && error.code === 'RateLimited') throw error
+      const policy = retry.classify(error, pipeline && pipeline.signal)
+      if (!policy.retry || attempt >= policy.maxAttempts) throw error
+      retry.discardResponse(error.response)
+      const delay = retry.delayMs(attempt, error.response)
+      console.warn(
+        `[Qwen] Retrying after ${policy.kind} (attempt ${attempt + 1}/${policy.maxAttempts}, wait ${delay}ms)`,
+      )
+      await retry.sleep(delay, pipeline && pipeline.signal)
+    }
+  }
+}
+
+module.exports = { buildQwenRouter, withRetry }

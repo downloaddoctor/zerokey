@@ -1,3 +1,5 @@
+'use strict'
+
 const express = require('express')
 
 const { StreamPipeline } = require('../../engine/pipeline')
@@ -5,19 +7,11 @@ const { DeepSeekAPI } = require('./api')
 const { getSharedTransport } = require('./browser-transport')
 const { streamHandler } = require('./stream-handler')
 const { acquireSlot } = require('../../utils/rate-limiter')
+const retry = require('../../utils/retry')
 const { reasoning } = require('./config')
 
-// Transport selection: 'browser' (default) drives the real web UI; 'api' keeps
-// the legacy direct-fetch path (PoW headers, cookie jar). Set via env when you
-// need to compare or fall back. The transport singleton is resolved lazily
-// inside buildDeepSeekRouter so it can be keyed to the selected local username
-// (profile dir = temp/profiles/deepseek/<username>/) — never constructed at
-// module load.
 const TRANSPORT = (process.env.DEEPSEEK_TRANSPORT || 'browser').toLowerCase()
 
-// O(1) reasoning_effort → { think, search } lookup.
-// Keys are the exact labels VS Code advertises (utils/sync-ide-config.js).
-// Anything not mapped disables both thinking and search.
 const REASONING_MAP = reasoning.map
 
 async function buildDeepSeekRouter(parsedFetch, session, userData) {
@@ -82,18 +76,22 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
     if (handled) return
 
     try {
-      await acquireSlot('DeepSeek')
-      const deepseekStream = await deepseekApi.chatCompletion(
-        activeSession.chatSessionId,
-        prompt,
-        activeSession.parentMessageId,
-        thinkingEnabled,
-        searchEnabled,
-        modelType,
-        fileIds,
+      const deepseekStream = await withRetry(
+        () =>
+          deepseekApi.chatCompletion(
+            activeSession.chatSessionId,
+            prompt,
+            activeSession.parentMessageId,
+            thinkingEnabled,
+            searchEnabled,
+            modelType,
+            fileIds,
+          ),
+        pipeline,
+        'DeepSeek',
       )
 
-      const retry = async () => {
+      const retryFn = async () => {
         await acquireSlot('DeepSeek', true)
         return deepseekApi.chatCompletion(
           activeSession.chatSessionId,
@@ -106,7 +104,7 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
         )
       }
 
-      streamHandler(deepseekStream, activeSession, pipeline, retry)
+      streamHandler(deepseekStream, activeSession, pipeline, retryFn)
     } catch (error) {
       if (error.code === 'account_suspended' && error.muteUntil && userData) {
         userData.waitUntil = Math.ceil(error.muteUntil * 1000)
@@ -119,4 +117,25 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
   return router
 }
 
-module.exports = { buildDeepSeekRouter }
+async function withRetry(fn, pipeline, label) {
+  let attempt = 0
+  for (;;) {
+    attempt += 1
+    await acquireSlot(label)
+    try {
+      return await fn()
+    } catch (error) {
+      if (error && error.code === 'account_suspended') throw error
+      const policy = retry.classify(error, pipeline && pipeline.signal)
+      if (!policy.retry || attempt >= policy.maxAttempts) throw error
+      retry.discardResponse(error.response)
+      const delay = retry.delayMs(attempt, error.response)
+      console.warn(
+        `[${label}] Retrying after ${policy.kind} (attempt ${attempt + 1}/${policy.maxAttempts}, wait ${delay}ms)`,
+      )
+      await retry.sleep(delay, pipeline && pipeline.signal)
+    }
+  }
+}
+
+module.exports = { buildDeepSeekRouter, withRetry }

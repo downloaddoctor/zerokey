@@ -1,3 +1,5 @@
+'use strict'
+
 const express = require('express')
 
 const { StreamPipeline } = require('../../engine/pipeline')
@@ -5,6 +7,7 @@ const { ClaudeAPI } = require('./api')
 const { claudeStreamHandler } = require('./stream-handler')
 const { setClaudeInstructions } = require('./set-instructions')
 const { acquireSlot } = require('../../utils/rate-limiter')
+const retry = require('../../utils/retry')
 const instructions = require('../../engine/instructions')
 const { models, reasoning } = require('./config')
 
@@ -25,7 +28,6 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
     const activeSession = pipeline.session
     const model = activeSession.model
 
-    // Enforce per-model allowed reasoning modes; fall back to first allowed
     const modelMeta = CLAUDE_MODELS[model] || {}
     const allowedModes = modelMeta.reasoning || PROVIDER_REASONING_LABELS
     let reasoningEffort = rawReasoningEffort
@@ -62,18 +64,20 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
       }
     }
 
-    await acquireSlot('Claude')
-
     try {
-      const { stream, chatSessionId } = await claudeApi.chatCompletion(
-        prompt,
-        activeSession.chatSessionId,
-        activeSession.parentMessageId,
-        model,
-        [],
-        fileIds,
-        reasoningEffort,
-        pipeline.ephemeralMode,
+      const { stream, chatSessionId } = await withRetry(
+        () =>
+          claudeApi.chatCompletion(
+            prompt,
+            activeSession.chatSessionId,
+            activeSession.parentMessageId,
+            model,
+            [],
+            fileIds,
+            reasoningEffort,
+            pipeline.ephemeralMode,
+          ),
+        pipeline,
       )
 
       if (chatSessionId && !activeSession.chatSessionId) {
@@ -157,8 +161,55 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
   return router
 }
 
+async function withRetry(fn, pipeline) {
+  let attempt = 0
+  for (;;) {
+    attempt += 1
+    await acquireSlot('Claude')
+    try {
+      return await fn()
+    } catch (error) {
+      // Claude limit errors carry their own reset time and must not be retried.
+      if (error && error.status === 429) throw error
+      const policy = retry.classify(error, pipeline && pipeline.signal)
+      if (!policy.retry || attempt >= policy.maxAttempts) throw error
+      retry.discardResponse(error.response)
+      const delay = retry.delayMs(attempt, error.response)
+      console.warn(
+        `[Claude] Retrying after ${policy.kind} (attempt ${attempt + 1}/${policy.maxAttempts}, wait ${delay}ms)`,
+      )
+      await retry.sleep(delay, pipeline && pipeline.signal)
+    }
+  }
+}
+
 function limitMessageText(resetTime, mins) {
-  return `\n⟦ask¦question=This Claude session has reached its usage limit. It resets at ${resetTime} (~${mins} min). What would you like to do?¦option=Switch to another Claude user¦default=true¦option=Switch to another provider¦option=Please Continue⟧`
+  const OPEN = String.fromCodePoint(0x27e6)
+  const CLOSE = String.fromCodePoint(0x27e7)
+  const SEP = String.fromCodePoint(0xa6)
+  const question =
+    'This Claude session has reached its usage limit. It resets at ' +
+    resetTime +
+    ' (~' +
+    mins +
+    ' min). What would you like to do?'
+  return (
+    '\n' +
+    OPEN +
+    'ask' +
+    SEP +
+    'question=' +
+    question +
+    SEP +
+    'option=Switch to another Claude user' +
+    SEP +
+    'default=true' +
+    SEP +
+    'option=Switch to another provider' +
+    SEP +
+    'option=Please Continue' +
+    CLOSE
+  )
 }
 
 function computeReset(waitUntilMs) {
@@ -175,4 +226,4 @@ function emitLimitResponse(parser, waitUntilMs, prefix) {
   parser.sendFinalChunk()
 }
 
-module.exports = { buildClaudeRouter }
+module.exports = { buildClaudeRouter, withRetry }
