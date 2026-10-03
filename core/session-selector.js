@@ -188,7 +188,7 @@ class SessionSelector {
         return {
           title: username,
           value: username,
-          description: limited ? 'at usage limit' : undefined,
+          description: limited ? '⚠ at usage limit' : undefined,
         }
       })
       choices.push({ title: text.cyan('Create new user'), value: '__new__' })
@@ -301,7 +301,7 @@ class SessionSelector {
       const fetchStr = await this._openEditor()
 
       if (!fetchStr || !fetchStr.includes('fetch(')) {
-        if (!(await this._retryOrCancel('Not a valid fetch() call - what would you like to do?')))
+        if (!(await this._retryOrCancel('✖ Not a valid fetch() call - what would you like to do?')))
           return null
         continue
       }
@@ -310,14 +310,14 @@ class SessionSelector {
       try {
         parsedFetch = this._parseFetchDirect(fetchStr)
       } catch (e) {
-        console.error('  Failed to parse fetch: ' + e.message + '\n')
+        console.error('  ✖ Failed to parse fetch: ' + e.message + '\n')
         continue
       }
 
       const missing = this._validateFetchHeaders(parsedFetch)
       if (missing.length > 0) {
         console.error(
-          '  Fetch is missing required headers:\n' +
+          '  ✖ Fetch is missing required headers:\n' +
             missing.map((h) => '     - ' + h).join('\n') +
             '\n',
         )
@@ -334,10 +334,10 @@ class SessionSelector {
       try {
         await this._validateLiveConnection(parsedFetch, username)
         process.stdout.write('\r                                  ')
-        process.stdout.write('\r  ' + text.green('Session verified') + '\n\n')
+        process.stdout.write('\r  ' + text.green('√ Session verified') + '\n\n')
       } catch (e) {
         process.stdout.write(' \n\n')
-        console.error('  Live check failed: ' + e.message + '\n')
+        console.error('  ✖ Live check failed: ' + e.message + '\n')
         if (
           !(await this._retryOrCancel(
             'Credentials rejected by provider - what would you like to do?',
@@ -514,7 +514,9 @@ class SessionSelector {
     } catch (e) {
       console.warn('\n  Provider cleanup failed: ' + e.message)
     }
-    process.stdout.write('\r  ' + text.green('Provider sessions cleaned.') + '                  \n')
+    process.stdout.write(
+      '\r  ' + text.green('√ Provider sessions cleaned.') + '                  \n',
+    )
 
     this.user = savedUser
     this.provider = savedProvider
@@ -525,7 +527,7 @@ class SessionSelector {
     } catch (e) {
       console.warn('  Failed to remove profile dir: ' + e.message)
     }
-    console.info('  ' + text.green('OK') + ' User "' + target + '" removed.\n')
+    console.info('  ' + text.green('√') + ' User "' + target + '" removed.\n')
 
     return this._stepUserLogin()
   }
@@ -545,7 +547,7 @@ class SessionSelector {
     if (confirmed) {
       process.stdout.write(text.dim('  Deleting sessions...'))
       await this._deleteProviderSessions()
-      process.stdout.write('\r  ' + text.green('Done.') + '                  \n\n')
+      process.stdout.write('\r  ' + text.green('√ Done.') + '                  \n\n')
 
       this.user.sessions = []
       this._saveUser(this.provider, this.user.username, this.user)
@@ -786,7 +788,7 @@ class SessionSelector {
       session.lastUsed ? 'last: ' + this._formatTime(session.lastUsed) : '',
     ]
       .filter(Boolean)
-      .join('  -  ')
+      .join('  ·  ')
   }
 }
 

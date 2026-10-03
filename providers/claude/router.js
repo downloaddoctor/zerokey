@@ -115,7 +115,9 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
               const overUtilized = limitReached.util >= 1.0
 
               if (overUtilized) {
-                console.warn(`[Claude] Usage at ${limitReached.pct} - over limit, skipping summary`)
+                console.warn(
+                  `[Claude] ⚠ Usage at ${limitReached.pct} — over limit, skipping summary`,
+                )
                 return emitLimitResponse(
                   pipeline,
                   userData.waitUntil,
@@ -123,7 +125,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
                 )
               }
 
-              console.warn(`[Claude] Usage at ${limitReached.pct} - requesting summary`)
+              console.warn(`[Claude] ⚠ Usage at ${limitReached.pct} — requesting summary`)
 
               try {
                 const { stream: summaryStream } = await claudeApi.chatCompletion(
@@ -244,7 +246,7 @@ function computeReset(waitUntilMs) {
 
 function emitLimitResponse(parser, waitUntilMs, prefix) {
   const { resetTime, mins } = computeReset(waitUntilMs)
-  parser.scan(`\n\n⚠ ${prefix} - it needs ~${mins} min to reset at ${resetTime}.\n`)
+  parser.scan(`\n\n⚠ ${prefix} — it needs ~${mins} min to reset at ${resetTime}.\n`)
   parser.scan(limitMessageText(resetTime, mins))
   parser.sendFinalChunk()
 }
