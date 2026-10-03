@@ -1,14 +1,22 @@
+'use strict'
+
+/**
+ * HTTP entry point. Loaded by scripts/start.js — never invoked directly.
+ *
+ * Bind address is fixed to loopback. Remote access goes through an SSH tunnel
+ * (ssh -L 7250:127.0.0.1:7250), not through a second bind or a firewall rule.
+ */
+
 const express = require('express')
+const { CONFIG } = require('./config/constants')
+const log = require('./utils/log')
 
 const infoRouter = require('./routes/info')
 const docsRouter = require('./routes/docs')
 const buildModelsRouter = require('./routes/models')
 const buildHealthRouter = require('./routes/health')
 const buildRouter = require('./core/chat-router')
-const { CONFIG } = require('./config/constants')
-const { SessionSelector } = require('./core/session-selector')
 const { toOpenAIError } = require('./utils/errors')
-const { findPort } = require('./utils/find-port')
 const { syncIdeConfig } = require('./utils/sync-ide-config')
 const { sequentialQueue } = require('./utils/sequential-queue')
 const { classifySession } = require('./utils/session-classifier')
@@ -20,20 +28,14 @@ const errorLog = new LogSaver({ name: 'errors', maxSize: 1024 * 1024 })
 
 require('./utils/logger')
 
-const app = express()
+let httpServer = null
 
+const app = express()
 app.use(express.json({ limit: '50mb' }))
 
-// Shared chat-request prep, run once per request for every provider:
-//   1. validate messages[]                (400 otherwise)
-//   2. set SSE headers                    (before any router writes)
-//   3. classify the tool surface from the system-prompt fingerprint and expose
-//      the real-vs-ephemeral verdict on req — nothing downstream re-classifies.
 const prepareChatRequest = (req, res, next) => {
   if (!validateMessages(req.body?.messages, res)) return
-
   StreamPipeline.setSSEHeaders(res)
-
   const { isReal, surface, matched } = classifySession(req.body?.messages)
   req.surface = surface
   req.isRealSession = isReal
@@ -44,9 +46,8 @@ const prepareChatRequest = (req, res, next) => {
 app.use((req, res, next) => {
   const start = Date.now()
   res.on('finish', () => {
-    const duration = Date.now() - start
-    console.debug(
-      `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} → ${res.statusCode} (${duration}ms)\n`,
+    log.debug(
+      `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} -> ${res.statusCode} (${Date.now() - start}ms)`,
     )
   })
   next()
@@ -55,59 +56,26 @@ app.use((req, res, next) => {
 app.use('/', docsRouter)
 app.use('/', infoRouter)
 
-async function start() {
-  const selector = new SessionSelector()
-  const provider = process.env.ZEROKEY_PROVIDER || process.argv[2]
-  const user = process.env.ZEROKEY_USER || process.argv[3]
-  const session = process.env.ZEROKEY_SESSION || process.argv[4]
+async function start({ db, preSelected }) {
+  if (!preSelected) throw new Error('start() requires preSelected session context.')
+  if (!db) throw new Error('start() requires an open SQLite handle.')
 
-  const headless = Boolean(provider && user && session)
-
-  let preSelected
-  if (headless) {
-    preSelected = await selector.select(false, provider, user, session)
-    if (!preSelected) {
-      // Do NOT exit(0): a start script must be able to tell that the proxy
-      // did not come up. Silent success on a dead port is the worst failure.
-      console.error(
-        `[Server] Session "${session}" for user "${user}" under provider "${provider}" not found.`,
-      )
-      console.error(`[Server] Check temp/users.json — or run without args to use the wizard.`)
-      process.exit(2)
-    }
-  } else {
-    preSelected = await selector.select(true)
-    if (!preSelected) {
-      console.error('No session selected. Exiting.')
-      process.exit(0)
-    }
-  }
-
-  const _tags = [
-    preSelected.user,
-    preSelected.provider,
-    preSelected.sessionName,
-    preSelected.session.model,
-  ].join(' · ')
-  console.info(`\n[Server] ${_tags}\n         ${preSelected.sessionTags}`)
-
-  const port = await findPort(CONFIG.PORT)
-
-  app.use('/', buildHealthRouter(preSelected))
+  app.use('/', buildHealthRouter(preSelected, { db }))
   app.use('/v1/models', buildModelsRouter(preSelected))
 
-  await syncIdeConfig(preSelected, port)
+  await syncIdeConfig(preSelected, CONFIG.PORT)
 
+  let router
   try {
-    const router = await buildRouter(preSelected)
-    app.use('/v1/chat/completions', sequentialQueue(), prepareChatRequest, router)
+    router = await buildRouter(preSelected)
   } catch (error) {
-    console.error('Failed to build initial router:', error)
-    process.exit(1)
+    log.error('Failed to build initial router: ' + (error.message || error))
+    throw error
   }
+  app.use('/v1/chat/completions', sequentialQueue(), prepareChatRequest, router)
 
   app.use((err, req, res, _next) => {
-    console.error('[Server] Unhandled error:', err.message || err)
+    log.error('[Server] Unhandled error: ' + (err.message || err))
     const openaiErr = toOpenAIError(err, preSelected.provider)
     const status = openaiErr.error?.status || err.statusCode || err.status || 500
     try {
@@ -126,59 +94,22 @@ async function start() {
     if (!res.headersSent) res.status(status).json(openaiErr)
     else res.end()
   })
-  const server = app.listen(port, '127.0.0.1', () => {
-    console.success(`\n√ ZeroKey running on http://localhost:${port}`)
-    console.log('')
-    console.log(`  POST  http://localhost:${port}/v1/chat/completions   Chat (SSE)`)
-    console.log(`  GET   http://localhost:${port}/v1/models             List models`)
-    console.log(`  GET   http://localhost:${port}/docs                  Swagger UI`)
-  })
 
-  const shutdown = (signal) => {
-    console.warn(`\n[Server] ${signal} received — shutting down...`)
-    selector.flush()
-    server.close(() => {
-      console.success('[Server] Closed.')
-      process.exit(0)
+  await new Promise((resolve, reject) => {
+    httpServer = app.listen(CONFIG.PORT, CONFIG.HOST, () => {
+      log.info(`ZeroKey listening on http://${CONFIG.HOST}:${CONFIG.PORT} (PID ${process.pid})`)
+      resolve()
     })
-    setTimeout(() => {
-      console.error('[Server] Forced shutdown after timeout.')
-      process.exit(1)
-    }, 5000)
-  }
-  process.on('SIGINT', () => shutdown('SIGINT'))
-  process.on('SIGTERM', () => shutdown('SIGTERM'))
-  process.on('SIGHUP', () => shutdown('SIGHUP'))
-  process.on('exit', () => selector.flush())
-
-  process.on('uncaughtException', (err) => {
-    try {
-      errorLog.log(
-        [
-          `[${new Date().toISOString()}] uncaughtException`,
-          `Message: ${err && (err.message || err)}`,
-          (err && err.stack) || '',
-        ].join('\n'),
-      )
-    } catch {}
-    console.error('[Server] uncaughtException:', (err && (err.stack || err.message)) || err)
-    selector.flush()
-    process.exit(1)
+    httpServer.once('error', reject)
   })
 
-  process.on('unhandledRejection', (reason) => {
-    const err = reason instanceof Error ? reason : new Error(String(reason))
-    try {
-      errorLog.log(
-        [
-          `[${new Date().toISOString()}] unhandledRejection`,
-          `Message: ${err.message}`,
-          err.stack || '',
-        ].join('\n'),
-      )
-    } catch {}
-    console.error('[Server] unhandledRejection:', err.stack || err.message)
-  })
+  return httpServer
 }
 
-start()
+async function stop() {
+  if (httpServer === null) return
+  await new Promise((resolve) => httpServer.close(resolve))
+  httpServer = null
+}
+
+module.exports = { app, start, stop }

@@ -2,16 +2,20 @@
 
 ## PROJECT
 ZeroKey — OpenAI-compatible local AI proxy for DeepSeek, Claude, ChatGPT, Qwen using real browser sessions (no API keys).
-Node >=18, pnpm@10.13.1, CommonJS. Personal-use, non-commercial license.
+Node >=22, pnpm@10.13.1, CommonJS. Personal-use, non-commercial license.
 
 ## ENTRY-POINTS
-server.js — boot: SessionSelector wizard → buildRouter → express app → findPort → listen on 127.0.0.1
+scripts/start.js — authoritative starter: /health probe, PID lock (wx), post-lock probe, legacy import, then server.js
+server.js — express app; exports { app, start({ db, preSelected }), stop }; listens on CONFIG.HOST:CONFIG.PORT
 zerokey.bat / zerokey.sh — portable launchers (clone + toolchain + pnpm start)
-package.json scripts: start, lint, format, check (scripts/check-modules.js), test (node --test), precommit
+package.json scripts: start (scripts/start.js), lint, format, check (scripts/check-modules.js), test (node --test), precommit
 
 ## DIRECTORY
-config/ — constants.js (PORT)
+config/ — constants.js (PORT, EXACT_PORT, DATA_DIR, DB_FILE, LOCK_FILE, LOG_DIR, LOG_LEVEL, LOG_MAX_BYTES, LOG_KEEP)
 core/ — chat-router.js, session-selector.js
+core/state/ — db.js (open, schema gate, migrate), schema.sql, sessions.js, import-legacy.js
+utils/log.js — central redact-before-write log; every write passes through redact()
+test/invariants.test.js — loopback bind, exact port, config junk rejection, redaction, schema gate, session round-trip, no-Unix-assumptions, node:sqlite availability
 docs/ — index.html (landing), llms.txt, .nojekyll, logos/
 .github/ — PR + issue templates
 .githooks/pre-commit — prettier + lint + check + test
@@ -53,8 +57,21 @@ opencode — prefix 'You are opencode'
 api — no tools; fallback only (DEFAULT_SURFACE in session-classifier)
 
 ## SCHEMA
-temp/users.json — { <provider>: { <username>: { username, parsedFetch, sessions[], instructionsHash, instructionsAppliedAt, waitUntil?, waitReason? } } }
-session — { name, chatSessionId, parentMessageId, createdAt, lastUsed, toolCalling, vision, model, dynamicToolsHash, todos, turnCount?, mcpInjected?, _usageTotals? }
+temp/users.json — legacy source of truth; read-only after first import into SQLite (see import-legacy.js). Shape: { <provider>: { <username>: { username, parsedFetch, sessions[], instructionsHash, instructionsAppliedAt, waitUntil?, waitReason? } } }
+temp/zerokey.db — SQLite; sessions(provider, session_id) → upstream_conversation_id, upstream_parent_message_id, state, metadata_json; meta(k,v); legacy_import audit
+temp/.start.lock — { pid, port, startedAt }; created with 'wx', released only by owner
+temp/logs/zerokey.log — rotating; rotated siblings at zerokey.log.1..N (N = CONFIG.LOG_KEEP)
+session — { name, chatSessionId, parentMessageId, createdAt, lastUsed, toolCalling, vision, model, dynamicToolsHash, todos, turnCount?, mcpInjected? } (in-memory view; SQLite row is authoritative once persistent)
+sessions.db row — { provider, session_id, upstream_conversation_id, upstream_parent_message_id, state, metadata_json, created_at, updated_at } — PK(provider, session_id)
+
+## INVARIANTS
+startup — scripts/start.js is the only entrypoint; two invocations cannot both bind CONFIG.PORT (health probe + PID lock via 'wx' + post-lock probe)
+port — CONFIG.EXACT_PORT default true; findPort fallback only when explicitly disabled
+schema — core/state/db.js refuses a database whose schema_version exceeds SCHEMA_VERSION; never downgrades
+log — every line passes utils/log.redact() before disk or stderr; no code path writes raw provider bytes
+state — sessions table stores IDs and state only; prompt/response content has no columns
+legacy import — import-legacy.js runs at most once (meta.legacy_import_done), never writes users.json, never overwrites existing rows
+PID lock — release() unlinks only the lock owned by this process; foreign owner is not touched
 session._usageTotals — { prompt_tokens, completion_tokens, total_tokens, turns } — estimated providers only (ChatGPT, Qwen); Claude/DeepSeek real usage not summed (context-window measure, not per-turn input)
 MHI payload — name ¦ key=value ¦ key=value; separator U+00A6; open U+27E6; close U+27E7; esc '\'
 

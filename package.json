@@ -5,10 +5,10 @@
   "main": "server.js",
   "packageManager": "pnpm@10.13.1",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
-    "start": "node server.js",
+    "start": "node scripts/start.js",
     "lint": "eslint .",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
