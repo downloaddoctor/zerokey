@@ -15,7 +15,7 @@
 
 const log = require('../../utils/log')
 const toolBridge = require('../../engine/tool-bridge')
-const bpi = require('../mhi')
+const mhi = require('../mhi')
 
 const FILE_TOOLS = new Set(['read', 'ls', 'glob', 'grep', 'write', 'replace', 'view_image'])
 
@@ -186,16 +186,16 @@ async function runToolLoop(options) {
     const turn = await options.turn(payload, signal)
     const assistantText = turn.assistantText || ''
 
-    const decision = bpi.evaluateAssistant(assistantText)
+    const decision = mhi.evaluateAssistant(assistantText)
     if (decision.kind === 'final') {
       return { assistantText, rounds }
     }
     if (decision.kind === 'continue') {
-      payload = bpi.appendResult(payload, decision.prompt)
+      payload = mhi.appendResult(payload, decision.prompt)
       continue
     }
 
-    const results = await bpi.executeCalls(decision.calls, {
+    const results = await mhi.executeCalls(decision.calls, {
       context: workspace,
       signal,
       fileTools: config.MHI_FILE_TOOLS,
@@ -208,8 +208,8 @@ async function runToolLoop(options) {
       cmdTimeoutMs: config.MHI_CMD_TIMEOUT_MS,
     })
 
-    const formatted = bpi.formatResults(results)
-    payload = bpi.appendResult(payload, formatted.text)
+    const formatted = mhi.formatResults(results)
+    payload = mhi.appendResult(payload, formatted.text)
     if (Array.isArray(formatted.attachments) && formatted.attachments.length > 0) {
       payload.attachments = formatted.attachments
     }

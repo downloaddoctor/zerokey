@@ -18,7 +18,6 @@
 
 const fs = require('fs')
 const path = require('path')
-const log = require('../../utils/log')
 
 const ONE_SHOT_401 = 'chatgpt_401_retry_used'
 
@@ -61,7 +60,7 @@ async function forceReloadCapture(api) {
       await api.initializeFromJSON(entry.parsedFetch)
       return { ok: true, username }
     } catch (error) {
-      log.warn(
+      console.warn(
         'Force-reload of capture failed for user ' + username + ': ' + (error.message || error),
       )
     }
@@ -79,7 +78,7 @@ async function withAuthRecovery(api, fn) {
   } catch (error) {
     if (!isUnauthorized(error)) throw error
 
-    log.warn('ChatGPT returned 401; forcing a capture reload and retrying once.')
+    console.warn('ChatGPT returned 401; forcing a capture reload and retrying once.')
     const reload = await forceReloadCapture(api)
     if (!reload.ok) {
       const wrapped = new Error(
@@ -118,7 +117,7 @@ async function refreshSentinelSafe(api) {
     }
     return { ok: false, reason: 'no_refresh_method' }
   } catch (error) {
-    log.warn('Sentinel refresh failed: ' + (error.message || error))
+    console.warn('Sentinel refresh failed: ' + (error.message || error))
     return { ok: false, reason: error && error.message ? error.message : String(error) }
   }
 }

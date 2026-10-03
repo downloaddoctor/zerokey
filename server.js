@@ -11,8 +11,6 @@
  * instances share temp/db/zerokey.db (users and sessions), each on its own
  * port. ZEROKEY_EXACT_PORT=1 refuses a busy start port instead of moving.
  */
-
-const log = require('./utils/log')
 const startup = require('./utils/startup')
 const { CONFIG } = require('./config/constants')
 const db = require('./core/state/db')
@@ -24,7 +22,7 @@ async function run() {
     exact: CONFIG.EXACT_PORT,
   })
   if (port !== CONFIG.PORT) {
-    log.info(`Port ${CONFIG.PORT} busy, using ${port}.`)
+    console.info(`Port ${CONFIG.PORT} busy, using ${port}.`)
   }
 
   await startup.postClaim(port)
@@ -49,26 +47,28 @@ async function run() {
   if (headless) {
     preSelected = await selector.select(false, provider, user, session)
     if (!preSelected) {
-      log.error(`Session "${session}" for user "${user}" under provider "${provider}" not found.`)
-      log.error('Check the SQLite users/sessions tables, or run without args for the wizard.')
+      console.error(
+        `Session "${session}" for user "${user}" under provider "${provider}" not found.`,
+      )
+      console.error('Check the SQLite users/sessions tables, or run without args for the wizard.')
       cleanup()
       process.exit(2)
     }
   } else if (process.stdin.isTTY && process.stdout.isTTY) {
     preSelected = await selector.select(true)
     if (!preSelected) {
-      log.info('No session selected. Exiting.')
+      console.info('No session selected. Exiting.')
       cleanup()
       process.exit(0)
     }
   } else {
-    log.error('No session selected and no TTY available for the wizard.')
-    log.error('Set ZEROKEY_PROVIDER, ZEROKEY_USER and ZEROKEY_SESSION, or run at a terminal.')
+    console.error('No session selected and no TTY available for the wizard.')
+    console.error('Set ZEROKEY_PROVIDER, ZEROKEY_USER and ZEROKEY_SESSION, or run at a terminal.')
     cleanup()
     process.exit(2)
   }
 
-  log.info(
+  console.info(
     `Session: ${preSelected.user} / ${preSelected.provider} / ${preSelected.sessionName} (${preSelected.sessionTags})`,
   )
 
@@ -79,14 +79,14 @@ async function run() {
     try {
       selector.flush()
     } catch {}
-    log.info(`Signal ${signal} received, shutting down.`)
+    console.info(`Signal ${signal} received, shutting down.`)
     app.stop().then(
       () => {
         cleanup()
         process.exit(0)
       },
       (err) => {
-        log.error(`Shutdown failed: ${err && err.message ? err.message : err}`)
+        console.error(`Shutdown failed: ${err && err.message ? err.message : err}`)
         startup.release(port)
         process.exit(1)
       },
@@ -108,7 +108,7 @@ run().then(
     if (code !== null) process.exit(code)
   },
   (err) => {
-    log.error(`Start failed: ${err && err.stack ? err.stack : String(err)}`)
+    console.error(`Start failed: ${err && err.stack ? err.stack : String(err)}`)
     process.exit(1)
   },
 )

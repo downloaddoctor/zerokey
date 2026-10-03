@@ -113,9 +113,12 @@ async function claudeStreamHandler(stream, session, parser, cb) {
       }
     },
     onDone: () => {
-      if (!finished) {
-        parser.emitText(`\n\n⚠ Claude stream closed before message_stop.\n`)
+      if (finished) {
+        parser.sendFinalChunk()
+        return
       }
+      parser.emitText(`\n\n⚠ Claude stream closed before message_stop.\n`)
+      parser.sendFinalChunk()
     },
     onError: (e) =>
       parser.onError(e, {

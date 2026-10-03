@@ -17,7 +17,6 @@
 const registry = require('../providers/registry')
 const sessions = require('./state/sessions')
 const users = require('./state/users')
-const log = require('../utils/log')
 const headers = require('../utils/headers')
 
 function seedSession(selected, sessionContext) {
@@ -81,7 +80,7 @@ function persistAfterTurn(seed, session) {
     seed.row.state = session.id ? 'idle' : 'unbound'
     seed.session.lastUsed = seed.row.lastUsed
   } catch (error) {
-    log.warn('Session persistence failed: ' + (error.message || error))
+    console.warn('Session persistence failed: ' + (error.message || error))
   }
 }
 
@@ -101,7 +100,7 @@ async function buildRouter(selected, sessionContext) {
         const user = users.getById(db, userId)
         if (user) user.parsedFetch = nextCapture
       } catch (error) {
-        log.warn('Credential persistence failed: ' + (error.message || error))
+        console.warn('Credential persistence failed: ' + (error.message || error))
       }
     }
   }

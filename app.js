@@ -8,7 +8,6 @@
 
 const express = require('express')
 const { CONFIG } = require('./config/constants')
-const log = require('./utils/log')
 const diagnostics = require('./utils/diagnostics')
 
 const infoRouter = require('./routes/info')
@@ -44,8 +43,13 @@ const prepareChatRequest = (req, res, next) => {
 
 app.use((req, res, next) => {
   const started = Date.now()
+  const controller = new AbortController()
+  res.on('close', () => {
+    if (!res.writableEnded) controller.abort()
+  })
+  Object.defineProperty(req, 'signal', { value: controller.signal, configurable: true })
   res.on('finish', () => {
-    log.debug(
+    console.debug(
       `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} -> ${res.statusCode} (${Date.now() - started}ms)`,
     )
   })
@@ -94,13 +98,13 @@ async function start({ db: store, preSelected, port }) {
       sessionName: preSelected.sessionName,
     })
   } catch (error) {
-    log.error(`Failed to build initial router: ${error.message || error}`)
+    console.error(`Failed to build initial router: ${error.message || error}`)
     throw error
   }
   app.use('/v1/chat/completions', sequentialQueue(), prepareChatRequest, router)
 
   app.use((err, req, res, _next) => {
-    log.error(`[Server] Unhandled error: ${err.message || err}`)
+    console.error(`[Server] Unhandled error: ${err.message || err}`)
     const openaiErr = toOpenAIError(err, preSelected.provider)
     const status = openaiErr.error?.status || err.statusCode || err.status || 500
     try {
@@ -122,7 +126,7 @@ async function start({ db: store, preSelected, port }) {
 
   await new Promise((resolve, reject) => {
     httpServer = app.listen(boundPort, CONFIG.HOST, () => {
-      log.info(`ZeroKey listening on http://${CONFIG.HOST}:${boundPort} (PID ${process.pid})`)
+      console.info(`ZeroKey listening on http://${CONFIG.HOST}:${boundPort} (PID ${process.pid})`)
       resolve()
     })
     httpServer.once('error', reject)

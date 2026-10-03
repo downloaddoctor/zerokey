@@ -20,7 +20,7 @@ utils/retry.js — per-class retry: 401→1, 403→2, 429→1, 5xx→3, network/
 utils/sse-writer.js — SSE with backpressure: await res drain on write(false), idempotent finish/fail, [DONE] emitted from one place
 utils/diagnostics.js — bounded, redacted diagnostics; secret-key-aware object walk (access/token/cookie/…)
 utils/headers.js — reads x-zerokey-* / x-opencode-* headers: session, rootSession, messageId, partId, generation
-utils/log.js — central redact-before-write log; every write passes through redact()
+utils/log.js — central redact-before-write log; overrides console.{log,info,success,warn,error,debug,debug.mix}; each call writes console (colour) AND one redacted line to LOG_DIR/zerokey.log gated by LOG_LEVEL (levels: error 0, warn 1, info 2, debug 3, log 4); no module-level debug/error/info/warn exports remain — callers use console.* directly; only write() swallows append errors⏎engine/triggers.js — static $C trigger returns TESTING cmd; plus auto-registered $<name> per engine/extra/*.md
 routes/diagnostics.js — GET /v1/diagnostics (bounded, redacted, loopback-only)
 test/ — node:test suites: invariants, retry, usage, diagnostics, compaction, tool-bridge, chatgpt-recovery, mhi-{parser,path-policy,files,view-image,index}
 docs/ — index.html (landing), llms.txt, .nojekyll, logos/

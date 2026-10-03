@@ -197,6 +197,10 @@ const staticTriggers = [
       return content.split('#{cwd}#').join(TEST_ROOT)
     },
   },
+  {
+    trigger: '$C',
+    template: 'TESTING ⟦cmd¦run=echo test⟧',
+  },
 ]
 
 // Auto-register one passthrough trigger per engine/extra/*.md file, unless a

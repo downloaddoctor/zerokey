@@ -28,7 +28,6 @@ const path = require('path')
 const http = require('http')
 const net = require('net')
 const { CONFIG } = require('../config/constants')
-const log = require('./log')
 
 const PROBE_TIMEOUT_MS = 2000
 
@@ -143,7 +142,7 @@ function acquire(port) {
       const lock = readLock(port)
       if (lock !== null && lock.pid !== process.pid && pidAlive(lock.pid)) return 'busy'
 
-      log.warn(
+      console.warn(
         `Removed orphaned start lock for port ${port} (PID ${
           lock === null ? 'unreadable' : lock.pid
         }).`,

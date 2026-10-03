@@ -92,78 +92,99 @@ function createWriter(res, options = {}) {
     }
   }
 
+  // Every frame runs through one promise chain, so the wire order always
+  // equals the call order. Without this, the async methods below are invoked
+  // without await: finish() flips `finished` before a pending toolCalls() has
+  // run, so the tool call is dropped and the client sees finish_reason first.
+  // `finished` is therefore set *inside* the queued finish task, not before.
+  let chain = Promise.resolve()
+  const enqueue = (task) => {
+    chain = chain.then(task, task)
+    return chain
+  }
+
   return {
     id,
     open,
 
-    async reasoning(value) {
-      if (finished || value === '') return
-      const delta = { reasoning_content: value }
-      if (!sentRole) {
-        sentRole = true
-        delta.role = 'assistant'
-      }
-      await send(frame(delta))
+    reasoning(value) {
+      return enqueue(async () => {
+        if (finished || value === '') return
+        const delta = { reasoning_content: value }
+        if (!sentRole) {
+          sentRole = true
+          delta.role = 'assistant'
+        }
+        await send(frame(delta))
+      })
     },
 
-    async text(value) {
-      if (finished || value === '') return
-      if (!sentRole) {
-        sentRole = true
-        await send(frame({ role: 'assistant', content: '' }))
-      }
-      await send(frame({ content: value }))
+    text(value) {
+      return enqueue(async () => {
+        if (finished || value === '') return
+        if (!sentRole) {
+          sentRole = true
+          await send(frame({ role: 'assistant', content: '' }))
+        }
+        await send(frame({ content: value }))
+      })
     },
 
-    async toolCalls(calls) {
-      if (finished || !Array.isArray(calls) || calls.length === 0) return
-      if (!sentRole) {
-        sentRole = true
-        await send(frame({ role: 'assistant', content: '' }))
-      }
-      await send(
-        frame({
-          tool_calls: calls.map((call, index) => ({
-            index,
-            id: call.id,
-            type: call.type,
-            function: call.function,
-          })),
-        }),
-      )
+    toolCalls(calls) {
+      return enqueue(async () => {
+        if (finished || !Array.isArray(calls) || calls.length === 0) return
+        if (!sentRole) {
+          sentRole = true
+          await send(frame({ role: 'assistant', content: '' }))
+        }
+        await send(
+          frame({
+            tool_calls: calls.map((call, index) => ({
+              index,
+              id: call.id,
+              type: call.type,
+              function: call.function,
+            })),
+          }),
+        )
+      })
     },
 
-    async finish(reason, usage, includeUsage) {
-      if (finished) return
-      finished = true
-      if (!alive()) return
-      if (!sentRole) await send(frame({ role: 'assistant', content: '' }))
-      await send(frame({}, reason || 'stop'))
-      if (!alive()) return
-      if (includeUsage && usage) {
-        await send({
-          id,
-          object: 'chat.completion.chunk',
-          created,
-          model,
-          choices: [],
-          usage,
-        })
-      }
-      if (!alive()) return
-      await write('data: [DONE]\n\n')
-      if (alive()) res.end()
+    finish(reason, usage, includeUsage) {
+      return enqueue(async () => {
+        if (finished) return
+        finished = true
+        if (!alive()) return
+        if (!sentRole) await send(frame({ role: 'assistant', content: '' }))
+        await send(frame({}, reason || 'stop'))
+        if (!alive()) return
+        if (includeUsage && usage) {
+          await send({
+            id,
+            object: 'chat.completion.chunk',
+            created,
+            model,
+            choices: [],
+            usage,
+          })
+        }
+        if (!alive()) return
+        await write('data: [DONE]\n\n')
+        if (alive()) res.end()
+      })
     },
 
-    async fail(message, code) {
-      if (finished) return
-      finished = true
-      open()
-      if (!alive()) return
-      const type = typeof code === 'string' && code !== '' ? code : 'upstream_error'
-      await write('data: ' + JSON.stringify({ error: { message, type, code: type } }) + '\n\n')
-      await write('data: [DONE]\n\n')
-      if (alive()) res.end()
+    fail(message, code) {
+      return enqueue(async () => {
+        if (finished) return
+        finished = true
+        open()
+        if (!alive()) return
+        const type = typeof code === 'string' && code !== '' ? code : 'upstream_error'
+        await write('data: ' + JSON.stringify({ error: { message, type, code: type } }) + '\n\n')
+        await write('data: [DONE]\n\n')
+        if (alive()) res.end()
+      })
     },
 
     isFinished: () => finished,

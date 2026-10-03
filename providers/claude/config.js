@@ -7,6 +7,15 @@ const models = {
   title: 'Claude',
   owned_by: 'anthropic',
   models: {
+    'claude-sonnet-5-5': {
+      id: 'claude-sonnet-5-5',
+      name: 'Claude Sonnet 5.5',
+      vision: true,
+      created: 1_772_736_000,
+      context_length: 1_000_000,
+      max_output_length: 128_000,
+      defaultReasoning: 'Medium',
+    },
     'claude-sonnet-4-6': {
       id: 'claude-sonnet-4-6',
       name: 'Claude Sonnet 4.6',

@@ -22,6 +22,7 @@ function envInt(name, fallback, minimum, maximum) {
 
 const CONFIG = {
   PORT: envInt('PORT', 7250, 1, 65535),
+  PORT_RANGE: envInt('ZEROKEY_PORT_RANGE', 100, 1, 1000),
 
   EXACT_PORT: process.env.ZEROKEY_EXACT_PORT === '1',
 

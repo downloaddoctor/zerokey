@@ -11,6 +11,12 @@
  *      reset sequences. Every string argument passes through redact() before
  *      it reaches stdout/stderr.
  *
+ *      Every console call ALSO writes one line to LOG_DIR/zerokey.log at
+ *      the matching level (success and info both go to `info`). The file
+ *      write is gated by LOG_LEVEL: with the default `info`, debug lines
+ *      reach the console but not the file. Only `write()` fails silently if
+ *      the append fails; it never throws back into the caller.
+ *
  *   2. redact(value) and isSecretKey(name). Bearer tokens, JWTs, data: URLs,
  *      SAS query parameters, and every value under a secret-shaped key name
  *      are replaced with "<redacted>" before they touch disk or stderr.
@@ -83,6 +89,23 @@ function redactValue(value) {
   return out
 }
 
+/** One console argument as a plain string, without colour codes. */
+function formatArg(value) {
+  if (typeof value === 'string') return value
+  if (value === null || value === undefined) return String(value)
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (value instanceof Error) return value.stack || value.message
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
+}
+
+function formatArgs(args) {
+  return args.map(formatArg).join(' ')
+}
+
 // -- console mutations ----------------------------------------------------
 
 const codes = {
@@ -122,36 +145,10 @@ function mapArgs(args, fn) {
   return args.map((a) => (typeof a === 'string' ? fn(a) : a))
 }
 
-console.warn = function (...args) {
-  _warn(...mapArgs(args, (s) => text.yellow(redact(s))))
-}
-
-console.error = function (...args) {
-  _error(...mapArgs(args, (s) => text.red(redact(s))))
-}
-
-console.debug = function (...args) {
-  _debug(...mapArgs(args, (s) => text.dim(redact(s))))
-}
-
-console.debug.mix = function (...args) {
-  _debug(
-    ...args.map((a) => {
-      if (typeof a !== 'string') return a
-      const redacted = redact(a)
-      return codes.dim + redacted.replace(/\x1b\[0m/g, '\x1b[0m' + codes.dim) + codes.reset
-    }),
-  )
-}
-
-console.success = function (...args) {
-  _log(...mapArgs(args, (s) => text.green(redact(s))))
-}
-
-console.info = function (...args) {
-  _log(...mapArgs(args, (s) => text.blue(redact(s))))
-}
-
+/**
+ * Live `\r`-updating countdown, e.g. "[label] WAIT 4200ms".
+ * Call the returned stop function once the wait completes to clear the line.
+ */
 function tickWait(label, ms) {
   const start = Date.now()
   const tick = () => {
@@ -265,7 +262,7 @@ function serializeError(err) {
 
 // -- process-wide lifecycle writer ----------------------------------------
 
-const LEVELS = { error: 0, warn: 1, info: 2, debug: 3 }
+const LEVELS = { error: 0, warn: 1, info: 2, debug: 3, log: 4 }
 
 const processSaver = new LogSaver({
   name: 'zerokey',
@@ -285,12 +282,51 @@ function write(level, message) {
   if (level === 'error') process.stderr.write(line + '\n')
 }
 
+// -- console methods now also write to the file ---------------------------
+
+console.warn = function (...args) {
+  _warn(...mapArgs(args, (s) => text.yellow(redact(s))))
+  write('warn', formatArgs(args))
+}
+
+console.error = function (...args) {
+  _error(...mapArgs(args, (s) => text.red(redact(s))))
+  write('error', formatArgs(args))
+}
+
+console.debug = function (...args) {
+  _debug(...mapArgs(args, (s) => text.dim(redact(s))))
+  write('debug', formatArgs(args))
+}
+
+console.debug.mix = function (...args) {
+  _debug(
+    ...args.map((a) => {
+      if (typeof a !== 'string') return a
+      const redacted = redact(a)
+      return codes.dim + redacted.replace(/\x1b\[0m/g, '\x1b[0m' + codes.dim) + codes.reset
+    }),
+  )
+  write('debug', formatArgs(args))
+}
+
+console.log = function (...args) {
+  _log(...mapArgs(args, (s) => redact(s)))
+  write('log', formatArgs(args))
+}
+
+console.success = function (...args) {
+  _log(...mapArgs(args, (s) => text.green(redact(s))))
+  write('info', formatArgs(args))
+}
+
+console.info = function (...args) {
+  _log(...mapArgs(args, (s) => text.blue(redact(s))))
+  write('info', formatArgs(args))
+}
+
 module.exports = {
   LogSaver,
-  debug: (...m) => write('debug', m.join(' ')),
-  error: (...m) => write('error', m.join(' ')),
-  info: (...m) => write('info', m.join(' ')),
-  warn: (...m) => write('warn', m.join(' ')),
   isSecretKey,
   redact,
   serializeError,

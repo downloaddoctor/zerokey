@@ -135,7 +135,7 @@ class StreamPipeline {
       }
       // Stop-only frame (empty content, empty tool_calls) — the pipeline is
       // finishing. Hand off to writer.finish with the usage payload.
-      if (finishReason === 'stop' || finishReason === null) {
+      if (finishReason === 'stop') {
         this.writer.finish(finishReason || 'stop', usage, false)
       }
     }

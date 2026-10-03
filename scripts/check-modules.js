@@ -13,6 +13,10 @@
 
 const fs = require('fs')
 const path = require('path')
+const log = require('../utils/log')
+const db = require('../core/state/db')
+
+const { CONFIG } = require('../config/constants')
 
 const root = path.join(__dirname, '..')
 const DIRS = ['core', 'engine', 'routes', 'utils', 'config', 'scripts', 'surfaces', 'providers']
@@ -59,10 +63,6 @@ try {
   console.error(`FAIL: ./app.js — ${err.message}`)
   failed++
 }
-
-const { CONFIG } = require('../config/constants')
-const log = require('../utils/log')
-const db = require('../core/state/db')
 
 function ok(label, condition, detail) {
   if (condition) return
