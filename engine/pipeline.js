@@ -3,7 +3,7 @@
 const SYNTAX = require('./syntax')
 const ToolCompiler = require('./compiler')
 const { toOpenAIError } = require('../utils/errors')
-const { LogSaver, serializeError } = require('../utils/log-saver')
+const { LogSaver, serializeError } = require('../utils/log')
 const { createWriter } = require('../utils/sse-writer')
 
 const routeErrorLog = new LogSaver({ name: 'errors', maxSize: 1024 * 1024 })
@@ -143,6 +143,10 @@ class StreamPipeline {
     this.tokenUsage = {}
     this._modelChars = 0
     this._finished = false
+    // Accumulated assistant text for the internal MHI tool loop. Appended in
+    // emitText; reset by beginTurn(). Never sent to the client directly — the
+    // pipeline streams as it scans.
+    this.assistantText = ''
 
     // bindUploader curries the API's uploadFile — must be set per-request.
     this.bindUploader = (api, collector) => {
@@ -156,7 +160,19 @@ class StreamPipeline {
   emit(delta, _finishReason = null, _usage = null) {}
 
   emitText(content, role = 'assistant') {
+    if (typeof content === 'string') this.assistantText += content
     this.emit({ role, content })
+  }
+
+  /**
+   * Reset per-turn state before another upstream round of the tool loop.
+   * Emitted frames still go out; only the accumulated assistant text resets,
+   * so the loop can tell what this turn produced.
+   */
+  beginTurn() {
+    this.assistantText = ''
+    this.tokenUsage = {}
+    this._modelChars = 0
   }
 
   /**
@@ -200,9 +216,39 @@ class StreamPipeline {
 
   sendFinalChunk() {
     if (this._finished) return
+    // During an internal MHI tool loop, each upstream turn finishes its stream
+    // but the client must NOT see a finish until the loop resolves. deferFinish
+    // suppresses the writer.finish call; the router calls flushFinish() once at
+    // the end. onFinalChunk still fires per turn so the router can await the
+    // current upstream stream before reading pipeline.assistantText.
+    if (this.deferFinish) {
+      this._turnFinished = true
+      if (this.onFinalChunk) {
+        try {
+          this.onFinalChunk()
+        } catch {}
+      }
+      return
+    }
     this._finished = true
     this.flush()
     // Real provider numbers win; estimate is the fallback. See engine/usage.js.
+    const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
+    const totals = accumulate(this.session, turnUsage)
+    this.writer.finish('stop', { ...turnUsage, session: totals }, false)
+    this.session.lastUsed = new Date().toISOString()
+    if (this.onFinalChunk) this.onFinalChunk()
+  }
+
+  /**
+   * Send the closing SSE frame after a deferred tool loop. Call exactly once
+   * when the loop resolves; harmless if called again.
+   */
+  flushFinish() {
+    if (this._finished) return
+    this.deferFinish = false
+    this._finished = true
+    this.flush()
     const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
     const totals = accumulate(this.session, turnUsage)
     this.writer.finish('stop', { ...turnUsage, session: totals }, false)

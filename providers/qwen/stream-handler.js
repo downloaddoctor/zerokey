@@ -1,7 +1,7 @@
 'use strict'
 
 const { readSSE } = require('../../utils/sse-reader')
-const { LogSaver, serializeError } = require('../../utils/log-saver')
+const { LogSaver, serializeError } = require('../../utils/log')
 
 const streamLog = new LogSaver({ name: 'qwen-error' })
 

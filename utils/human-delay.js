@@ -6,7 +6,7 @@
  * @param {number} maxMs - Maximum delay in milliseconds (default: 9000)
  * @returns {Promise<void>}
  */
-const { tickWait } = require('./logger')
+const { tickWait } = require('./log')
 
 async function humanDelay(minMs = 3000, maxMs = 9000) {
   const delay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs

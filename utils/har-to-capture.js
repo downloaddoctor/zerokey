@@ -1,6 +1,6 @@
 const fs = require('fs')
 const path = require('path')
-require('./logger')
+require('./log')
 
 /**
  * Convert a HAR JSON file into the network-capture format used by deepseek4free.

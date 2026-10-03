@@ -8,6 +8,8 @@ const { chatgptStreamHandler } = require('./stream-handler')
 const { acquireSlot } = require('../../utils/rate-limiter')
 const retry = require('../../utils/retry')
 const recovery = require('./recovery')
+const { runToolLoop } = require('../../core/mhi/loop')
+const { CONFIG } = require('../../config/constants')
 
 const chatgptApi = new ChatGPTAPI()
 chatgptApi._providerKey = 'chatgpt'
@@ -19,46 +21,66 @@ async function buildChatGPTRouter(parsedFetch, session) {
   const router = express.Router()
 
   router.post('/', async (req, res) => {
-    const { messages = [], tools } = req.body
     const pipeline = new StreamPipeline(res, session, 'chatgpt', req.surface, req.isRealSession)
-    const activeSession = pipeline.session
-    const model = activeSession.model || 'auto'
-
-    const attachments = []
-    pipeline.bindUploader(chatgptApi, attachments)
-
-    const { prompt, handled } = await pipeline.setup(messages, tools, req)
-    if (handled) return
 
     if (pipeline.ephemeralMode) {
       pipeline.onFinalChunk = () => {
-        if (activeSession.chatSessionId) {
-          chatgptApi.deleteSession(activeSession.chatSessionId).catch(() => {})
+        if (pipeline.session.chatSessionId) {
+          chatgptApi.deleteSession(pipeline.session.chatSessionId).catch(() => {})
         }
       }
+      pipeline.sendFinalChunk()
+      return
     }
 
-    // Refresh sentinel + conduit before the turn. Failure is logged but not
-    // fatal: the process may still hold valid tokens, and a hard failure here
-    // would mask the real upstream error.
-    await recovery.refreshSentinelSafe(chatgptApi)
+    const activeSession = pipeline.session
+    const model = activeSession.model || 'auto'
+
+    // Defer the SSE [DONE] until the tool loop resolves.
+    pipeline.deferFinish = true
 
     try {
-      const stream = await withRetry(
-        () =>
-          recovery.withAuthRecovery(chatgptApi, () =>
-            chatgptApi.chatCompletion(
-              prompt,
-              activeSession.chatSessionId,
-              activeSession.parentMessageId,
-              model,
-              attachments,
-            ),
-          ),
+      await runToolLoop({
+        payload: {
+          messages: req.body.messages || [],
+          tools: req.body.tools,
+        },
         pipeline,
-      )
-      await chatgptStreamHandler(stream, activeSession, pipeline)
+        config: CONFIG,
+        signal: req.signal,
+        turn: async (payload, _signal) => {
+          const attachments = []
+          pipeline.bindUploader(chatgptApi, attachments)
+
+          const { prompt, handled } = await pipeline.setup(payload.messages, payload.tools, req)
+          if (handled) return { assistantText: '' }
+
+          pipeline.beginTurn()
+          await recovery.refreshSentinelSafe(chatgptApi)
+
+          const stream = await withRetry(
+            () =>
+              recovery.withAuthRecovery(chatgptApi, () =>
+                chatgptApi.chatCompletion(
+                  prompt,
+                  activeSession.chatSessionId,
+                  activeSession.parentMessageId,
+                  model,
+                  attachments,
+                ),
+              ),
+            pipeline,
+          )
+          await chatgptStreamHandler(stream, activeSession, pipeline)
+          return { assistantText: pipeline.assistantText }
+        },
+      })
+      pipeline.flushFinish()
     } catch (error) {
+      if (pipeline.deferFinish) {
+        pipeline.deferFinish = false
+        pipeline._finished = false
+      }
       return pipeline.onError(error)
     }
   })
@@ -71,12 +93,6 @@ async function buildChatGPTRouter(parsedFetch, session) {
  * the stream handler. 429 and 403-unusual-activity are handled inside
  * chatgptApi via the rate-limiter cooldown, and classify as terminal here so
  * the router does not hammer a cooled-down provider.
- *
- * 401 is handled inside the callback by `recovery.withAuthRecovery`, which
- * forces a capture reload and retries exactly once per process. If that
- * retry also fails with 401, the error propagates and `retry.classify`
- * marks it terminal (401 → maxAttempts 1), so the outer loop does not
- * retry it again.
  */
 async function withRetry(fn, pipeline) {
   let attempt = 0

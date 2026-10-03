@@ -8,6 +8,8 @@ const { getSharedTransport } = require('./browser-transport')
 const { streamHandler } = require('./stream-handler')
 const { acquireSlot } = require('../../utils/rate-limiter')
 const retry = require('../../utils/retry')
+const { runToolLoop } = require('../../core/mhi/loop')
+const { CONFIG } = require('../../config/constants')
 const { reasoning } = require('./config')
 
 const TRANSPORT = (process.env.DEEPSEEK_TRANSPORT || 'browser').toLowerCase()
@@ -42,7 +44,6 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
   const router = express.Router()
 
   router.post('/', async (req, res) => {
-    const { messages = [], tools, reasoning_effort: reasoningEffort = null } = req.body
     const pipeline = new StreamPipeline(res, session, 'deepseek', req.surface, req.isRealSession)
 
     if (pipeline.ephemeralMode) {
@@ -64,51 +65,78 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
       }
     }
     const modelType = pipeline.isNewSession ? activeSession.model || 'default' : null
-    const { think: thinkingEnabled, search: searchEnabled } = REASONING_MAP[reasoningEffort] ?? {
-      think: false,
-      search: false,
-    }
+    const { think: thinkingEnabled, search: searchEnabled } = REASONING_MAP[
+      req.body.reasoning_effort
+    ] ?? { think: false, search: false }
 
-    const fileIds = []
-    pipeline.bindUploader(deepseekApi, fileIds)
-
-    const { prompt, handled } = await pipeline.setup(messages, tools, req)
-    if (handled) return
+    pipeline.deferFinish = true
 
     try {
-      const deepseekStream = await withRetry(
-        () =>
-          deepseekApi.chatCompletion(
-            activeSession.chatSessionId,
-            prompt,
-            activeSession.parentMessageId,
-            thinkingEnabled,
-            searchEnabled,
-            modelType,
-            fileIds,
-          ),
+      await runToolLoop({
+        payload: {
+          messages: req.body.messages || [],
+          tools: req.body.tools,
+        },
         pipeline,
-        'DeepSeek',
-      )
+        config: CONFIG,
+        signal: req.signal,
+        turn: async (payload, _signal) => {
+          const fileIds = []
+          pipeline.bindUploader(deepseekApi, fileIds)
 
-      const retryFn = async () => {
-        await acquireSlot('DeepSeek', true)
-        return deepseekApi.chatCompletion(
-          activeSession.chatSessionId,
-          prompt,
-          activeSession.parentMessageId,
-          thinkingEnabled,
-          searchEnabled,
-          modelType,
-          fileIds,
-        )
-      }
+          const { prompt, handled } = await pipeline.setup(payload.messages, payload.tools, req)
+          if (handled) return { assistantText: '' }
 
-      streamHandler(deepseekStream, activeSession, pipeline, retryFn)
+          pipeline.beginTurn()
+
+          const deepseekStream = await withRetry(
+            () =>
+              deepseekApi.chatCompletion(
+                activeSession.chatSessionId,
+                prompt,
+                activeSession.parentMessageId,
+                thinkingEnabled,
+                searchEnabled,
+                modelType,
+                fileIds,
+              ),
+            pipeline,
+            'DeepSeek',
+          )
+
+          const retryFn = async () => {
+            await acquireSlot('DeepSeek', true)
+            return deepseekApi.chatCompletion(
+              activeSession.chatSessionId,
+              prompt,
+              activeSession.parentMessageId,
+              thinkingEnabled,
+              searchEnabled,
+              modelType,
+              fileIds,
+            )
+          }
+
+          await new Promise((resolve) => {
+            const originalOnFinalChunk = pipeline.onFinalChunk
+            pipeline.onFinalChunk = () => {
+              if (originalOnFinalChunk) originalOnFinalChunk()
+              resolve()
+            }
+            streamHandler(deepseekStream, activeSession, pipeline, retryFn)
+          })
+          return { assistantText: pipeline.assistantText }
+        },
+      })
+      pipeline.flushFinish()
     } catch (error) {
       if (error.code === 'account_suspended' && error.muteUntil && userData) {
         userData.waitUntil = Math.ceil(error.muteUntil * 1000)
         userData.waitReason = 'account_suspended'
+      }
+      if (pipeline.deferFinish) {
+        pipeline.deferFinish = false
+        pipeline._finished = false
       }
       return pipeline.onError(error)
     }

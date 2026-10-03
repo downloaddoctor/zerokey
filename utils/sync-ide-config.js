@@ -6,7 +6,7 @@ const fetch = require('node-fetch')
 
 const { isPortActive } = require('./find-port')
 const registry = require('../providers/registry')
-const { text } = require('./logger')
+const { text } = require('./log')
 
 async function _fetchHealth(p) {
   try {

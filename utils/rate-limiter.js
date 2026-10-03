@@ -1,4 +1,4 @@
-const { tickWait } = require('./logger')
+const { tickWait } = require('./log')
 
 const RATE_LIMIT = 15
 const RATE_WINDOW = 60_000

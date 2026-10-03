@@ -8,6 +8,8 @@ const { streamHandler } = require('./stream-handler')
 const { setQwenInstructions } = require('./set-instructions')
 const { acquireSlot } = require('../../utils/rate-limiter')
 const retry = require('../../utils/retry')
+const { runToolLoop } = require('../../core/mhi/loop')
+const { CONFIG } = require('../../config/constants')
 const { models } = require('./config')
 
 const QWEN_MODELS = models.models
@@ -28,22 +30,16 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
   const router = express.Router()
 
   router.post('/', async (req, res) => {
-    const { messages = [], tools, reasoning_effort: rawReasoningEffort = null } = req.body
     const pipeline = new StreamPipeline(res, session, 'qwen', req.surface, req.isRealSession)
     const activeSession = pipeline.session
 
     const modelMeta = QWEN_MODELS[activeSession.model] || QWEN_MODELS[session.model] || {}
     const allowedModes = modelMeta.reasoning || []
-    let reasoningEffort = rawReasoningEffort
+    let reasoningEffort = req.body.reasoning_effort
     if (allowedModes.length === 0) {
       reasoningEffort = null
     } else if (!reasoningEffort || !allowedModes.includes(reasoningEffort)) {
       reasoningEffort = allowedModes[0]
-    }
-
-    if (pipeline.isNewSession && !pipeline.rawMode) {
-      await setQwenInstructions(qwenApi, userData, pipeline.toolCalling)
-      pipeline.haveInstructionsAPI = true
     }
 
     if (!activeSession.chatSessionId) {
@@ -52,51 +48,76 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
       )
     }
 
-    const fileIds = []
-    pipeline.bindUploader(qwenApi, fileIds)
-
-    const { prompt, handled } = await pipeline.setup(messages, tools, req)
-    if (handled) return
-
-    if (pipeline.ephemeralMode) {
-      pipeline.onFinalChunk = () => {
-        if (activeSession.chatSessionId) {
-          qwenApi.deleteSession(activeSession.chatSessionId).catch(() => {})
-        }
-      }
-    }
+    pipeline.deferFinish = true
 
     try {
-      const qwenStream = await withRetry(
-        () =>
-          qwenApi.chatCompletion(
-            activeSession.chatSessionId,
-            prompt,
-            activeSession.parentMessageId,
-            { model: activeSession.model, reasoningEffort },
-          ),
+      await runToolLoop({
+        payload: {
+          messages: req.body.messages || [],
+          tools: req.body.tools,
+        },
         pipeline,
-      )
+        config: CONFIG,
+        signal: req.signal,
+        turn: async (payload, _signal) => {
+          if (pipeline.isNewSession && !pipeline.rawMode) {
+            await setQwenInstructions(qwenApi, userData, pipeline.toolCalling)
+            pipeline.haveInstructionsAPI = true
+          }
 
-      const retryFn = async () => {
-        await acquireSlot('Qwen', true)
-        return qwenApi.chatCompletion(
-          activeSession.chatSessionId,
-          prompt,
-          activeSession.parentMessageId,
-          { model: activeSession.model, reasoningEffort },
-        )
-      }
+          const fileIds = []
+          pipeline.bindUploader(qwenApi, fileIds)
 
-      const onFinished = (responseId) => {
-        qwenApi.selectMessage(activeSession.chatSessionId, responseId).catch(() => {})
-      }
-      streamHandler(qwenStream, activeSession, pipeline, retryFn, onFinished)
+          const { prompt, handled } = await pipeline.setup(payload.messages, payload.tools, req)
+          if (handled) return { assistantText: '' }
+
+          pipeline.beginTurn()
+
+          const qwenStream = await withRetry(
+            () =>
+              qwenApi.chatCompletion(
+                activeSession.chatSessionId,
+                prompt,
+                activeSession.parentMessageId,
+                { model: activeSession.model, reasoningEffort },
+              ),
+            pipeline,
+          )
+
+          const retryFn = async () => {
+            await acquireSlot('Qwen', true)
+            return qwenApi.chatCompletion(
+              activeSession.chatSessionId,
+              prompt,
+              activeSession.parentMessageId,
+              { model: activeSession.model, reasoningEffort },
+            )
+          }
+
+          await new Promise((resolve) => {
+            const originalOnFinalChunk = pipeline.onFinalChunk
+            pipeline.onFinalChunk = () => {
+              if (originalOnFinalChunk) originalOnFinalChunk()
+              resolve()
+            }
+            const onFinished = (responseId) => {
+              qwenApi.selectMessage(activeSession.chatSessionId, responseId).catch(() => {})
+            }
+            streamHandler(qwenStream, activeSession, pipeline, retryFn, onFinished)
+          })
+          return { assistantText: pipeline.assistantText }
+        },
+      })
+      pipeline.flushFinish()
     } catch (error) {
       if (error?.code === 'RateLimited' && userData) {
         const waitMs = typeof error.waitMs === 'number' ? error.waitMs : 24 * 60 * 60 * 1000
         userData.waitUntil = Date.now() + waitMs
         userData.waitReason = 'daily_limit'
+      }
+      if (pipeline.deferFinish) {
+        pipeline.deferFinish = false
+        pipeline._finished = false
       }
       return pipeline.onError(error)
     }

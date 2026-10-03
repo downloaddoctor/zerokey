@@ -8,7 +8,7 @@ const { spawn } = require('child_process')
 const prompts = require('prompts')
 
 const registry = require('../providers/registry')
-const { text } = require('../utils/logger')
+const { text } = require('../utils/log')
 const sessionsState = require('./state/sessions')
 
 const BACKSLASH = String.fromCharCode(0x5c)

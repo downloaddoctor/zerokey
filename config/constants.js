@@ -40,8 +40,48 @@ const CONFIG = {
   LOG_KEEP: envInt('ZEROKEY_LOG_KEEP', 5, 1, 100),
 }
 
+function envBool(name, fallback) {
+  const raw = process.env[name]
+  if (raw === undefined || raw === '') return fallback
+  const value = String(raw).trim().toLowerCase()
+  if (value === '1' || value === 'true' || value === 'yes') return true
+  if (value === '0' || value === 'false' || value === 'no') return false
+  throw new Error(name + ' is not a switch: ' + raw)
+}
+
+function envPaths(name, fallback) {
+  const raw = process.env[name]
+  if (raw === undefined || raw.trim() === '') return [...fallback]
+  return raw
+    .split(path.delimiter)
+    .map((value) => value.trim())
+    .filter((value) => value !== '')
+}
+
+function envList(name, fallback) {
+  const raw = process.env[name]
+  if (raw === undefined || raw.trim() === '') return [...fallback]
+  return raw
+    .split(/[;,]/)
+    .map((value) => value.trim())
+    .filter((value) => value !== '')
+}
+
 CONFIG.DB_FILE = path.join(CONFIG.DATA_DIR, 'zerokey.db')
 CONFIG.LOCK_FILE = path.join(CONFIG.DATA_DIR, '.start.lock')
 CONFIG.LOG_DIR = path.join(CONFIG.DATA_DIR, 'logs')
+
+// Internal MHI executors. Each running process is pinned to one workspace
+// root and one set of capability flags; nothing here is per-request.
+CONFIG.WORKSPACE_ROOTS = envPaths('ZEROKEY_WORKSPACE_ROOTS', [process.cwd()])
+CONFIG.MHI_FILE_TOOLS = envBool('ZEROKEY_MHI_FILE_TOOLS', true)
+CONFIG.MHI_CMD_TOOLS = envBool('ZEROKEY_MHI_CMD_TOOLS', false)
+CONFIG.MHI_VIEW_IMAGE = envBool('ZEROKEY_MHI_VIEW_IMAGE', true)
+CONFIG.MHI_CMD_PROGRAMS = envList('ZEROKEY_MHI_CMD_PROGRAMS', ['node', 'git'])
+CONFIG.MHI_CMD_PROJECT_PROGRAMS = envList('ZEROKEY_MHI_CMD_PROJECT_PROGRAMS', [])
+CONFIG.MHI_CMD_ALLOW_WRITE = envBool('ZEROKEY_MHI_CMD_ALLOW_WRITE', false)
+CONFIG.MHI_CMD_ALLOW_NETWORK = envBool('ZEROKEY_MHI_CMD_ALLOW_NETWORK', false)
+CONFIG.MHI_CMD_TIMEOUT_MS = envInt('ZEROKEY_MHI_CMD_TIMEOUT_MS', 30000, 100, 120000)
+CONFIG.MHI_MAX_ROUNDS = envInt('ZEROKEY_MHI_MAX_ROUNDS', 8, 1, 32)
 
 module.exports = { CONFIG }
