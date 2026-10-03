@@ -57,7 +57,7 @@ function cleanupDb(file) {
 
 test('SQLite schema_version gate refuses a newer version', () => {
   const db = require('../core/state/db')
-  const file = path.join(ROOT, 'temp', 'schema-gate-test.db')
+  const file = path.join(ROOT, 'temp', 'test', 'schema-gate-test.db')
   fs.mkdirSync(path.dirname(file), { recursive: true })
   cleanupDb(file)
   try {
@@ -74,7 +74,7 @@ test('sessions.create then get round-trips a row', () => {
   const dbModule = require('../core/state/db')
   const users = require('../core/state/users')
   const sessions = require('../core/state/sessions')
-  const file = path.join(ROOT, 'temp', 'sessions-roundtrip.db')
+  const file = path.join(ROOT, 'temp', 'test', 'sessions-roundtrip.db')
   fs.mkdirSync(path.dirname(file), { recursive: true })
   try {
     if (fs.existsSync(file)) fs.unlinkSync(file)
@@ -102,7 +102,7 @@ test('sessions.resolve creates a row for a new (userId, name)', () => {
   const dbModule = require('../core/state/db')
   const users = require('../core/state/users')
   const sessions = require('../core/state/sessions')
-  const file = path.join(ROOT, 'temp', 'sessions-resolve.db')
+  const file = path.join(ROOT, 'temp', 'test', 'sessions-resolve.db')
   fs.mkdirSync(path.dirname(file), { recursive: true })
   try {
     if (fs.existsSync(file)) fs.unlinkSync(file)

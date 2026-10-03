@@ -10,7 +10,7 @@ const dbModule = require('../../../core/state/db')
 const users = require('../../../core/state/users')
 const sessions = require('../../../core/state/sessions')
 
-const scratch = path.join(ROOT, 'temp', 'compaction-test.db')
+const scratch = path.join(ROOT, 'temp', 'test', 'compaction-test.db')
 
 function cleanup() {
   for (const suffix of ['', '-wal', '-shm']) {

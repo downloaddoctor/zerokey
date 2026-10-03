@@ -7,7 +7,7 @@ const path = require('node:path')
 const files = require('../../../core/mhi/files')
 
 const ROOT = path.resolve(__dirname, '..')
-const SCRATCH = path.join(ROOT, 'temp', 'mhi-files-scratch')
+const SCRATCH = path.join(ROOT, 'temp', 'test', 'mhi-files-scratch')
 
 function reset() {
   fs.rmSync(SCRATCH, { recursive: true, force: true })

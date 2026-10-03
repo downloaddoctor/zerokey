@@ -8,7 +8,7 @@ const mhi = require('../../../core/mhi')
 const SYNTAX = require('../../../engine/syntax')
 
 const ROOT = path.resolve(__dirname, '..')
-const SCRATCH = path.join(ROOT, 'temp', 'mhi-index-scratch')
+const SCRATCH = path.join(ROOT, 'temp', 'test', 'mhi-index-scratch')
 
 const S = SYNTAX.SEP
 

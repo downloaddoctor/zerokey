@@ -7,7 +7,7 @@ const path = require('node:path')
 const viewImage = require('../../../core/mhi/view-image')
 
 const ROOT = path.resolve(__dirname, '..')
-const SCRATCH = path.join(ROOT, 'temp', 'mhi-view-image-scratch')
+const SCRATCH = path.join(ROOT, 'temp', 'test', 'mhi-view-image-scratch')
 
 function makePng() {
   return Buffer.from(

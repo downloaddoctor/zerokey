@@ -63,8 +63,6 @@ try {
 const { CONFIG } = require('../config/constants')
 const log = require('../utils/log')
 const db = require('../core/state/db')
-const users = require('../core/state/users')
-const sessions = require('../core/state/sessions')
 
 function ok(label, condition, detail) {
   if (condition) return
@@ -109,62 +107,8 @@ const sas = log.redact('https://x/y?sv=2024-11-04&se=2030-01-01&sig=topsecret')
 ok('SAS signature is redacted', !sas.includes('topsecret'), sas)
 ok('SAS query stays diagnosable', sas.includes('sig=<redacted>'), sas)
 
-// --- state round-trip on a scratch database ------------------------------
-
-function cleanupDb(file) {
-  for (const suffix of ['', '-wal', '-shm']) {
-    const f = file + suffix
-    if (!fs.existsSync(f)) continue
-    try {
-      fs.unlinkSync(f)
-    } catch (err) {
-      if (err.code !== 'EBUSY' && err.code !== 'EPERM') throw err
-    }
-  }
-}
-
-const scratchDir = path.join(root, 'temp')
-fs.mkdirSync(scratchDir, { recursive: true })
-const scratch = path.join(scratchDir, 'check-modules-scratch.db')
-cleanupDb(scratch)
-
-try {
-  const store = db.open({ file: scratch })
-  const user = users.create(store, 'chatgpt', 'check-modules-user', {
-    parsedFetch: { url: 'x', method: 'POST', headers: {}, body: '{}' },
-  })
-  ok('users.create returns a row with a UUID id', typeof user.id === 'string' && user.id.length > 0)
-
-  const created = sessions.resolve(store, user.id, 'check-modules-session')
-  ok('sessions.resolve returns a persistent row', created.persistent === true)
-  ok('sessions.resolve creates a new row on first call', created.id === null)
-
-  created.id = 'conv-check'
-  created.parentId = 'msg-check'
-  sessions.flushNow(store, created)
-  const loaded = sessions.get(store, user.id, 'check-modules-session')
-  eq('sessions round-trip stores conversation id', loaded.id, 'conv-check')
-  eq('sessions round-trip stores parent id', loaded.parentId, 'msg-check')
-
-  sessions.removeAllForUser(store, user.id)
-  eq('removeAllForUser drops every session', sessions.listForUser(store, user.id).length, 0)
-
-  users.remove(store, user.id)
-  eq('users.remove drops the user', users.get(store, 'chatgpt', 'check-modules-user'), null)
-
-  db.setMeta(store, 'schema_version', db.SCHEMA_VERSION + 1)
-  store.close()
-
-  let rejected = false
-  try {
-    db.open({ file: scratch })
-  } catch {
-    rejected = true
-  }
-  ok('schema_version gate rejects a newer database', rejected)
-} finally {
-  cleanupDb(scratch)
-}
+// State round-trip tests live in test/invariants.test.js; this gate only
+// loads modules and asserts a small set of invariants.
 
 // --- startup hygiene -----------------------------------------------------
 

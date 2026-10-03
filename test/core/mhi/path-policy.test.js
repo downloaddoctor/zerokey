@@ -7,7 +7,7 @@ const path = require('node:path')
 const policy = require('../../../core/mhi/path-policy')
 
 const ROOT = path.resolve(__dirname, '..')
-const SCRATCH = path.join(ROOT, 'temp', 'mhi-path-policy-scratch')
+const SCRATCH = path.join(ROOT, 'temp', 'test', 'mhi-path-policy-scratch')
 
 function ensure() {
   fs.mkdirSync(SCRATCH, { recursive: true })
