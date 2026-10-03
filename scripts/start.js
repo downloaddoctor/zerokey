@@ -172,10 +172,70 @@ async function main() {
     log.info('Legacy import skipped: ' + imported.reason + '.')
   }
 
+  // Wizard runs only at a real terminal. Headless startup uses env vars
+  // (ZEROKEY_PROVIDER / ZEROKEY_USER / ZEROKEY_SESSION) and skips the prompts.
+  const { SessionSelector } = require('../core/session-selector')
+  const selector = new SessionSelector({ db: store })
+  const provider = process.env.ZEROKEY_PROVIDER || process.argv[2]
+  const user = process.env.ZEROKEY_USER || process.argv[3]
+  const session = process.env.ZEROKEY_SESSION || process.argv[4]
+  const headless = Boolean(provider && user && session)
+
+  let preSelected = null
+  if (headless) {
+    preSelected = await selector.select(false, provider, user, session)
+    if (!preSelected) {
+      log.error(
+        'Session "' +
+          session +
+          '" for user "' +
+          user +
+          '" under provider "' +
+          provider +
+          '" not found.',
+      )
+      log.error(
+        'Check temp/users.json or the SQLite sessions table, or run without args for the wizard.',
+      )
+      release()
+      db.close(store)
+      process.exit(2)
+    }
+  } else if (process.stdin.isTTY && process.stdout.isTTY) {
+    preSelected = await selector.select(true)
+    if (!preSelected) {
+      log.info('No session selected. Exiting.')
+      release()
+      db.close(store)
+      process.exit(0)
+    }
+  } else {
+    log.error('No session selected and no TTY available for the wizard.')
+    log.error('Set ZEROKEY_PROVIDER, ZEROKEY_USER and ZEROKEY_SESSION, or run at a terminal.')
+    release()
+    db.close(store)
+    process.exit(2)
+  }
+
+  log.info(
+    'Session: ' +
+      preSelected.user +
+      ' / ' +
+      preSelected.provider +
+      ' / ' +
+      preSelected.sessionName +
+      ' (' +
+      preSelected.sessionTags +
+      ')',
+  )
+
   const server = require('../server')
-  await server.start({ db: store })
+  await server.start({ db: store, preSelected })
 
   const shutdown = (signal) => {
+    try {
+      selector.flush()
+    } catch {}
     log.info('Signal ' + signal + ' received, shutting down.')
     server.stop().then(
       () => {

@@ -1,3 +1,5 @@
+'use strict'
+
 const fs = require('fs')
 const path = require('path')
 const SYNTAX = require('../engine/syntax')
@@ -7,11 +9,15 @@ const prompts = require('prompts')
 
 const registry = require('../providers/registry')
 const { text } = require('../utils/logger')
+const sessionsState = require('./state/sessions')
+
+const BACKSLASH = String.fromCharCode(0x5c)
 
 class SessionSelector {
-  constructor() {
+  constructor(options = {}) {
     this._dataDir = path.join(__dirname, '..', 'temp')
     this._usersFile = path.join(this._dataDir, 'users.json')
+    this._db = options.db || null
     this.TIMEOUT_MS = 0
     if (!fs.existsSync(this._dataDir)) {
       fs.mkdirSync(this._dataDir, { recursive: true })
@@ -47,7 +53,7 @@ class SessionSelector {
       while (this.user.waitUntil && this.user.waitUntil > Date.now()) {
         const mins = Math.ceil((this.user.waitUntil - Date.now()) / 60000)
         const resetsAt = this._formatResetTime(this.user.waitUntil)
-        console.warn(`\n${waitPolicy.userMessage(this.user.username, resetsAt, mins)}\n`)
+        console.warn('\n' + waitPolicy.userMessage(this.user.username, resetsAt, mins) + '\n')
 
         const availableUsers = Object.values(providerUsers).filter(
           (u) => u.username !== this.user.username && (!u.waitUntil || u.waitUntil <= Date.now()),
@@ -60,7 +66,9 @@ class SessionSelector {
             .sort((a, b) => a.ts - b.ts)[0]
           const minsLeft = Math.ceil((soonest.ts - Date.now()) / 60000)
           const resetsAtSoonest = this._formatResetTime(soonest.ts)
-          console.error(`\n${waitPolicy.allMessage(soonest.username, resetsAtSoonest, minsLeft)}\n`)
+          console.error(
+            '\n' + waitPolicy.allMessage(soonest.username, resetsAtSoonest, minsLeft) + '\n',
+          )
           return this.select(false)
         }
 
@@ -93,13 +101,13 @@ class SessionSelector {
       const users = all[provider] || {}
       for (const username of Object.keys(users)) {
         const user = users[username]
-        const sessions = user.sessions || []
-        for (const session of sessions) {
+        const list = user.sessions || []
+        for (const session of list) {
           if (session.lastUsed) {
             resolved.push({
               ...session,
-              username: username,
-              provider: provider,
+              username,
+              provider,
               lastUsedEpoc: new Date(session.lastUsed).getTime(),
             })
           }
@@ -113,7 +121,7 @@ class SessionSelector {
     resolved.length = Math.min(resolved.length, 3)
 
     const choices = resolved.map((session, i) => ({
-      title: `${session.name} · ${session.provider} · ${session.username} `,
+      title: session.name + ' - ' + session.provider + ' - ' + session.username + ' ',
       description: this.formatSessionTags(session, session.provider),
       value: i,
     }))
@@ -180,7 +188,7 @@ class SessionSelector {
         return {
           title: username,
           value: username,
-          description: limited ? '⚠ at usage limit' : undefined,
+          description: limited ? 'at usage limit' : undefined,
         }
       })
       choices.push({ title: text.cyan('Create new user'), value: '__new__' })
@@ -190,7 +198,7 @@ class SessionSelector {
         {
           type: 'select',
           name: 'username',
-          message: `Select User (${this.provider})`,
+          message: 'Select User (' + this.provider + ')',
           choices,
         },
         { onCancel: () => process.exit(0) },
@@ -240,19 +248,19 @@ class SessionSelector {
       .toLowerCase()
     if (!v) return 'Username is required'
     if (!/^[a-z0-9]{1,32}$/.test(v)) {
-      return 'Alphanumeric only (a-z, 0-9), 1–32 chars'
+      return 'Alphanumeric only (a-z, 0-9), 1-32 chars'
     }
     if (this._existingLocalKeys().includes(v)) {
-      return `User "${v}" already exists — pick another key or delete it first`
+      return 'User "' + v + '" already exists - pick another key or delete it first'
     }
     if (fs.existsSync(this._profileDirFor(v))) {
-      return `Profile dir for "${v}" already exists — pick another key or delete it manually`
+      return 'Profile dir for "' + v + '" already exists - pick another key or delete it manually'
     }
     return true
   }
 
   async _promptNewUser() {
-    console.info('\n  ── Create New User ──\n')
+    console.info('\n  -- Create New User --\n')
 
     const { username: rawUsername } = await prompts(
       {
@@ -270,16 +278,16 @@ class SessionSelector {
     const provider = registry.get(this.provider)
     const providerUrl = provider.setupSteps?.url
     if (providerUrl) {
-      console.debug.mix(`\n  Opening ${text.blue(providerUrl)} in your browser...`)
+      console.debug.mix('\n  Opening ' + text.blue(providerUrl) + ' in your browser...')
       this._openBrowser(providerUrl)
     }
 
     const steps = []
     if (provider.setupSteps) {
-      steps.push('  1. Open DevTools (F12) → Network tab')
+      steps.push('  1. Open DevTools (F12) - Network tab')
       steps.push('  2. Start a conversation')
-      steps.push(`  3. Find a request to ${text.cyan(provider.setupSteps.requestFilter)}`)
-      steps.push('  4. Right-click → Copy → Copy as fetch')
+      steps.push('  3. Find a request to ' + text.cyan(provider.setupSteps.requestFilter))
+      steps.push('  4. Right-click - Copy - Copy as fetch')
     }
 
     console.debug('\n  Paste the full fetch() call from browser DevTools:')
@@ -288,12 +296,12 @@ class SessionSelector {
 
     while (true) {
       console.debug(
-        '  Notepad will open — paste your fetch() call, save (Ctrl+S), close Notepad.\n',
+        '  Notepad will open - paste your fetch() call, save (Ctrl+S), close Notepad.\n',
       )
       const fetchStr = await this._openEditor()
 
       if (!fetchStr || !fetchStr.includes('fetch(')) {
-        if (!(await this._retryOrCancel('✖ Not a valid fetch() call — what would you like to do?')))
+        if (!(await this._retryOrCancel('Not a valid fetch() call - what would you like to do?')))
           return null
         continue
       }
@@ -302,18 +310,20 @@ class SessionSelector {
       try {
         parsedFetch = this._parseFetchDirect(fetchStr)
       } catch (e) {
-        console.error(`  ✖ Failed to parse fetch: ${e.message}\n`)
+        console.error('  Failed to parse fetch: ' + e.message + '\n')
         continue
       }
 
       const missing = this._validateFetchHeaders(parsedFetch)
       if (missing.length > 0) {
         console.error(
-          `  ✖ Fetch is missing required headers:\n${missing.map((h) => `     • ${h}`).join('\n')}\n`,
+          '  Fetch is missing required headers:\n' +
+            missing.map((h) => '     - ' + h).join('\n') +
+            '\n',
         )
         if (
           !(await this._retryOrCancel(
-            'Make sure you copied the right request — what would you like to do?',
+            'Make sure you copied the right request - what would you like to do?',
           ))
         )
           return null
@@ -324,13 +334,13 @@ class SessionSelector {
       try {
         await this._validateLiveConnection(parsedFetch, username)
         process.stdout.write('\r                                  ')
-        process.stdout.write('\r  ' + text.green('√ Session verified') + '\n\n')
+        process.stdout.write('\r  ' + text.green('Session verified') + '\n\n')
       } catch (e) {
-        process.stdout.write(' ✖\n\n')
-        console.error(`  ✖ Live check failed: ${e.message}\n`)
+        process.stdout.write(' \n\n')
+        console.error('  Live check failed: ' + e.message + '\n')
         if (
           !(await this._retryOrCancel(
-            'Credentials rejected by provider — what would you like to do?',
+            'Credentials rejected by provider - what would you like to do?',
           ))
         )
           return null
@@ -360,20 +370,20 @@ class SessionSelector {
   }
 
   async _stepSessionSelection(preset) {
-    const sessions = this.user.sessions || []
+    const list = this.user.sessions || []
     if (preset) {
-      const found = sessions.find((s) => s.name === preset)
+      const found = list.find((s) => s.name === preset)
       if (found) return found
     }
 
-    const choices = sessions.map((s, i) => ({
+    const choices = list.map((s, i) => ({
       title: s.name,
       description: this.formatSessionTags(s),
       value: i,
     }))
 
     choices.push({ title: text.cyan('Create new session'), value: -1 })
-    if (sessions.length > 0) {
+    if (list.length > 0) {
       choices.push({ title: text.red('Delete all sessions'), value: -2 })
     }
 
@@ -392,7 +402,6 @@ class SessionSelector {
     if (result === -2) return this._deleteAllSessions()
     return this.user.sessions[result]
   }
-
   async _createNewSession() {
     const defaultName = new Date().toISOString().slice(0, 19).replace('T', ' ')
 
@@ -410,7 +419,7 @@ class SessionSelector {
         choices: [
           {
             title: text.cyan('Tools Mode'),
-            description: SYNTAX.NAME + ' agent — recommended',
+            description: SYNTAX.NAME + ' agent - recommended',
             value: true,
           },
           { title: 'Raw Mode', description: 'Plain chat, no tools', value: false },
@@ -427,7 +436,7 @@ class SessionSelector {
       questions.push({
         type: 'select',
         name: 'model',
-        message: `${label} model`,
+        message: label + ' model',
         choices: modelEntries.map(([value, meta]) => ({
           title: meta.name,
           value,
@@ -462,7 +471,7 @@ class SessionSelector {
       {
         type: 'select',
         name: 'target',
-        message: `Delete which user (${this.provider})?`,
+        message: 'Delete which user (' + this.provider + ')?',
         choices: [
           ...savedUsers.map((u) => ({ title: text.red(u), value: u })),
           { title: 'Back', value: '__back__' },
@@ -482,7 +491,12 @@ class SessionSelector {
       {
         type: 'confirm',
         name: 'confirmed',
-        message: `Delete user "${target}" and ${sessionCount} local session(s)? This also deletes all provider-side sessions.`,
+        message:
+          'Delete user "' +
+          target +
+          '" and ' +
+          sessionCount +
+          ' local session(s)? This also deletes all provider-side sessions.',
         initial: false,
       },
       { onCancel: () => process.exit(0) },
@@ -498,11 +512,9 @@ class SessionSelector {
     try {
       await this._deleteProviderSessions()
     } catch (e) {
-      console.warn(`\n  ⚠ Provider cleanup failed: ${e.message}`)
+      console.warn('\n  Provider cleanup failed: ' + e.message)
     }
-    process.stdout.write(
-      '\r  ' + text.green('√ Provider sessions cleaned.') + '                  \n',
-    )
+    process.stdout.write('\r  ' + text.green('Provider sessions cleaned.') + '                  \n')
 
     this.user = savedUser
     this.provider = savedProvider
@@ -511,9 +523,9 @@ class SessionSelector {
     try {
       fs.rmSync(this._profileDirFor(target.toLowerCase()), { recursive: true, force: true })
     } catch (e) {
-      console.warn(`  ⚠ Failed to remove profile dir: ${e.message}`)
+      console.warn('  Failed to remove profile dir: ' + e.message)
     }
-    console.info(`  ${text.green('√')} User "${target}" removed.\n`)
+    console.info('  ' + text.green('OK') + ' User "' + target + '" removed.\n')
 
     return this._stepUserLogin()
   }
@@ -524,7 +536,7 @@ class SessionSelector {
       {
         type: 'confirm',
         name: 'confirmed',
-        message: `Delete all ${count} sessions?`,
+        message: 'Delete all ' + count + ' sessions?',
         initial: true,
       },
       { onCancel: () => process.exit(0) },
@@ -533,7 +545,7 @@ class SessionSelector {
     if (confirmed) {
       process.stdout.write(text.dim('  Deleting sessions...'))
       await this._deleteProviderSessions()
-      process.stdout.write('\r  ' + text.green('√ Done.') + '                  \n\n')
+      process.stdout.write('\r  ' + text.green('Done.') + '                  \n\n')
 
       this.user.sessions = []
       this._saveUser(this.provider, this.user.username, this.user)
@@ -555,10 +567,10 @@ class SessionSelector {
     for (const session of toDelete) {
       try {
         deleted++
-        process.stdout.write(text.dim(`\r  Deleting ${deleted}/${toDelete.length}`))
+        process.stdout.write(text.dim('\r  Deleting ' + deleted + '/' + toDelete.length))
         await api.deleteSession(session.chatSessionId)
       } catch (e) {
-        console.warn(`\n  ⚠ Failed ${session.chatSessionId}: ${e.message}`)
+        console.warn('\n  Failed ' + session.chatSessionId + ': ' + e.message)
       }
     }
   }
@@ -566,7 +578,7 @@ class SessionSelector {
   _openEditor() {
     return new Promise((resolve) => {
       const os = require('os')
-      const tmp = path.join(os.tmpdir(), `zerokey-fetch-${Date.now()}.js`)
+      const tmp = path.join(os.tmpdir(), 'zerokey-fetch-' + Date.now() + '.js')
       fs.writeFileSync(tmp, '', 'utf8')
       const editor = process.platform === 'win32' ? 'notepad' : process.env.EDITOR || 'nano'
       const { spawnSync } = require('child_process')
@@ -589,15 +601,15 @@ class SessionSelector {
     const optStart = afterUrl.indexOf('{')
     if (optStart === -1) throw new Error('Could not parse options')
 
-    let depth = 0,
-      inStr = false,
-      sc = '',
-      js = -1,
-      je = -1
+    let depth = 0
+    let inStr = false
+    let sc = ''
+    let js = -1
+    let je = -1
     for (let i = optStart; i < afterUrl.length; i++) {
       const c = afterUrl[i]
       if (inStr) {
-        if (c === '\\') {
+        if (c === BACKSLASH) {
           i++
           continue
         }
@@ -636,34 +648,32 @@ class SessionSelector {
   }
 
   _loadAll() {
-    try {
-      if (fs.existsSync(this._usersFile)) {
-        return JSON.parse(fs.readFileSync(this._usersFile, 'utf8'))
-      }
-    } catch (e) {
-      console.error('Load users error:', e.message)
-    }
-    return {}
-  }
+    const json = this._readJson()
+    if (!this._db) return json
 
-  _removeUser(provider, username) {
     try {
-      const all = this._loadAll()
-      if (all[provider]) {
-        delete all[provider][username]
-        if (Object.keys(all[provider]).length === 0) delete all[provider]
+      const rows = sessionsState.list(this._db, 500)
+      for (const row of rows) {
+        const bucket = json[row.provider] || (json[row.provider] = {})
+        for (const username of Object.keys(bucket)) {
+          const user = bucket[username]
+          const list = Array.isArray(user.sessions) ? user.sessions : []
+          const match = list.find((s) => s.name === row.id)
+          if (!match) continue
+          if (row.upstreamConversationId) match.chatSessionId = row.upstreamConversationId
+          if (row.upstreamParentMessageId) match.parentMessageId = row.upstreamParentMessageId
+          if (row.updatedAt) match.lastUsed = new Date(row.updatedAt).toISOString()
+        }
       }
-      const tmp = this._usersFile + '.tmp'
-      fs.writeFileSync(tmp, JSON.stringify(all, null, 2), 'utf8')
-      fs.renameSync(tmp, this._usersFile)
-    } catch (e) {
-      console.error('Remove user error:', e.message)
+    } catch (error) {
+      console.error('Load sessions from SQLite failed:', error.message)
     }
+    return json
   }
 
   _saveUser(provider, username, userData) {
     try {
-      const all = this._loadAll()
+      const all = this._readJson()
       if (!all[provider]) all[provider] = {}
       all[provider][username] = userData
       const tmp = this._usersFile + '.tmp'
@@ -672,6 +682,68 @@ class SessionSelector {
     } catch (e) {
       console.error('Save user error:', e.message)
     }
+
+    if (!this._db) return
+    const list = Array.isArray(userData.sessions) ? userData.sessions : []
+    for (const entry of list) {
+      if (!entry || typeof entry.name !== 'string' || entry.name === '') continue
+      try {
+        sessionsState.save(
+          this._db,
+          {
+            provider,
+            id: entry.name,
+            upstreamConversationId: entry.chatSessionId || null,
+            upstreamParentMessageId: entry.parentMessageId || null,
+            metadata: {},
+          },
+          { state: entry.chatSessionId ? 'idle' : 'unbound' },
+        )
+      } catch (e) {
+        console.error('Save session to SQLite failed:', e.message)
+      }
+    }
+  }
+
+  _removeUser(provider, username) {
+    try {
+      const all = this._readJson()
+      const removed = all[provider] && all[provider][username]
+      const sessionNames =
+        removed && Array.isArray(removed.sessions)
+          ? removed.sessions.map((s) => s && s.name).filter(Boolean)
+          : []
+      if (all[provider]) {
+        delete all[provider][username]
+        if (Object.keys(all[provider]).length === 0) delete all[provider]
+      }
+      const tmp = this._usersFile + '.tmp'
+      fs.writeFileSync(tmp, JSON.stringify(all, null, 2), 'utf8')
+      fs.renameSync(tmp, this._usersFile)
+
+      if (this._db) {
+        for (const name of sessionNames) {
+          try {
+            sessionsState.remove(this._db, provider, name)
+          } catch (e) {
+            console.error('Remove session from SQLite failed:', e.message)
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Remove user error:', e.message)
+    }
+  }
+
+  _readJson() {
+    try {
+      if (fs.existsSync(this._usersFile)) {
+        return JSON.parse(fs.readFileSync(this._usersFile, 'utf8'))
+      }
+    } catch (e) {
+      console.error('Load users error:', e.message)
+    }
+    return {}
   }
 
   _formatResetTime(ts) {
@@ -690,9 +762,9 @@ class SessionSelector {
       const d = new Date(isoString)
       const mins = Math.floor((Date.now() - d) / 60000)
       if (mins < 1) return 'just now'
-      if (mins < 60) return `${mins}m ago`
-      if (mins < 1440) return `${Math.floor(mins / 60)}h ago`
-      return `${Math.floor(mins / 1440)}d ago`
+      if (mins < 60) return mins + 'm ago'
+      if (mins < 1440) return Math.floor(mins / 60) + 'h ago'
+      return Math.floor(mins / 1440) + 'd ago'
     } catch {
       return 'unknown'
     }
@@ -711,10 +783,10 @@ class SessionSelector {
       this._modelName(p, session.model),
       session.toolCalling ? 'tools' : 'no tools',
       session.vision ? 'vision' : 'no vision',
-      session.lastUsed ? `last: ${this._formatTime(session.lastUsed)}` : '',
+      session.lastUsed ? 'last: ' + this._formatTime(session.lastUsed) : '',
     ]
       .filter(Boolean)
-      .join('  ·  ')
+      .join('  -  ')
   }
 }
 
