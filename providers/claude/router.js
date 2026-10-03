@@ -53,8 +53,8 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
 
     if (pipeline.ephemeralMode) {
       pipeline.onFinalChunk = () => {
-        if (activeSession.chatSessionId) {
-          claudeApi.deleteSession(activeSession.chatSessionId).catch(() => {})
+        if (activeSession.id) {
+          claudeApi.deleteSession(activeSession.id).catch(() => {})
         }
       }
     }
@@ -83,8 +83,8 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
             () =>
               claudeApi.chatCompletion(
                 prompt,
-                activeSession.chatSessionId,
-                activeSession.parentMessageId,
+                activeSession.id,
+                activeSession.parentId,
                 model,
                 [],
                 fileIds,
@@ -94,8 +94,8 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
             pipeline,
           )
 
-          if (chatSessionId && !activeSession.chatSessionId) {
-            activeSession.chatSessionId = chatSessionId
+          if (chatSessionId && !activeSession.id) {
+            activeSession.id = chatSessionId
           }
 
           await new Promise((resolve) => {
@@ -130,8 +130,8 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
               try {
                 const { stream: summaryStream } = await claudeApi.chatCompletion(
                   instructions.getExtra('summary').content.trim(),
-                  activeSession.chatSessionId,
-                  activeSession.parentMessageId,
+                  activeSession.id,
+                  activeSession.parentId,
                   model,
                   [],
                 )

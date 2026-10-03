@@ -26,8 +26,8 @@ function streamHandler(stream, session, parser, retry, onFinished) {
     streamLog.log({
       ts: new Date().toISOString(),
       reason,
-      chatSessionId: session.chatSessionId,
-      parentMessageId: session.parentMessageId,
+      chatSessionId: session.id,
+      parentMessageId: session.parentId,
       lastEventType,
       dataCount,
       producedOutput,
@@ -39,12 +39,12 @@ function streamHandler(stream, session, parser, retry, onFinished) {
   const adoptResponseId = (id) => {
     if (!id) return
     responseId = id
-    session.parentMessageId = id
+    session.parentId = id
   }
 
   const emitChunk = (delta, finishReason = null) => {
     const chunk = {
-      id: responseId || session.chatSessionId || '',
+      id: responseId || session.id || '',
       model: parser.compiler.provider,
       object: 'chat.completion.chunk',
       choices: [{ index: 0, delta, finish_reason: finishReason }],

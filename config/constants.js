@@ -67,8 +67,8 @@ function envList(name, fallback) {
     .filter((value) => value !== '')
 }
 
-CONFIG.DB_FILE = path.join(CONFIG.DATA_DIR, 'zerokey.db')
-CONFIG.LOCK_FILE = path.join(CONFIG.DATA_DIR, '.start.lock')
+CONFIG.DB_FILE = path.join(CONFIG.DATA_DIR, 'db', 'zerokey.db')
+CONFIG.LOCK_FILE = path.join(CONFIG.DATA_DIR, 'db', '.start.lock')
 CONFIG.LOG_DIR = path.join(CONFIG.DATA_DIR, 'logs')
 
 // Internal MHI executors. Each running process is pinned to one workspace

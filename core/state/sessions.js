@@ -1,255 +1,314 @@
 'use strict'
 
 /**
- * Persistent mapping:  (provider, session id)  ->  upstream conversation.
+ * Sessions: one row per (user, session name).
  *
- * Only technical IDs, state, and timestamps are stored. Prompt or response
- * content never touches this table.
+ * Column names are snake_case; the JS object is camelCase. The proxy in this
+ * module is the boundary. Writes are debounced 50 ms; nested writes are not
+ * intercepted, so reassign a field to persist a change.
  *
- * Compaction generations are handled here: when the caller reports a higher
- * generation than the row holds, the upstream conversation binding is broken
- * (upstream_* cleared) and the old conversation ID is appended to
- * metadata.pendingPreviousConversationIds so the next successful turn can
- * retire it after a fresh one succeeds.
+ * Compaction: when a caller reports a higher generation than the row holds,
+ * id and parentId are cleared and the old id is appended to
+ * metadata.pendingPreviousConversationIds.
  */
 
-const VALID_ID = /^[A-Za-z0-9._:-]{1,200}$/
-const MAX_GENERATION = Number.MAX_SAFE_INTEGER
-
-function normalizeId(value) {
-  if (typeof value !== 'string') return null
-  const id = value.trim()
-  if (!VALID_ID.test(id)) return null
-  if (id === '__proto__' || id === 'prototype' || id === 'constructor') return null
-  return id
+const COLUMN_MAP = {
+  userId: 'user_id',
+  name: 'name',
+  id: 'id',
+  parentId: 'parent_id',
+  generation: 'generation',
+  toolCalling: 'tool_calling',
+  vision: 'vision',
+  model: 'model',
+  todos: 'todos_json',
+  turnCount: 'turn_count',
+  dynamicToolsHash: 'dynamic_tools_hash',
+  mcpInjected: 'mcp_injected',
+  state: 'state',
+  metadata: 'metadata_json',
+  lastUsed: 'last_used',
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
 }
 
-function normalizeProvider(value) {
-  if (typeof value !== 'string') return null
-  const provider = value.trim().toLowerCase()
-  if (!provider || provider.length > 64) return null
-  return provider
+const BLOB_KEYS = new Set(['todos', 'metadata'])
+const FLUSH_MS = 50
+const MAX_GENERATION = Number.MAX_SAFE_INTEGER
+const SELECT_COLUMNS =
+  'user_id, name, id, parent_id, generation, tool_calling, vision, model, ' +
+  'todos_json, turn_count, dynamic_tools_hash, mcp_injected, state, metadata_json, ' +
+  'last_used, created_at, state_json, updated_at'
+
+const pending = new Map()
+
+function parseBlob(value, fallback) {
+  if (typeof value !== 'string' || value === '') return fallback
+  try {
+    const parsed = JSON.parse(value)
+    return parsed && typeof parsed === 'object' ? parsed : fallback
+  } catch {
+    return fallback
+  }
 }
 
 function normalizeGeneration(value) {
   return Number.isSafeInteger(value) && value >= 0 && value <= MAX_GENERATION ? value : 0
 }
 
-function parseMetadata(value) {
-  if (typeof value !== 'string' || value === '') return {}
-  try {
-    const parsed = JSON.parse(value)
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
 function rowToSession(row) {
   if (!row) return null
-  return {
-    provider: row.provider,
-    id: row.session_id,
-    upstreamConversationId: row.upstream_conversation_id || null,
-    upstreamParentMessageId: row.upstream_parent_message_id || null,
-    generation: normalizeGeneration(row.compaction_generation),
-    state: row.state || 'idle',
-    metadata: parseMetadata(row.metadata_json),
-    createdAt: row.created_at,
+  const state = parseBlob(row.state_json, {})
+  const session = {
+    userId: row.user_id,
+    name: row.name,
+    id: row.id ?? null,
+    parentId: row.parent_id ?? null,
+    generation: normalizeGeneration(row.generation),
+    toolCalling:
+      row.tool_calling === null || row.tool_calling === undefined ? null : row.tool_calling === 1,
+    vision: row.vision === null || row.vision === undefined ? null : row.vision === 1,
+    model: row.model ?? null,
+    todos: parseBlob(row.todos_json, null),
+    turnCount: row.turn_count ?? null,
+    dynamicToolsHash: row.dynamic_tools_hash ?? null,
+    mcpInjected:
+      row.mcp_injected === null || row.mcp_injected === undefined ? null : row.mcp_injected === 1,
+    state: row.state ?? null,
+    metadata: parseBlob(row.metadata_json, {}),
+    lastUsed: row.last_used ?? null,
+    createdAt: row.created_at ?? null,
     updatedAt: row.updated_at,
   }
+  for (const [key, value] of Object.entries(state)) {
+    if (!(key in session)) session[key] = value
+  }
+  return session
 }
 
-function get(db, provider, sessionId) {
-  const providerName = normalizeProvider(provider)
-  const id = normalizeId(sessionId)
-  if (!providerName || !id) return null
-  return rowToSession(
-    db
-      .prepare(
-        'SELECT provider, session_id, upstream_conversation_id, ' +
-          'upstream_parent_message_id, compaction_generation, state, ' +
-          'metadata_json, created_at, updated_at ' +
-          'FROM sessions WHERE provider = ? AND session_id = ?',
-      )
-      .get(providerName, id),
-  )
+function columnProjection(session) {
+  const columns = {}
+  const state = {}
+  for (const [key, value] of Object.entries(session)) {
+    const column = COLUMN_MAP[key]
+    if (!column) {
+      state[key] = value
+      continue
+    }
+    if (BLOB_KEYS.has(key)) {
+      columns[column] = value === null || value === undefined ? null : JSON.stringify(value)
+    } else if (typeof value === 'boolean') {
+      columns[column] = value ? 1 : 0
+    } else {
+      columns[column] = value === undefined ? null : value
+    }
+  }
+  return {
+    columns,
+    state: Object.keys(state).length === 0 ? null : JSON.stringify(state),
+  }
 }
 
-function save(db, session, options = {}) {
-  const provider = normalizeProvider(session && session.provider)
-  const id = normalizeId(session && session.id)
-  if (!provider || !id) return session
+function flush(db, session) {
+  const { columns, state } = columnProjection(session)
+  columns.state_json = state
+  columns.updated_at = Date.now()
+  session.updatedAt = columns.updated_at
 
-  const now = Date.now()
-  const state =
-    typeof options.state === 'string'
-      ? options.state
-      : typeof session.state === 'string'
-        ? session.state
-        : 'idle'
-  const generation = normalizeGeneration(session.generation)
-  const metadata =
-    session.metadata && typeof session.metadata === 'object' ? { ...session.metadata } : {}
-  const metadataJson = Object.keys(metadata).length === 0 ? null : JSON.stringify(metadata)
-
+  const names = Object.keys(columns)
+  const placeholders = names.map(() => '?').join(', ')
+  const updates = names
+    .filter((n) => n !== 'user_id' && n !== 'name')
+    .map((n) => n + ' = excluded.' + n)
+    .join(', ')
   db.prepare(
     'INSERT INTO sessions (' +
-      'provider, session_id, upstream_conversation_id, upstream_parent_message_id, ' +
-      'compaction_generation, state, metadata_json, created_at, updated_at' +
-      ') VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ' +
-      'ON CONFLICT(provider, session_id) DO UPDATE SET ' +
-      'upstream_conversation_id = excluded.upstream_conversation_id, ' +
-      'upstream_parent_message_id = excluded.upstream_parent_message_id, ' +
-      'compaction_generation = excluded.compaction_generation, ' +
-      'state = excluded.state, ' +
-      'metadata_json = excluded.metadata_json, ' +
-      'updated_at = excluded.updated_at',
-  ).run(
-    provider,
-    id,
-    session.upstreamConversationId || null,
-    session.upstreamParentMessageId || null,
-    generation,
-    state,
-    metadataJson,
-    Number.isInteger(session.createdAt) ? session.createdAt : now,
-    now,
+      names.join(', ') +
+      ') VALUES (' +
+      placeholders +
+      ') ON CONFLICT(user_id, name) DO UPDATE SET ' +
+      updates,
+  ).run(...names.map((n) => columns[n]))
+}
+
+function schedule(db, session) {
+  const key = session.userId + '\u0000' + session.name
+  if (pending.has(key)) return
+  pending.set(
+    key,
+    setTimeout(() => {
+      pending.delete(key)
+      try {
+        flush(db, session)
+      } catch (error) {
+        // A flush scheduled just before the caller closed the database is
+        // expected in short-lived processes (tests). Any other error is
+        // reported once.
+        const message = error && error.message ? error.message : String(error)
+        if (!/database is not open/i.test(message)) {
+          console.error('sessions flush failed: ' + message)
+        }
+      }
+    }, FLUSH_MS),
   )
-
-  session.provider = provider
-  session.state = state
-  session.generation = generation
-  session.metadata = metadata
-  session.createdAt = Number.isInteger(session.createdAt) ? session.createdAt : now
-  session.updatedAt = now
-  return session
 }
 
-/**
- * Resolve the persistent session for (provider, id). When `options.generation`
- * is higher than the row's, the upstream conversation is rebound: upstream_*
- * are cleared, the old conversation ID is appended to
- * metadata.pendingPreviousConversationIds, and state becomes 'rebased'.
- *
- * @param {object} db
- * @param {string} providerValue
- * @param {string} sessionIdValue
- * @param {{ generation?: number }} [options]
- */
-function resolve(db, providerValue, sessionIdValue, options = {}) {
-  const provider = normalizeProvider(providerValue)
-  const id = normalizeId(sessionIdValue)
-  const incoming = normalizeGeneration(options.generation)
-
-  if (!provider || !id) {
-    return {
-      provider: provider || null,
-      id: null,
-      upstreamConversationId: null,
-      upstreamParentMessageId: null,
-      generation: incoming,
-      state: 'transient',
-      metadata: {},
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      persistent: false,
-    }
-  }
-
-  let session = get(db, provider, id)
-  if (!session) {
-    session = {
-      provider,
-      id,
-      upstreamConversationId: null,
-      upstreamParentMessageId: null,
-      generation: incoming,
-      state: 'idle',
-      metadata: {},
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      persistent: true,
-    }
-    return save(db, session)
-  }
-  session.persistent = true
-
-  if (incoming > session.generation) {
-    // Bind the incoming generation even if it is safe-integer max, so long as
-    // it is strictly higher than what is on disk.
-    const previousConversationId = session.upstreamConversationId || null
-    const pending = Array.isArray(session.metadata.pendingPreviousConversationIds)
-      ? session.metadata.pendingPreviousConversationIds.filter(
-          (value) => typeof value === 'string' && value !== '',
-        )
-      : []
-    if (previousConversationId) pending.push(previousConversationId)
-
-    session.generation = incoming
-    session.upstreamConversationId = null
-    session.upstreamParentMessageId = null
-    session.state = 'rebased'
-    session.metadata = {
-      ...(session.metadata || {}),
-      pendingPreviousConversationIds: [...new Set(pending)],
-    }
-    save(db, session)
-  }
-
-  return session
+function wrap(db, session) {
+  return new Proxy(session, {
+    set(target, key, value) {
+      if (typeof key !== 'string' || key === 'updatedAt' || key === 'createdAt') {
+        target[key] = value
+        return true
+      }
+      target[key] = value
+      schedule(db, target)
+      return true
+    },
+    deleteProperty(target, key) {
+      delete target[key]
+      schedule(db, target)
+      return true
+    },
+  })
 }
 
-function resetUpstream(db, providerValue, sessionIdValue) {
-  const provider = normalizeProvider(providerValue)
-  const id = normalizeId(sessionIdValue)
-  if (!provider || !id) return null
-
-  const current = get(db, provider, id)
-  if (!current) return null
-
-  const now = Date.now()
-  db.prepare(
-    'UPDATE sessions SET upstream_conversation_id = NULL, ' +
-      'upstream_parent_message_id = NULL, state = ?, updated_at = ? ' +
-      'WHERE provider = ? AND session_id = ?',
-  ).run('rebased', now, provider, id)
-  current.upstreamConversationId = null
-  current.upstreamParentMessageId = null
-  current.state = 'rebased'
-  current.updatedAt = now
-  return current
+function get(db, userId, name) {
+  const row = db
+    .prepare('SELECT ' + SELECT_COLUMNS + ' FROM sessions WHERE user_id = ? AND name = ?')
+    .get(userId, name)
+  if (!row) return null
+  return wrap(db, rowToSession(row))
 }
 
-function list(db, limit = 100) {
-  const bounded = Math.max(1, Math.min(Number(limit) || 100, 500))
+function listForUser(db, userId) {
   return db
     .prepare(
-      'SELECT provider, session_id, upstream_conversation_id, ' +
-        'upstream_parent_message_id, compaction_generation, state, ' +
-        'metadata_json, created_at, updated_at ' +
-        'FROM sessions ORDER BY updated_at DESC LIMIT ?',
+      'SELECT ' +
+        SELECT_COLUMNS +
+        ' FROM sessions WHERE user_id = ? ORDER BY last_used DESC NULLS LAST, name DESC',
     )
+    .all(userId)
+    .map((row) => wrap(db, rowToSession(row)))
+}
+
+function list(db, limit = 500) {
+  const bounded = Math.max(1, Math.min(Number(limit) || 500, 2000))
+  return db
+    .prepare('SELECT ' + SELECT_COLUMNS + ' FROM sessions ORDER BY updated_at DESC LIMIT ?')
     .all(bounded)
     .map(rowToSession)
 }
 
-function remove(db, providerValue, sessionIdValue) {
-  const provider = normalizeProvider(providerValue)
-  const id = normalizeId(sessionIdValue)
-  if (!provider || !id) return 0
-  return db.prepare('DELETE FROM sessions WHERE provider = ? AND session_id = ?').run(provider, id)
-    .changes
+function create(db, userId, fields = {}) {
+  if (!userId) throw new Error('sessions.create requires a userId')
+  const name = fields.name || new Date().toISOString().slice(0, 19).replace('T', ' ')
+  const now = Date.now()
+  const session = {
+    userId,
+    name,
+    id: fields.id ?? null,
+    parentId: fields.parentId ?? null,
+    generation: normalizeGeneration(fields.generation),
+    toolCalling: fields.toolCalling ?? true,
+    vision: fields.vision ?? false,
+    model: fields.model ?? null,
+    todos: fields.todos ?? null,
+    turnCount: fields.turnCount ?? 0,
+    dynamicToolsHash: fields.dynamicToolsHash ?? null,
+    mcpInjected: fields.mcpInjected ?? false,
+    state: fields.state ?? 'idle',
+    metadata: fields.metadata ?? {},
+    lastUsed: fields.lastUsed ?? now,
+    createdAt: fields.createdAt ?? now,
+    updatedAt: now,
+  }
+  flush(db, session)
+  return wrap(db, session)
+}
+
+function resolve(db, userId, name, options = {}) {
+  if (!userId || !name) {
+    return {
+      userId: userId || null,
+      name: name || null,
+      id: null,
+      parentId: null,
+      generation: normalizeGeneration(options.generation),
+      state: 'transient',
+      metadata: {},
+      persistent: false,
+    }
+  }
+
+  const incoming = normalizeGeneration(options.generation)
+  let session = get(db, userId, name)
+  if (!session) {
+    const created = create(db, userId, { name, generation: incoming })
+    created.persistent = true
+    return created
+  }
+  session.persistent = true
+
+  if (incoming > session.generation) {
+    const previousId = session.id || null
+    const pendingIds = Array.isArray(session.metadata.pendingPreviousConversationIds)
+      ? session.metadata.pendingPreviousConversationIds.filter(
+          (value) => typeof value === 'string' && value !== '',
+        )
+      : []
+    if (previousId) pendingIds.push(previousId)
+    session.generation = incoming
+    session.id = null
+    session.parentId = null
+    session.state = 'rebased'
+    session.metadata = {
+      ...(session.metadata || {}),
+      pendingPreviousConversationIds: [...new Set(pendingIds)],
+    }
+  }
+  return session
+}
+
+function remove(db, userId, name) {
+  const key = userId + '\u0000' + name
+  if (pending.has(key)) {
+    clearTimeout(pending.get(key))
+    pending.delete(key)
+  }
+  return db.prepare('DELETE FROM sessions WHERE user_id = ? AND name = ?').run(userId, name).changes
+}
+
+function removeAllForUser(db, userId) {
+  for (const key of [...pending.keys()]) {
+    if (key.startsWith(userId + '\u0000')) {
+      clearTimeout(pending.get(key))
+      pending.delete(key)
+    }
+  }
+  return db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId).changes
+}
+
+function flushNow(db, session) {
+  const key = session.userId + '\u0000' + session.name
+  if (pending.has(key)) {
+    clearTimeout(pending.get(key))
+    pending.delete(key)
+  }
+  flush(db, session)
 }
 
 module.exports = {
+  BLOB_KEYS,
+  COLUMN_MAP,
+  create,
+  flush,
+  flushNow,
   get,
   list,
+  listForUser,
   normalizeGeneration,
-  normalizeId,
-  normalizeProvider,
   remove,
-  resetUpstream,
+  removeAllForUser,
   resolve,
-  save,
+  rowToSession,
 }

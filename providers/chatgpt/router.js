@@ -25,8 +25,8 @@ async function buildChatGPTRouter(parsedFetch, session) {
 
     if (pipeline.ephemeralMode) {
       pipeline.onFinalChunk = () => {
-        if (pipeline.session.chatSessionId) {
-          chatgptApi.deleteSession(pipeline.session.chatSessionId).catch(() => {})
+        if (pipeline.session.id) {
+          chatgptApi.deleteSession(pipeline.session.id).catch(() => {})
         }
       }
       pipeline.sendFinalChunk()
@@ -63,8 +63,8 @@ async function buildChatGPTRouter(parsedFetch, session) {
               recovery.withAuthRecovery(chatgptApi, () =>
                 chatgptApi.chatCompletion(
                   prompt,
-                  activeSession.chatSessionId,
-                  activeSession.parentMessageId,
+                  activeSession.id,
+                  activeSession.parentId,
                   model,
                   attachments,
                 ),

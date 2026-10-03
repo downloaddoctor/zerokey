@@ -22,9 +22,9 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
 
   if (!session) throw new Error('No session provided')
 
-  if (!session.chatSessionId) {
+  if (!session.id) {
     const chatId = await qwenApi.createChatSession(session.model || 'qwen3.7-max')
-    session.chatSessionId = chatId
+    session.id = chatId
   }
 
   const router = express.Router()
@@ -42,10 +42,8 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
       reasoningEffort = allowedModes[0]
     }
 
-    if (!activeSession.chatSessionId) {
-      activeSession.chatSessionId = await qwenApi.createChatSession(
-        activeSession.model || 'qwen3.7-max',
-      )
+    if (!activeSession.id) {
+      activeSession.id = await qwenApi.createChatSession(activeSession.model || 'qwen3.7-max')
     }
 
     pipeline.deferFinish = true
@@ -75,23 +73,19 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
 
           const qwenStream = await withRetry(
             () =>
-              qwenApi.chatCompletion(
-                activeSession.chatSessionId,
-                prompt,
-                activeSession.parentMessageId,
-                { model: activeSession.model, reasoningEffort },
-              ),
+              qwenApi.chatCompletion(activeSession.id, prompt, activeSession.parentId, {
+                model: activeSession.model,
+                reasoningEffort,
+              }),
             pipeline,
           )
 
           const retryFn = async () => {
             await acquireSlot('Qwen', true)
-            return qwenApi.chatCompletion(
-              activeSession.chatSessionId,
-              prompt,
-              activeSession.parentMessageId,
-              { model: activeSession.model, reasoningEffort },
-            )
+            return qwenApi.chatCompletion(activeSession.id, prompt, activeSession.parentId, {
+              model: activeSession.model,
+              reasoningEffort,
+            })
           }
 
           await new Promise((resolve) => {
@@ -101,7 +95,7 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
               resolve()
             }
             const onFinished = (responseId) => {
-              qwenApi.selectMessage(activeSession.chatSessionId, responseId).catch(() => {})
+              qwenApi.selectMessage(activeSession.id, responseId).catch(() => {})
             }
             streamHandler(qwenStream, activeSession, pipeline, retryFn, onFinished)
           })

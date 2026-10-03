@@ -75,8 +75,8 @@ function streamHandler(stream, session, parser, retry) {
     streamLog.log({
       ts: new Date().toISOString(),
       reason,
-      chatSessionId: session.chatSessionId,
-      parentMessageId: session.parentMessageId,
+      chatSessionId: session.id,
+      parentMessageId: session.parentId,
       currentFragmentType,
       lastEventType,
       dataCount,
@@ -102,8 +102,8 @@ function streamHandler(stream, session, parser, retry) {
           streamLog.log({
             ts: new Date().toISOString(),
             reason: `retry failed — ${err?.message || err}`,
-            chatSessionId: session.chatSessionId,
-            parentMessageId: session.parentMessageId,
+            chatSessionId: session.id,
+            parentMessageId: session.parentId,
             dataCount,
             producedOutput,
             error: serializeError(err),
@@ -149,7 +149,7 @@ function streamHandler(stream, session, parser, retry) {
     // Initial response snapshot — carries message ids and the first fragment.
     const response = data.v?.response
     if (response) {
-      session.parentMessageId = response.message_id
+      session.parentId = response.message_id
       session.lastUsed = new Date().toISOString()
       const firstFragment = response.fragments?.[0]
       if (firstFragment) {

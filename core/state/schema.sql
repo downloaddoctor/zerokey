@@ -1,44 +1,59 @@
 -- ZeroKey state. Applied idempotently on every open.
 --
--- Rule: lifecycle data only, never content. Prompt text, response text, and
--- attachment bytes have no columns here on purpose.
+-- Two tables: users and sessions. The nesting is provider -> user -> sessions,
+-- mirroring the old temp/users.json shape. Credentials (parsed_fetch) live on
+-- the user row; session state lives on the session row.
+--
+-- Rule: lifecycle data only, never prompt or response content.
 
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
   value TEXT
 );
 
--- One row per (provider, session id). The session id is whatever the client
--- considers its own session key; the provider name namespaces it so a
--- DeepSeek session and a ChatGPT session with the same id do not collide.
---
--- compaction_generation tracks the client's compaction counter. When the
--- client reports a higher generation, the upstream conversation is rebound:
--- upstream_* are cleared and the old conversation ID is moved into
--- metadata_json.pendingPreviousConversationIds for retirement on the next
--- successful turn.
-CREATE TABLE IF NOT EXISTS sessions (
+-- One row per (provider, username). id is a UUID generated at wizard time.
+-- Column names are snake_case; the JS layer sees camelCase via the proxy in
+-- core/state/users.js and core/state/sessions.js.
+CREATE TABLE IF NOT EXISTS users (
+  id                      TEXT    PRIMARY KEY,
   provider                TEXT    NOT NULL,
-  session_id              TEXT    NOT NULL,
-  upstream_conversation_id TEXT,
-  upstream_parent_message_id TEXT,
-  compaction_generation   INTEGER NOT NULL DEFAULT 0,
-  state                   TEXT    NOT NULL DEFAULT 'idle',
-  metadata_json           TEXT,
+  username                TEXT    NOT NULL,
+  parsed_fetch            TEXT    NOT NULL,
+  instructions_hash       TEXT,
+  instructions_applied_at INTEGER,
+  wait_until              INTEGER,
+  wait_reason             TEXT,
+  state_json              TEXT,
   created_at              INTEGER NOT NULL,
   updated_at              INTEGER NOT NULL,
-  PRIMARY KEY (provider, session_id)
+  UNIQUE (provider, username)
 );
 
-CREATE INDEX IF NOT EXISTS idx_sessions_updated
-  ON sessions(updated_at DESC);
-
--- One row per (provider, session id) -> user mapping imported from the legacy
--- temp/users.json the first time the database is opened. Read-only thereafter.
-CREATE TABLE IF NOT EXISTS legacy_import (
-  provider   TEXT    NOT NULL,
-  username   TEXT    NOT NULL,
-  session_id TEXT    NOT NULL,
-  imported_at INTEGER NOT NULL,
-  PRIMARY KEY (provider, username, session_id)
+-- One row per (user, session name). user_id -> users.id, cascade on delete.
+-- id and parent_id are the provider conversation UUID and last-message UUID.
+-- state_json holds any key that is not in the column map above.
+CREATE TABLE IF NOT EXISTS sessions (
+  user_id            TEXT    NOT NULL,
+  name               TEXT    NOT NULL,
+  id                 TEXT,
+  parent_id          TEXT,
+  generation         INTEGER NOT NULL DEFAULT 0,
+  tool_calling       INTEGER,
+  vision             INTEGER,
+  model              TEXT,
+  todos_json         TEXT,
+  turn_count         INTEGER,
+  dynamic_tools_hash TEXT,
+  mcp_injected       INTEGER,
+  state              TEXT,
+  metadata_json      TEXT,
+  last_used          INTEGER,
+  created_at         INTEGER,
+  state_json         TEXT,
+  updated_at         INTEGER NOT NULL,
+  PRIMARY KEY (user_id, name),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_sessions_user
+  ON sessions(user_id, last_used DESC);

@@ -92,7 +92,8 @@ async function start({ db, preSelected }) {
   try {
     router = await buildRouter(preSelected, {
       db,
-      sessionKey: preSelected.sessionName,
+      userId: preSelected.userId || preSelected.userData?.id || null,
+      sessionName: preSelected.sessionName,
     })
   } catch (error) {
     log.error('Failed to build initial router: ' + (error.message || error))

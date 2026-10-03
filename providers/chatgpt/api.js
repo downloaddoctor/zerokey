@@ -471,6 +471,17 @@ class ChatGPTAPI {
     }
 
     this._headers['cookie'] = this._cookies.toString()
+
+    if (typeof this._onCaptureChanged === 'function') {
+      try {
+        this._onCaptureChanged({
+          url: this._headers.__url || 'https://chatgpt.com/backend-api/f/conversation',
+          method: 'POST',
+          headers: { ...this._headers },
+          body: this._bodyTemplate,
+        })
+      } catch {}
+    }
   }
 
   // ─── Delete conversation ─────────────────────────────────────

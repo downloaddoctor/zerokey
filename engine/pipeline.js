@@ -94,7 +94,7 @@ class StreamPipeline {
     this.provider = provider
     this.session = isReal ? session : ephemeralSession(session)
 
-    this.isNewSession = this.session.parentMessageId == null
+    this.isNewSession = this.session.parentId == null
     this.toolCalling = this.session.toolCalling ?? false
     this.haveInstructionsAPI = false
     this.ephemeralMode = !isReal

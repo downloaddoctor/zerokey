@@ -63,7 +63,7 @@ async function claudeStreamHandler(stream, session, parser, cb) {
       switch (parsed.type) {
         case 'message_start': {
           const msg = parsed.message
-          if (msg) session.parentMessageId = msg.uuid
+          if (msg) session.parentId = msg.uuid
           break
         }
         case 'content_block_start': {

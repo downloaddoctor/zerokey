@@ -22,7 +22,6 @@ const http = require('http')
 const { CONFIG } = require('../config/constants')
 const log = require('../utils/log')
 const db = require('../core/state/db')
-const { importOnce } = require('../core/state/import-legacy')
 
 const PROBE_TIMEOUT_MS = 2000
 
@@ -159,18 +158,6 @@ async function main() {
   }
 
   const store = db.open()
-  const imported = importOnce(store)
-  if (!imported.skipped) {
-    log.info(
-      'Imported legacy users.json into SQLite: ' +
-        imported.imported +
-        ' session(s), skipped ' +
-        imported.skippedExisting +
-        ' existing row(s).',
-    )
-  } else if (imported.reason !== 'already_imported' && imported.reason !== 'no_legacy_file') {
-    log.info('Legacy import skipped: ' + imported.reason + '.')
-  }
 
   // Wizard runs only at a real terminal. Headless startup uses env vars
   // (ZEROKEY_PROVIDER / ZEROKEY_USER / ZEROKEY_SESSION) and skips the prompts.
@@ -194,11 +181,11 @@ async function main() {
           provider +
           '" not found.',
       )
-      log.error(
-        'Check temp/users.json or the SQLite sessions table, or run without args for the wizard.',
-      )
+      log.error('Check the SQLite users/sessions tables, or run without args for the wizard.')
       release()
-      db.close(store)
+      try {
+        store.close()
+      } catch {}
       process.exit(2)
     }
   } else if (process.stdin.isTTY && process.stdout.isTTY) {
@@ -206,14 +193,22 @@ async function main() {
     if (!preSelected) {
       log.info('No session selected. Exiting.')
       release()
-      db.close(store)
+      try {
+        store.close()
+      } catch {}
+      release()
+      try {
+        store.close()
+      } catch {}
       process.exit(0)
     }
   } else {
     log.error('No session selected and no TTY available for the wizard.')
     log.error('Set ZEROKEY_PROVIDER, ZEROKEY_USER and ZEROKEY_SESSION, or run at a terminal.')
     release()
-    db.close(store)
+    try {
+      store.close()
+    } catch {}
     process.exit(2)
   }
 
@@ -240,7 +235,9 @@ async function main() {
     server.stop().then(
       () => {
         release()
-        db.close(store)
+        try {
+          store.close()
+        } catch {}
         log.close()
         process.exit(0)
       },
@@ -262,13 +259,17 @@ async function main() {
   return null
 }
 
-main().then(
-  (code) => {
-    if (code !== null) process.exit(code)
-  },
-  (err) => {
-    log.error('Start failed: ' + (err && err.stack ? err.stack : String(err)))
-    release()
-    process.exit(1)
-  },
-)
+if (require.main === module) {
+  main().then(
+    (code) => {
+      if (code !== null) process.exit(code)
+    },
+    (err) => {
+      log.error('Start failed: ' + (err && err.stack ? err.stack : String(err)))
+      release()
+      process.exit(1)
+    },
+  )
+}
+
+module.exports = { main }

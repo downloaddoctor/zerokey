@@ -70,23 +70,25 @@ test('SQLite schema_version gate refuses a newer version', () => {
   }
 })
 
-test('sessions.save then get round-trips a row', () => {
+test('sessions.create then get round-trips a row', () => {
   const dbModule = require('../core/state/db')
+  const users = require('../core/state/users')
   const sessions = require('../core/state/sessions')
   const file = path.join(ROOT, 'temp', 'sessions-roundtrip.db')
   fs.mkdirSync(path.dirname(file), { recursive: true })
   try {
     if (fs.existsSync(file)) fs.unlinkSync(file)
     const db = dbModule.open({ file })
-    sessions.save(db, {
-      provider: 'chatgpt',
-      id: 'sess-1',
-      upstreamConversationId: 'conv-1',
-      upstreamParentMessageId: 'msg-1',
+    const user = users.create(db, 'chatgpt', 'roundtrip-user', { parsedFetch: {} })
+    const created = sessions.create(db, user.id, {
+      name: 'sess-1',
+      id: 'conv-1',
+      parentId: 'msg-1',
     })
-    const loaded = sessions.get(db, 'chatgpt', 'sess-1')
-    assert.equal(loaded.upstreamConversationId, 'conv-1')
-    assert.equal(loaded.upstreamParentMessageId, 'msg-1')
+    sessions.flushNow(db, created)
+    const loaded = sessions.get(db, user.id, 'sess-1')
+    assert.equal(loaded.id, 'conv-1')
+    assert.equal(loaded.parentId, 'msg-1')
     db.close()
   } finally {
     for (const suffix of ['', '-wal', '-shm']) {
@@ -96,18 +98,20 @@ test('sessions.save then get round-trips a row', () => {
   }
 })
 
-test('sessions.resolve creates a row for a new (provider, id)', () => {
+test('sessions.resolve creates a row for a new (userId, name)', () => {
   const dbModule = require('../core/state/db')
+  const users = require('../core/state/users')
   const sessions = require('../core/state/sessions')
   const file = path.join(ROOT, 'temp', 'sessions-resolve.db')
   fs.mkdirSync(path.dirname(file), { recursive: true })
   try {
     if (fs.existsSync(file)) fs.unlinkSync(file)
     const db = dbModule.open({ file })
-    const fresh = sessions.resolve(db, 'deepseek', 'sess-2')
-    assert.equal(fresh.provider, 'deepseek')
+    const user = users.create(db, 'deepseek', 'resolve-user', { parsedFetch: {} })
+    const fresh = sessions.resolve(db, user.id, 'sess-2')
+    assert.equal(fresh.userId, user.id)
     assert.equal(fresh.persistent, true)
-    const again = sessions.resolve(db, 'deepseek', 'sess-2')
+    const again = sessions.resolve(db, user.id, 'sess-2')
     assert.equal(again.state, 'idle')
     db.close()
   } finally {

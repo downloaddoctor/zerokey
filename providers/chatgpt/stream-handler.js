@@ -43,18 +43,18 @@ async function chatgptStreamHandler(stream, session, parser) {
     }
 
     if (data.type === 'input_message' && data.input_message?.id) {
-      session.parentMessageId = data.input_message.id
+      session.parentId = data.input_message.id
       return
     }
     if (data.type === 'message_stream_complete') {
       finished = true
       sawCompletionMarker = true
-      if (data.conversation_id) session.chatSessionId = data.conversation_id
+      if (data.conversation_id) session.id = data.conversation_id
       return
     }
     if (data.type === 'resume_conversation_token') {
       if (typeof data.token === 'string') resumeToken = data.token
-      if (data.conversation_id) session.chatSessionId = data.conversation_id
+      if (data.conversation_id) session.id = data.conversation_id
       return
     }
     if (data.type === 'stream_handoff') {
@@ -64,7 +64,7 @@ async function chatgptStreamHandler(stream, session, parser) {
       return
     }
     if (data.o === 'add' && data.v?.message?.id) {
-      session.parentMessageId = data.v.message.id
+      session.parentId = data.v.message.id
       return
     }
     if (data.p === '/message/content/parts/0' && data.o === 'append') {

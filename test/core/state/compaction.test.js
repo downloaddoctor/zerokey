@@ -5,8 +5,9 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 
-const ROOT = path.resolve(__dirname, '..')
+const ROOT = path.resolve(__dirname, '..', '..', '..')
 const dbModule = require('../../../core/state/db')
+const users = require('../../../core/state/users')
 const sessions = require('../../../core/state/sessions')
 
 const scratch = path.join(ROOT, 'temp', 'compaction-test.db')
@@ -21,21 +22,29 @@ function cleanup() {
   }
 }
 
-test('generation 0 keeps the existing upstream conversation', () => {
+function freshDb() {
   cleanup()
   fs.mkdirSync(path.dirname(scratch), { recursive: true })
   const db = dbModule.open({ file: scratch })
+  const user = users.create(db, 'chatgpt', 'compaction-user', {
+    parsedFetch: { url: 'x', method: 'POST', headers: {}, body: '{}' },
+  })
+  return { db, user }
+}
+
+test('generation 0 keeps the existing conversation', () => {
+  const { db, user } = freshDb()
   try {
-    sessions.save(db, {
-      provider: 'chatgpt',
-      id: 'sess-keep',
-      upstreamConversationId: 'conv-1',
-      upstreamParentMessageId: 'msg-1',
+    const created = sessions.create(db, user.id, {
+      name: 'sess-keep',
+      id: 'conv-1',
+      parentId: 'msg-1',
       generation: 0,
     })
-    const row = sessions.resolve(db, 'chatgpt', 'sess-keep', { generation: 0 })
-    assert.equal(row.upstreamConversationId, 'conv-1')
-    assert.equal(row.upstreamParentMessageId, 'msg-1')
+    sessions.flushNow(db, created)
+    const row = sessions.resolve(db, user.id, 'sess-keep', { generation: 0 })
+    assert.equal(row.id, 'conv-1')
+    assert.equal(row.parentId, 'msg-1')
   } finally {
     db.close()
     cleanup()
@@ -43,19 +52,18 @@ test('generation 0 keeps the existing upstream conversation', () => {
 })
 
 test('higher generation rebinds and stashes the previous conversation', () => {
-  cleanup()
-  const db = dbModule.open({ file: scratch })
+  const { db, user } = freshDb()
   try {
-    sessions.save(db, {
-      provider: 'chatgpt',
-      id: 'sess-rebind',
-      upstreamConversationId: 'conv-old',
-      upstreamParentMessageId: 'msg-old',
+    const created = sessions.create(db, user.id, {
+      name: 'sess-rebind',
+      id: 'conv-old',
+      parentId: 'msg-old',
       generation: 0,
     })
-    const row = sessions.resolve(db, 'chatgpt', 'sess-rebind', { generation: 1 })
-    assert.equal(row.upstreamConversationId, null)
-    assert.equal(row.upstreamParentMessageId, null)
+    sessions.flushNow(db, created)
+    const row = sessions.resolve(db, user.id, 'sess-rebind', { generation: 1 })
+    assert.equal(row.id, null)
+    assert.equal(row.parentId, null)
     assert.equal(row.generation, 1)
     assert.equal(row.state, 'rebased')
     assert.deepEqual(row.metadata.pendingPreviousConversationIds, ['conv-old'])
@@ -66,17 +74,16 @@ test('higher generation rebinds and stashes the previous conversation', () => {
 })
 
 test('lower generation is ignored', () => {
-  cleanup()
-  const db = dbModule.open({ file: scratch })
+  const { db, user } = freshDb()
   try {
-    sessions.save(db, {
-      provider: 'chatgpt',
-      id: 'sess-lower',
-      upstreamConversationId: 'conv-2',
+    const created = sessions.create(db, user.id, {
+      name: 'sess-lower',
+      id: 'conv-2',
       generation: 2,
     })
-    const row = sessions.resolve(db, 'chatgpt', 'sess-lower', { generation: 1 })
-    assert.equal(row.upstreamConversationId, 'conv-2')
+    sessions.flushNow(db, created)
+    const row = sessions.resolve(db, user.id, 'sess-lower', { generation: 1 })
+    assert.equal(row.id, 'conv-2')
     assert.equal(row.generation, 2)
   } finally {
     db.close()
@@ -85,26 +92,23 @@ test('lower generation is ignored', () => {
 })
 
 test('successive bumps accumulate pending conversation ids', () => {
-  cleanup()
-  const db = dbModule.open({ file: scratch })
+  const { db, user } = freshDb()
   try {
-    sessions.save(db, {
-      provider: 'chatgpt',
-      id: 'sess-accum',
-      upstreamConversationId: 'conv-a',
+    const first = sessions.create(db, user.id, {
+      name: 'sess-accum',
+      id: 'conv-a',
       generation: 0,
     })
-    sessions.resolve(db, 'chatgpt', 'sess-accum', { generation: 1 })
-    // Simulate the next successful turn binding a new conversation.
-    sessions.save(db, {
-      provider: 'chatgpt',
-      id: 'sess-accum',
-      upstreamConversationId: 'conv-b',
-      generation: 1,
-      metadata: { pendingPreviousConversationIds: ['conv-a'] },
-    })
-    const row = sessions.resolve(db, 'chatgpt', 'sess-accum', { generation: 2 })
-    assert.equal(row.upstreamConversationId, null)
+    sessions.flushNow(db, first)
+    sessions.resolve(db, user.id, 'sess-accum', { generation: 1 })
+
+    const second = sessions.get(db, user.id, 'sess-accum')
+    second.id = 'conv-b'
+    second.metadata = { pendingPreviousConversationIds: ['conv-a'] }
+    sessions.flushNow(db, second)
+
+    const row = sessions.resolve(db, user.id, 'sess-accum', { generation: 2 })
+    assert.equal(row.id, null)
     const pending = row.metadata.pendingPreviousConversationIds
     assert.ok(pending.includes('conv-a'))
     assert.ok(pending.includes('conv-b'))

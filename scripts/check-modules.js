@@ -63,6 +63,7 @@ try {
 const { CONFIG } = require('../config/constants')
 const log = require('../utils/log')
 const db = require('../core/state/db')
+const users = require('../core/state/users')
 const sessions = require('../core/state/sessions')
 
 function ok(label, condition, detail) {
@@ -129,23 +130,27 @@ cleanupDb(scratch)
 
 try {
   const store = db.open({ file: scratch })
-  const created = sessions.resolve(store, 'chatgpt', 'check-modules-session')
-  ok('sessions.resolve returns a persistent row', created.persistent === true)
-  ok('sessions.resolve creates a new row on first call', created.upstreamConversationId === null)
-
-  sessions.save(store, {
-    provider: 'chatgpt',
-    id: created.id,
-    upstreamConversationId: 'conv-check',
-    upstreamParentMessageId: 'msg-check',
+  const user = users.create(store, 'chatgpt', 'check-modules-user', {
+    parsedFetch: { url: 'x', method: 'POST', headers: {}, body: '{}' },
   })
-  const loaded = sessions.get(store, 'chatgpt', 'check-modules-session')
-  eq('sessions round-trip stores conversation id', loaded.upstreamConversationId, 'conv-check')
-  eq('sessions round-trip stores parent id', loaded.upstreamParentMessageId, 'msg-check')
+  ok('users.create returns a row with a UUID id', typeof user.id === 'string' && user.id.length > 0)
 
-  const reset = sessions.resetUpstream(store, 'chatgpt', 'check-modules-session')
-  eq('resetUpstream clears conversation id', reset.upstreamConversationId, null)
-  eq('resetUpstream marks state', reset.state, 'rebased')
+  const created = sessions.resolve(store, user.id, 'check-modules-session')
+  ok('sessions.resolve returns a persistent row', created.persistent === true)
+  ok('sessions.resolve creates a new row on first call', created.id === null)
+
+  created.id = 'conv-check'
+  created.parentId = 'msg-check'
+  sessions.flushNow(store, created)
+  const loaded = sessions.get(store, user.id, 'check-modules-session')
+  eq('sessions round-trip stores conversation id', loaded.id, 'conv-check')
+  eq('sessions round-trip stores parent id', loaded.parentId, 'msg-check')
+
+  sessions.removeAllForUser(store, user.id)
+  eq('removeAllForUser drops every session', sessions.listForUser(store, user.id).length, 0)
+
+  users.remove(store, user.id)
+  eq('users.remove drops the user', users.get(store, 'chatgpt', 'check-modules-user'), null)
 
   db.setMeta(store, 'schema_version', db.SCHEMA_VERSION + 1)
   store.close()

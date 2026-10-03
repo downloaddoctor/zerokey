@@ -28,10 +28,10 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
 
   if (!session) throw new Error('No session provided')
 
-  if (!session.chatSessionId) {
+  if (!session.id) {
     try {
-      session.chatSessionId = await deepseekApi.createChatSession()
-      await deepseekApi.warmupSession(session.chatSessionId)
+      session.id = await deepseekApi.createChatSession()
+      await deepseekApi.warmupSession(session.id)
     } catch (error) {
       if (error.code === 'account_suspended' && error.muteUntil != null && userData) {
         userData.waitUntil = Math.ceil(error.muteUntil * 1000)
@@ -52,10 +52,10 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
     }
 
     const activeSession = pipeline.session
-    if (!activeSession.chatSessionId) {
+    if (!activeSession.id) {
       try {
-        activeSession.chatSessionId = await deepseekApi.createChatSession()
-        await deepseekApi.warmupSession(activeSession.chatSessionId)
+        activeSession.id = await deepseekApi.createChatSession()
+        await deepseekApi.warmupSession(activeSession.id)
       } catch (error) {
         if (error.code === 'account_suspended' && error.muteUntil && userData) {
           userData.waitUntil = Math.ceil(error.muteUntil * 1000)
@@ -92,9 +92,9 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
           const deepseekStream = await withRetry(
             () =>
               deepseekApi.chatCompletion(
-                activeSession.chatSessionId,
+                activeSession.id,
                 prompt,
-                activeSession.parentMessageId,
+                activeSession.parentId,
                 thinkingEnabled,
                 searchEnabled,
                 modelType,
@@ -107,9 +107,9 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
           const retryFn = async () => {
             await acquireSlot('DeepSeek', true)
             return deepseekApi.chatCompletion(
-              activeSession.chatSessionId,
+              activeSession.id,
               prompt,
-              activeSession.parentMessageId,
+              activeSession.parentId,
               thinkingEnabled,
               searchEnabled,
               modelType,

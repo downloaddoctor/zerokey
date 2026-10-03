@@ -9,14 +9,18 @@ const prompts = require('prompts')
 
 const registry = require('../providers/registry')
 const { text } = require('../utils/log')
+const usersState = require('./state/users')
 const sessionsState = require('./state/sessions')
 
 const BACKSLASH = String.fromCharCode(0x5c)
 
 class SessionSelector {
+  /**
+   * @param {object} options
+   * @param {object} options.db - open SQLite handle (required for real use)
+   */
   constructor(options = {}) {
     this._dataDir = path.join(__dirname, '..', 'temp')
-    this._usersFile = path.join(this._dataDir, 'users.json')
     this._db = options.db || null
     this.TIMEOUT_MS = 0
     if (!fs.existsSync(this._dataDir)) {
@@ -36,17 +40,14 @@ class SessionSelector {
     this.user = await this._stepUserLogin(username)
     if (!this.user) return null
 
-    if (!this.user.sessions) this.user.sessions = []
-
-    const allProviders = this._loadAll()
-    const providerUsers = allProviders[this.provider] || {}
+    const providerUsers = this._listUsersForProvider(this.provider)
 
     const waitPolicy = registry.get(this.provider)?.waitPolicy
     if (waitPolicy) {
-      for (const u of Object.values(providerUsers)) {
+      for (const u of providerUsers) {
         if (u.waitUntil && u.waitUntil <= Date.now()) {
-          delete u.waitUntil
-          delete u.waitReason
+          u.waitUntil = null
+          u.waitReason = null
         }
       }
 
@@ -55,12 +56,12 @@ class SessionSelector {
         const resetsAt = this._formatResetTime(this.user.waitUntil)
         console.warn('\n' + waitPolicy.userMessage(this.user.username, resetsAt, mins) + '\n')
 
-        const availableUsers = Object.values(providerUsers).filter(
+        const availableUsers = providerUsers.filter(
           (u) => u.username !== this.user.username && (!u.waitUntil || u.waitUntil <= Date.now()),
         )
 
         if (availableUsers.length === 0) {
-          const soonest = Object.values(providerUsers)
+          const soonest = providerUsers
             .map((u) => ({ username: u.username, ts: u.waitUntil }))
             .filter((u) => u.ts)
             .sort((a, b) => a.ts - b.ts)[0]
@@ -80,7 +81,7 @@ class SessionSelector {
     this.session = await this._stepSessionSelection(sessionName)
     if (!this.session) return null
 
-    this._saveUser(this.provider, this.user.username, this.user)
+    this.session.lastUsed = Date.now()
 
     return {
       user: this.user.username,
@@ -94,35 +95,31 @@ class SessionSelector {
   }
 
   async _stepContinueRecentSession() {
-    const all = this._loadAll()
+    if (!this._db) return null
+    const all = this._listAllUsers()
     const resolved = []
 
-    for (const provider of Object.keys(all)) {
-      const users = all[provider] || {}
-      for (const username of Object.keys(users)) {
-        const user = users[username]
-        const list = user.sessions || []
-        for (const session of list) {
-          if (session.lastUsed) {
-            resolved.push({
-              ...session,
-              username,
-              provider,
-              lastUsedEpoc: new Date(session.lastUsed).getTime(),
-            })
-          }
+    for (const user of all) {
+      const list = sessionsState.listForUser(this._db, user.id)
+      for (const session of list) {
+        if (session.lastUsed) {
+          resolved.push({
+            session,
+            username: user.username,
+            provider: user.provider,
+          })
         }
       }
     }
 
     if (resolved.length === 0) return null
 
-    resolved.sort((a, b) => b.lastUsedEpoc - a.lastUsedEpoc)
+    resolved.sort((a, b) => (b.session.lastUsed || 0) - (a.session.lastUsed || 0))
     resolved.length = Math.min(resolved.length, 3)
 
-    const choices = resolved.map((session, i) => ({
-      title: session.name + ' - ' + session.provider + ' - ' + session.username + ' ',
-      description: this.formatSessionTags(session, session.provider),
+    const choices = resolved.map((item, i) => ({
+      title: item.session.name + ' - ' + item.provider + ' - ' + item.username + ' ',
+      description: this.formatSessionTags(item.session, item.provider),
       value: i,
     }))
 
@@ -140,15 +137,13 @@ class SessionSelector {
 
     if (choice === undefined || choice === -1) return null
 
-    const session = resolved[choice]
-
-    return this.select(false, session.provider, session.username, session.name)
+    const picked = resolved[choice]
+    return this.select(false, picked.provider, picked.username, picked.session.name)
   }
 
   flush() {
-    if (this.provider && this.user) {
-      this._saveUser(this.provider, this.user.username, this.user)
-    }
+    // Users and sessions are persisted by their own proxies on mutation.
+    // Nothing to flush here.
   }
 
   async _stepProviderSelection(preset) {
@@ -173,21 +168,22 @@ class SessionSelector {
   }
 
   async _stepUserLogin(preset) {
-    const allProviders = this._loadAll()
-    const providerUsers = allProviders[this.provider] || {}
-    if (preset && providerUsers[preset]) return providerUsers[preset]
-    const savedUsers = Object.keys(providerUsers)
+    const providerUsers = this._listUsersForProvider(this.provider)
+    if (preset) {
+      const found = providerUsers.find((u) => u.username === preset)
+      if (found) return found
+    }
+    const savedUsers = providerUsers.map((u) => u.username)
 
     if (savedUsers.length > 0) {
-      const choices = savedUsers.map((username) => {
-        const user = providerUsers[username]
+      const choices = providerUsers.map((user) => {
         const limited =
           Boolean(registry.get(this.provider)?.waitPolicy) &&
           user.waitUntil &&
           user.waitUntil > Date.now()
         return {
-          title: username,
-          value: username,
+          title: user.username,
+          value: user.username,
           description: limited ? '⚠ at usage limit' : undefined,
         }
       })
@@ -206,7 +202,7 @@ class SessionSelector {
 
       if (username === '__new__') return this._promptNewUser()
       if (username === '__delete__') return this._deleteUser(savedUsers)
-      return providerUsers[username]
+      return providerUsers.find((u) => u.username === username)
     }
 
     return this._promptNewUser()
@@ -233,9 +229,17 @@ class SessionSelector {
     spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore' }).unref()
   }
 
+  _listAllUsers() {
+    if (!this._db) return []
+    return usersState.list(this._db)
+  }
+
+  _listUsersForProvider(provider) {
+    return this._listAllUsers().filter((u) => u.provider === provider)
+  }
+
   _existingLocalKeys() {
-    const all = this._loadAll()
-    return Object.keys(all[this.provider] || {}).map((k) => k.toLowerCase())
+    return this._listUsersForProvider(this.provider).map((u) => u.username.toLowerCase())
   }
 
   _profileDirFor(username) {
@@ -347,9 +351,8 @@ class SessionSelector {
         continue
       }
 
-      const user = { username, parsedFetch, sessions: [] }
-      this._saveUser(this.provider, username, user)
-      return user
+      if (!this._db) return { username, parsedFetch }
+      return usersState.create(this._db, this.provider, username, { parsedFetch })
     }
   }
 
@@ -370,21 +373,22 @@ class SessionSelector {
   }
 
   async _stepSessionSelection(preset) {
-    const list = this.user.sessions || []
+    const list = this._listSessionsForCurrentUser()
+
     if (preset) {
       const found = list.find((s) => s.name === preset)
       if (found) return found
     }
 
-    const choices = list.map((s, i) => ({
+    const choices = list.map((s) => ({
       title: s.name,
       description: this.formatSessionTags(s),
-      value: i,
+      value: s.name,
     }))
 
-    choices.push({ title: text.cyan('Create new session'), value: -1 })
+    choices.push({ title: text.cyan('Create new session'), value: '__new__' })
     if (list.length > 0) {
-      choices.push({ title: text.red('Delete all sessions'), value: -2 })
+      choices.push({ title: text.red('Delete all sessions'), value: '__delete_all__' })
     }
 
     const { result } = await prompts(
@@ -398,10 +402,16 @@ class SessionSelector {
     )
 
     if (result === undefined) return null
-    if (result === -1) return this._createNewSession()
-    if (result === -2) return this._deleteAllSessions()
-    return this.user.sessions[result]
+    if (result === '__new__') return this._createNewSession()
+    if (result === '__delete_all__') return this._deleteAllSessions()
+    return list.find((s) => s.name === result)
   }
+
+  _listSessionsForCurrentUser() {
+    if (!this._db || !this.user || !this.user.id) return []
+    return sessionsState.listForUser(this._db, this.user.id)
+  }
+
   async _createNewSession() {
     const defaultName = new Date().toISOString().slice(0, 19).replace('T', ' ')
 
@@ -451,19 +461,21 @@ class SessionSelector {
     const modelMeta = providerModels.models?.[answers.model]
     const vision = modelMeta?.vision ?? Boolean(providerDef.defaultVision)
 
-    const newSession = {
+    if (!this._db || !this.user || !this.user.id) {
+      return {
+        name: answers.name || defaultName,
+        toolCalling: answers.toolCalling ?? true,
+        vision,
+        model: answers.model,
+      }
+    }
+
+    return sessionsState.create(this._db, this.user.id, {
       name: answers.name || defaultName,
-      chatSessionId: null,
-      parentMessageId: null,
-      createdAt: new Date().toISOString(),
-      lastUsed: new Date().toISOString(),
       toolCalling: answers.toolCalling ?? true,
       vision,
       model: answers.model,
-    }
-
-    this.user.sessions.push(newSession)
-    return newSession
+    })
   }
 
   async _deleteUser(savedUsers) {
@@ -482,11 +494,11 @@ class SessionSelector {
 
     if (!target || target === '__back__') return this._stepUserLogin()
 
-    const allProviders = this._loadAll()
-    const user = (allProviders[this.provider] || {})[target]
-    if (!user) return this._stepUserLogin()
+    const providerUsers = this._listUsersForProvider(this.provider)
+    const targetUser = providerUsers.find((u) => u.username === target)
+    if (!targetUser) return this._stepUserLogin()
 
-    const sessionCount = (user.sessions || []).length
+    const sessionCount = this._db ? sessionsState.listForUser(this._db, targetUser.id).length : 0
     const { confirmed } = await prompts(
       {
         type: 'confirm',
@@ -507,7 +519,7 @@ class SessionSelector {
     const savedUser = this.user
     const savedProvider = this.provider
 
-    this.user = user
+    this.user = targetUser
     process.stdout.write(text.dim('  Deleting provider sessions...'))
     try {
       await this._deleteProviderSessions()
@@ -521,7 +533,9 @@ class SessionSelector {
     this.user = savedUser
     this.provider = savedProvider
 
-    this._removeUser(savedProvider, target)
+    if (this._db) {
+      usersState.remove(this._db, targetUser.id)
+    }
     try {
       fs.rmSync(this._profileDirFor(target.toLowerCase()), { recursive: true, force: true })
     } catch (e) {
@@ -533,7 +547,8 @@ class SessionSelector {
   }
 
   async _deleteAllSessions() {
-    const count = this.user.sessions.length
+    const list = this._listSessionsForCurrentUser()
+    const count = list.length
     const { confirmed } = await prompts(
       {
         type: 'confirm',
@@ -549,8 +564,9 @@ class SessionSelector {
       await this._deleteProviderSessions()
       process.stdout.write('\r  ' + text.green('√ Done.') + '                  \n\n')
 
-      this.user.sessions = []
-      this._saveUser(this.provider, this.user.username, this.user)
+      if (this._db && this.user && this.user.id) {
+        sessionsState.removeAllForUser(this._db, this.user.id)
+      }
     }
 
     return this._stepSessionSelection()
@@ -561,7 +577,8 @@ class SessionSelector {
     const api = provider.createAPI({ log: false })
     await api.initializeFromJSON(this.user.parsedFetch || {})
 
-    const toDelete = this.user.sessions.filter((s) => s.chatSessionId)
+    const list = this._listSessionsForCurrentUser()
+    const toDelete = list.filter((s) => s.id)
     if (toDelete.length === 0) return
 
     let deleted = 0
@@ -570,9 +587,9 @@ class SessionSelector {
       try {
         deleted++
         process.stdout.write(text.dim('\r  Deleting ' + deleted + '/' + toDelete.length))
-        await api.deleteSession(session.chatSessionId)
+        await api.deleteSession(session.id)
       } catch (e) {
-        console.warn('\n  Failed ' + session.chatSessionId + ': ' + e.message)
+        console.warn('\n  Failed ' + session.id + ': ' + e.message)
       }
     }
   }
@@ -649,105 +666,6 @@ class SessionSelector {
     return { headers, body, url: urlMatch[2] }
   }
 
-  _loadAll() {
-    const json = this._readJson()
-    if (!this._db) return json
-
-    try {
-      const rows = sessionsState.list(this._db, 500)
-      for (const row of rows) {
-        const bucket = json[row.provider] || (json[row.provider] = {})
-        for (const username of Object.keys(bucket)) {
-          const user = bucket[username]
-          const list = Array.isArray(user.sessions) ? user.sessions : []
-          const match = list.find((s) => s.name === row.id)
-          if (!match) continue
-          if (row.upstreamConversationId) match.chatSessionId = row.upstreamConversationId
-          if (row.upstreamParentMessageId) match.parentMessageId = row.upstreamParentMessageId
-          if (row.updatedAt) match.lastUsed = new Date(row.updatedAt).toISOString()
-        }
-      }
-    } catch (error) {
-      console.error('Load sessions from SQLite failed:', error.message)
-    }
-    return json
-  }
-
-  _saveUser(provider, username, userData) {
-    try {
-      const all = this._readJson()
-      if (!all[provider]) all[provider] = {}
-      all[provider][username] = userData
-      const tmp = this._usersFile + '.tmp'
-      fs.writeFileSync(tmp, JSON.stringify(all, null, 2), 'utf8')
-      fs.renameSync(tmp, this._usersFile)
-    } catch (e) {
-      console.error('Save user error:', e.message)
-    }
-
-    if (!this._db) return
-    const list = Array.isArray(userData.sessions) ? userData.sessions : []
-    for (const entry of list) {
-      if (!entry || typeof entry.name !== 'string' || entry.name === '') continue
-      try {
-        sessionsState.save(
-          this._db,
-          {
-            provider,
-            id: entry.name,
-            upstreamConversationId: entry.chatSessionId || null,
-            upstreamParentMessageId: entry.parentMessageId || null,
-            metadata: {},
-          },
-          { state: entry.chatSessionId ? 'idle' : 'unbound' },
-        )
-      } catch (e) {
-        console.error('Save session to SQLite failed:', e.message)
-      }
-    }
-  }
-
-  _removeUser(provider, username) {
-    try {
-      const all = this._readJson()
-      const removed = all[provider] && all[provider][username]
-      const sessionNames =
-        removed && Array.isArray(removed.sessions)
-          ? removed.sessions.map((s) => s && s.name).filter(Boolean)
-          : []
-      if (all[provider]) {
-        delete all[provider][username]
-        if (Object.keys(all[provider]).length === 0) delete all[provider]
-      }
-      const tmp = this._usersFile + '.tmp'
-      fs.writeFileSync(tmp, JSON.stringify(all, null, 2), 'utf8')
-      fs.renameSync(tmp, this._usersFile)
-
-      if (this._db) {
-        for (const name of sessionNames) {
-          try {
-            sessionsState.remove(this._db, provider, name)
-          } catch (e) {
-            console.error('Remove session from SQLite failed:', e.message)
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Remove user error:', e.message)
-    }
-  }
-
-  _readJson() {
-    try {
-      if (fs.existsSync(this._usersFile)) {
-        return JSON.parse(fs.readFileSync(this._usersFile, 'utf8'))
-      }
-    } catch (e) {
-      console.error('Load users error:', e.message)
-    }
-    return {}
-  }
-
   _formatResetTime(ts) {
     const d = new Date(ts)
     const now = new Date()
@@ -761,7 +679,7 @@ class SessionSelector {
   _formatTime(isoString) {
     if (!isoString) return 'never'
     try {
-      const d = new Date(isoString)
+      const d = typeof isoString === 'number' ? new Date(isoString) : new Date(isoString)
       const mins = Math.floor((Date.now() - d) / 60000)
       if (mins < 1) return 'just now'
       if (mins < 60) return mins + 'm ago'
