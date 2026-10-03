@@ -7,8 +7,10 @@ const { ChatGPTAPI } = require('./api')
 const { chatgptStreamHandler } = require('./stream-handler')
 const { acquireSlot } = require('../../utils/rate-limiter')
 const retry = require('../../utils/retry')
+const recovery = require('./recovery')
 
 const chatgptApi = new ChatGPTAPI()
+chatgptApi._providerKey = 'chatgpt'
 
 async function buildChatGPTRouter(parsedFetch, session) {
   console.debug('[ChatGPT] Initializing from parsed capture JSON')
@@ -36,15 +38,22 @@ async function buildChatGPTRouter(parsedFetch, session) {
       }
     }
 
+    // Refresh sentinel + conduit before the turn. Failure is logged but not
+    // fatal: the process may still hold valid tokens, and a hard failure here
+    // would mask the real upstream error.
+    await recovery.refreshSentinelSafe(chatgptApi)
+
     try {
       const stream = await withRetry(
         () =>
-          chatgptApi.chatCompletion(
-            prompt,
-            activeSession.chatSessionId,
-            activeSession.parentMessageId,
-            model,
-            attachments,
+          recovery.withAuthRecovery(chatgptApi, () =>
+            chatgptApi.chatCompletion(
+              prompt,
+              activeSession.chatSessionId,
+              activeSession.parentMessageId,
+              model,
+              attachments,
+            ),
           ),
         pipeline,
       )
@@ -62,6 +71,12 @@ async function buildChatGPTRouter(parsedFetch, session) {
  * the stream handler. 429 and 403-unusual-activity are handled inside
  * chatgptApi via the rate-limiter cooldown, and classify as terminal here so
  * the router does not hammer a cooled-down provider.
+ *
+ * 401 is handled inside the callback by `recovery.withAuthRecovery`, which
+ * forces a capture reload and retries exactly once per process. If that
+ * retry also fails with 401, the error propagates and `retry.classify`
+ * marks it terminal (401 → maxAttempts 1), so the outer loop does not
+ * retry it again.
  */
 async function withRetry(fn, pipeline) {
   let attempt = 0
