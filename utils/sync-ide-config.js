@@ -4,7 +4,7 @@ const os = require('os')
 
 const fetch = require('node-fetch')
 
-const { isPortActive } = require('./find-port')
+const { isPortActive } = require('./startup')
 const registry = require('../providers/registry')
 const { text } = require('./log')
 

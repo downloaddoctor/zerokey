@@ -23,9 +23,7 @@ function envInt(name, fallback, minimum, maximum) {
 const CONFIG = {
   PORT: envInt('PORT', 7250, 1, 65535),
 
-  // A busy port is an error, not a reason to wander. Callers that want the old
-  // fallback behaviour must opt in explicitly.
-  EXACT_PORT: process.env.ZEROKEY_EXACT_PORT !== '0',
+  EXACT_PORT: process.env.ZEROKEY_EXACT_PORT === '1',
 
   // State lives next to the code, outside the git-tracked tree. `temp/` is
   // already gitignored in this repo.

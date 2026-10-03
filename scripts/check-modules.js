@@ -82,7 +82,7 @@ function eq(label, actual, expected) {
 
 eq('bind host is loopback', CONFIG.HOST, '127.0.0.1')
 eq('default port', CONFIG.PORT, 7250)
-eq('exact port is on by default', CONFIG.EXACT_PORT, true)
+eq('port fallback is on by default', CONFIG.EXACT_PORT, false)
 ok(
   'schema version is a positive integer',
   Number.isInteger(db.SCHEMA_VERSION) && db.SCHEMA_VERSION > 0,
@@ -113,10 +113,7 @@ ok('SAS query stays diagnosable', sas.includes('sig=<redacted>'), sas)
 // --- startup hygiene -----------------------------------------------------
 
 const startupSource = fs.readFileSync(path.join(root, 'utils', 'startup.js'), 'utf8')
-ok(
-  'startup uses wx lock acquisition',
-  /fs\.openSync\(CONFIG\.LOCK_FILE, 'wx'\)/.test(startupSource),
-)
+ok('startup uses wx lock acquisition', /fs\.openSync\(file, 'wx'\)/.test(startupSource))
 ok(
   'startup verifies listener ownership before adopting health',
   startupSource.includes('healthBelongsToThisInstance'),

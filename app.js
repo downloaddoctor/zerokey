@@ -1,3 +1,11 @@
+'use strict'
+
+/**
+ * The express application. Pure module: requiring this file has no side
+ * effects. server.js calls start() with an open database, a preSelected
+ * session context, and the port chosen at boot.
+ */
+
 const express = require('express')
 const { CONFIG } = require('./config/constants')
 const log = require('./utils/log')
@@ -47,9 +55,10 @@ app.use((req, res, next) => {
 app.use('/', docsRouter)
 app.use('/', infoRouter)
 
-async function start({ db: store, preSelected }) {
+async function start({ db: store, preSelected, port }) {
   if (!preSelected) throw new Error('start() requires preSelected session context.')
   if (!store) throw new Error('start() requires an open SQLite handle.')
+  const boundPort = Number.isInteger(port) ? port : CONFIG.PORT
 
   const startedAt = Date.now()
 
@@ -68,14 +77,14 @@ async function start({ db: store, preSelected }) {
     '/v1/diagnostics',
     buildDiagnosticsRouter({
       host: CONFIG.HOST,
-      port: CONFIG.PORT,
+      port: boundPort,
       startedAt,
       db: store,
       providerStatus,
     }),
   )
 
-  await syncIdeConfig(preSelected, CONFIG.PORT)
+  await syncIdeConfig(preSelected, boundPort)
 
   let router
   try {
@@ -85,13 +94,13 @@ async function start({ db: store, preSelected }) {
       sessionName: preSelected.sessionName,
     })
   } catch (error) {
-    log.error('Failed to build initial router: ' + (error.message || error))
+    log.error(`Failed to build initial router: ${error.message || error}`)
     throw error
   }
   app.use('/v1/chat/completions', sequentialQueue(), prepareChatRequest, router)
 
   app.use((err, req, res, _next) => {
-    log.error('[Server] Unhandled error: ' + (err.message || err))
+    log.error(`[Server] Unhandled error: ${err.message || err}`)
     const openaiErr = toOpenAIError(err, preSelected.provider)
     const status = openaiErr.error?.status || err.statusCode || err.status || 500
     try {
@@ -112,8 +121,8 @@ async function start({ db: store, preSelected }) {
   })
 
   await new Promise((resolve, reject) => {
-    httpServer = app.listen(CONFIG.PORT, CONFIG.HOST, () => {
-      log.info(`ZeroKey listening on http://${CONFIG.HOST}:${CONFIG.PORT} (PID ${process.pid})`)
+    httpServer = app.listen(boundPort, CONFIG.HOST, () => {
+      log.info(`ZeroKey listening on http://${CONFIG.HOST}:${boundPort} (PID ${process.pid})`)
       resolve()
     })
     httpServer.once('error', reject)
