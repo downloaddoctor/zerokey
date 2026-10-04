@@ -126,7 +126,13 @@ async function start({ db: store, preSelected, port }) {
 
   await new Promise((resolve, reject) => {
     httpServer = app.listen(boundPort, CONFIG.HOST, () => {
-      console.info(`ZeroKey listening on http://${CONFIG.HOST}:${boundPort} (PID ${process.pid})`)
+      const HOST = `http://${CONFIG.HOST}:${boundPort}`
+      console.warn(`\n√ ZeroKey running on ${HOST} (PID ${process.pid})`)
+      console.log('')
+      console.log(`  POST  ${HOST}/v1/chat/completions   Chat (SSE)`)
+      console.log(`  GET   ${HOST}/v1/models             List models`)
+      console.log(`  GET   ${HOST}/docs                  Swagger UI`)
+
       resolve()
     })
     httpServer.once('error', reject)

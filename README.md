@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Non--Commercial-blue"></a>
-  <a href="package.json"><img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-brightgreen"></a>
+  <a href="package.json"><img alt="Node" src="https://img.shields.io/badge/node-%3E%3D22-brightgreen"></a>
   <a href="package.json"><img alt="pnpm" src="https://img.shields.io/badge/pnpm-10.13.1-orange"></a>
   <a href="#quick-start"><img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-yes-8b7bff"></a>
   <img alt="Telemetry" src="https://img.shields.io/badge/telemetry-none-8b7bff">

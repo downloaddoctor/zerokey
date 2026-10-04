@@ -29,6 +29,8 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
     const activeSession = pipeline.session
     const model = activeSession.model
 
+    if (pipeline.ephemeralMode) return pipeline.sendFinalChunk()
+
     const modelMeta = CLAUDE_MODELS[model] || {}
     const allowedModes = modelMeta.reasoning || PROVIDER_REASONING_LABELS
     let reasoningEffort = req.body.reasoning_effort
@@ -49,14 +51,6 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
     if (pipeline.isNewSession && !pipeline.rawMode) {
       await setClaudeInstructions(claudeApi, userData, pipeline.toolCalling)
       pipeline.haveInstructionsAPI = true
-    }
-
-    if (pipeline.ephemeralMode) {
-      pipeline.onFinalChunk = () => {
-        if (activeSession.id) {
-          claudeApi.deleteSession(activeSession.id).catch(() => {})
-        }
-      }
     }
 
     pipeline.deferFinish = true
