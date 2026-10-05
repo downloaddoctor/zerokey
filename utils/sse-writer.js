@@ -150,7 +150,7 @@ function createWriter(res, options = {}) {
       })
     },
 
-    finish(reason, usage, includeUsage) {
+    finish(reason, usage) {
       return enqueue(async () => {
         if (finished) return
         finished = true
@@ -158,7 +158,7 @@ function createWriter(res, options = {}) {
         if (!sentRole) await send(frame({ role: 'assistant', content: '' }))
         await send(frame({}, reason || 'stop'))
         if (!alive()) return
-        if (includeUsage && usage) {
+        if (usage) {
           await send({
             id,
             object: 'chat.completion.chunk',

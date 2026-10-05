@@ -122,21 +122,21 @@ class StreamPipeline {
       if (delta && Array.isArray(delta.tool_calls)) {
         this.writer.toolCalls(delta.tool_calls)
         if (finishReason === 'stop' && usage != null) {
-          this.writer.finish('stop', usage, false)
+          this.writer.finish('stop', usage)
         }
         return
       }
       if (delta && typeof delta.content === 'string' && delta.content !== '') {
         this.writer.text(delta.content)
         if (finishReason === 'stop' && usage != null) {
-          this.writer.finish('stop', usage, false)
+          this.writer.finish('stop', usage)
         }
         return
       }
       // Stop-only frame (empty content, empty tool_calls) — the pipeline is
       // finishing. Hand off to writer.finish with the usage payload.
       if (finishReason === 'stop') {
-        this.writer.finish(finishReason || 'stop', usage, false)
+        this.writer.finish(finishReason || 'stop', usage)
       }
     }
 
@@ -196,7 +196,7 @@ class StreamPipeline {
     if (finishReason === 'stop' || finishReason === 'length') {
       const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
       const totals = accumulate(this.session, turnUsage)
-      this.writer.finish(finishReason, { ...turnUsage, session: totals }, false)
+      this.writer.finish(finishReason, { ...turnUsage, session: totals })
       this._finished = true
       this.session.lastUsed = new Date().toISOString()
       if (this.onFinalChunk) this.onFinalChunk()
@@ -208,7 +208,7 @@ class StreamPipeline {
     this.flush()
     const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
     const totals = accumulate(this.session, turnUsage)
-    this.writer.finish('stop', { ...turnUsage, session: totals }, false)
+    this.writer.finish('stop', { ...turnUsage, session: totals })
     this._finished = true
     this.session.lastUsed = new Date().toISOString()
     if (this.onFinalChunk) this.onFinalChunk()
@@ -235,7 +235,7 @@ class StreamPipeline {
     // Real provider numbers win; estimate is the fallback. See engine/usage.js.
     const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
     const totals = accumulate(this.session, turnUsage)
-    this.writer.finish('stop', { ...turnUsage, session: totals }, false)
+    this.writer.finish('stop', { ...turnUsage, session: totals })
     this.session.lastUsed = new Date().toISOString()
     if (this.onFinalChunk) this.onFinalChunk()
   }
@@ -251,7 +251,7 @@ class StreamPipeline {
     this.flush()
     const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
     const totals = accumulate(this.session, turnUsage)
-    this.writer.finish('stop', { ...turnUsage, session: totals }, false)
+    this.writer.finish('stop', { ...turnUsage, session: totals })
     this.session.lastUsed = new Date().toISOString()
     if (this.onFinalChunk) this.onFinalChunk()
   }
