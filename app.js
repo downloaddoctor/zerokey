@@ -34,7 +34,11 @@ app.use(express.json({ limit: '50mb' }))
 const prepareChatRequest = (req, res, next) => {
   if (!validateMessages(req.body?.messages, res)) return
   StreamPipeline.setSSEHeaders(res)
-  const { isReal, surface, matched } = classifySession(req.body?.messages)
+  const forceOpenai = req.headers['x-zerokey-tools'] === '1'
+  const { isReal, surface, matched } = classifySession(req.body?.messages, undefined, {
+    tools: req.body?.tools,
+    forceOpenai,
+  })
   req.surface = surface
   req.isRealSession = isReal
   req.matchedSurface = matched

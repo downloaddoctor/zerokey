@@ -349,11 +349,22 @@ class DeepSeekBrowserTransport {
 
   async warmupSession(_chatSessionId) {}
 
-  // TODO: Every time it should be different, means it should like each time diferent then addtion or mutliple or other
+  // Warmup prompt: a trivial arithmetic question whose *shape* also varies
+  // so repeated calls do not look identical to anti-abuse heuristics. The
+  // answer is never inspected — this only opens the chat session.
   _warmupPrompt() {
     const a = Math.floor(Math.random() * 900) + 100
     const b = Math.floor(Math.random() * 900) + 100
-    return `What is ${a} + ${b}?`
+    const [lo, hi] = a >= b ? [b, a] : [a, b]
+    const forms = [
+      `What is ${a} + ${b}?`,
+      `What is ${hi} - ${lo}?`,
+      `What is ${a} × ${b}?`,
+      `What is ${a * b} ÷ ${b}?`,
+      `What is ${a} plus ${b}?`,
+      `Compute ${a} + ${b}.`,
+    ]
+    return forms[Math.floor(Math.random() * forms.length)]
   }
 
   // ── Chat ─────────────────────────────────────────────────────────────────

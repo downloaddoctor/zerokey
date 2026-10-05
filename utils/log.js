@@ -1,32 +1,18 @@
 'use strict'
 
 /**
- * ZeroKey logging: console colouring, redaction, and rotating file writers.
+ * ZeroKey logging.
  *
- * One module, three concerns, one directory:
+ * Requiring this file rewires console.{log,warn,error,debug,info,success} to
+ * colour, redact, prepend the caller's [file] tag (unless the call is already
+ * self-tagged with a leading '['), and mirror every call to LOG_DIR/zerokey.log
+ * at the matching level (success → info). The file write respects LOG_LEVEL.
  *
- *   1. Console mutations. After this file is required, console.warn prints
- *      yellow, console.error red, console.debug dim, console.info blue,
- *      console.success green. console.debug.mix preserves nested colour
- *      reset sequences. Every string argument passes through redact() before
- *      it reaches stdout/stderr.
+ * redact() / isSecretKey() strip bearer tokens, JWTs, data: URLs, SAS query
+ * parameters, and any value under a secret-shaped key before it reaches disk.
  *
- *      Every console call ALSO writes one line to LOG_DIR/zerokey.log at
- *      the matching level (success and info both go to `info`). The file
- *      write is gated by LOG_LEVEL: with the default `info`, debug lines
- *      reach the console but not the file. Only `write()` fails silently if
- *      the append fails; it never throws back into the caller.
- *
- *   2. redact(value) and isSecretKey(name). Bearer tokens, JWTs, data: URLs,
- *      SAS query parameters, and every value under a secret-shaped key name
- *      are replaced with "<redacted>" before they touch disk or stderr.
- *
- *   3. LogSaver. Every instance writes to LOG_DIR/<name>.log and rotates to
- *      LOG_DIR/<name>.<ISO>.log when the active file exceeds maxSize. After a
- *      rotation, files matching <name>.*.log are sorted by the ISO timestamp
- *      in their filename and the oldest are removed until only LOG_KEEP
- *      remain. Redaction is the default beforeSave; pass beforeSave: null to
- *      opt out.
+ * LogSaver writes LOG_DIR/<name>.log and rotates to <name>.<ISO>.log past
+ * maxSize, pruning to LOG_KEEP files. Redaction is the default beforeSave.
  */
 
 const fs = require('fs')
@@ -280,48 +266,121 @@ function write(level, message) {
   processSaver.log(line.replaceAll('\n', '\\n'))
 }
 
+// -- caller-site prefix (one shallow stack walk per call) -----------------
+//
+// Uses V8's structured stack (Error.prepareStackTrace) with a hard frame cap,
+// so the cost is one short walk instead of stringifying the whole trace. The
+// log.js frame itself is always skipped.
+
+const MAX_STACK_FRAMES = 4
+const SELF_FILE = __filename
+
+let _prepareStackSave = null
+
+function _captureCaller() {
+  // Only install our prepareStackTrace once — it is global V8 state.
+  if (_prepareStackSave === null) {
+    _prepareStackSave = Error.prepareStackTrace
+    Error.prepareStackTrace = (_err, structured) => structured
+  }
+  const previousLimit = Error.stackTraceLimit
+  Error.stackTraceLimit = MAX_STACK_FRAMES
+  const stack = new Error().stack
+  Error.stackTraceLimit = previousLimit
+
+  if (!Array.isArray(stack)) return null
+  for (const frame of stack) {
+    const file = typeof frame.getFileName === 'function' ? frame.getFileName() : null
+    if (!file || file === SELF_FILE) continue
+    const line = typeof frame.getLineNumber === 'function' ? frame.getLineNumber() : 0
+    return { file: path.basename(file), abs: file, line }
+  }
+  return null
+}
+
+function _callerTag() {
+  const caller = _captureCaller()
+  if (!caller) return ''
+  // Files named index.js are ambiguous — use the parent dir name instead, and
+  // drop the .js suffix. Callers with a distinctive filename keep it as-is.
+  let label = caller.file
+  if (label === 'index.js' && caller.abs) {
+    const parent = path.basename(path.dirname(caller.abs))
+    if (parent) label = parent
+  } else {
+    label = label.replace(/\.js$/, '')
+  }
+  return `[${label}] `
+}
+
 // -- console methods now also write to the file ---------------------------
 
-// TODO: how about all the console auto finds the file location from where they are called and print prefix [file_loc/ file_name] message so that it will be easier to see, also how to tackle that if the log does want to show its own prefix then how to handle it or will be given by the log, make sure everything in O(1)
+/**
+ * Attaches the caller tag to the first argument (unless the call is
+ * self-tagged or ends with a `1` marker) and strips the marker.
+ * @param {any[]} rawArgs
+ * @returns {{ args: any[], line: string }} console args + flat log line
+ */
+function _prepareCall(rawArgs) {
+  const hasMarker = rawArgs.length > 1 && rawArgs[rawArgs.length - 1] === 1
+  const clean = hasMarker ? rawArgs.slice(0, -1) : rawArgs
+
+  const first = clean[0]
+  const selfTagged = typeof first === 'string' && first.startsWith('[')
+  const prefix = hasMarker || selfTagged ? '' : _callerTag()
+
+  const args = prefix && clean.length > 0 ? [prefix + clean[0], ...clean.slice(1)] : clean
+  const line = prefix + formatArgs(clean)
+
+  return { args, line }
+}
+
 console.warn = function (...args) {
-  _warn(...mapArgs(args, (s) => text.yellow(redact(s))))
-  write('warn', formatArgs(args))
+  const { args: clean, line } = _prepareCall(args)
+  _warn(...mapArgs(clean, (s) => text.yellow(redact(s))))
+  write('warn', line)
 }
 
 console.error = function (...args) {
-  _error(...mapArgs(args, (s) => text.red(redact(s))))
-  write('error', formatArgs(args))
+  const { args: clean, line } = _prepareCall(args)
+  _error(...mapArgs(clean, (s) => text.red(redact(s))))
+  write('error', line)
 }
 
 console.debug = function (...args) {
-  _debug(...mapArgs(args, (s) => text.dim(redact(s))))
-  write('debug', formatArgs(args))
+  const { args: clean, line } = _prepareCall(args)
+  _debug(...mapArgs(clean, (s) => text.dim(redact(s))))
+  write('debug', line)
 }
 
 console.debug.mix = function (...args) {
+  const { args: clean, line } = _prepareCall(args)
   _debug(
-    ...args.map((a) => {
+    ...clean.map((a) => {
       if (typeof a !== 'string') return a
       const redacted = redact(a)
       return codes.dim + redacted.replace(/\x1b\[0m/g, '\x1b[0m' + codes.dim) + codes.reset
     }),
   )
-  write('debug', formatArgs(args))
+  write('debug', line)
 }
 
 console.log = function (...args) {
-  _log(...mapArgs(args, (s) => redact(s)))
-  write('log', formatArgs(args))
+  const { args: clean, line } = _prepareCall(args)
+  _log(...mapArgs(clean, (s) => redact(s)))
+  write('log', line)
 }
 
 console.success = function (...args) {
-  _log(...mapArgs(args, (s) => text.green(redact(s))))
-  write('info', formatArgs(args))
+  const { args: clean, line } = _prepareCall(args)
+  _log(...mapArgs(clean, (s) => text.green(redact(s))))
+  write('info', line)
 }
 
 console.info = function (...args) {
-  _log(...mapArgs(args, (s) => text.blue(redact(s))))
-  write('info', formatArgs(args))
+  const { args: clean, line } = _prepareCall(args)
+  _log(...mapArgs(clean, (s) => text.blue(redact(s))))
+  write('info', line)
 }
 
 module.exports = {

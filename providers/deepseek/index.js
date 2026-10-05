@@ -2,7 +2,13 @@ const { DeepSeekAPI } = require('./api')
 const { buildDeepSeekRouter } = require('./router')
 const { models, reasoning, promptLimit, setupSteps } = require('./config')
 
-// TODO: Add reinject $tools on 250K*n and $reminder on 50K*n on usage reaches
+// Token-threshold reinjection (see engine/pipeline.js setup()): re-inject the
+// MHI tools grammar every 250K accumulated tokens, the reminder every 50K.
+const REINJECT_AT = [
+  { tokens: 250_000, fragment: 'instructions' },
+  { tokens: 50_000, fragment: 'reminder' },
+]
+
 module.exports = {
   name: 'deepseek',
   displayName: 'DeepSeek',
@@ -10,6 +16,7 @@ module.exports = {
   reasoning,
   promptLimit,
   setupSteps,
+  reinjectAt: REINJECT_AT,
   defaultVision: true,
   waitPolicy: {
     label: 'suspended',

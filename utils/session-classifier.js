@@ -12,6 +12,10 @@
 const surfaceRegistry = require('../surfaces/registry')
 
 const DEFAULT_SURFACE = 'api'
+// A plain OpenAI client (no IDE system prompt) that carries tools[] is routed
+// to the identity-mapped 'openai' surface. It is a real turn (persistent
+// session, tool loop enabled) so the MHI executors run without an IDE.
+const OPENAI_SURFACE = 'openai'
 
 /**
  * Classify a request: which tool surface does it belong to, and is it a real
@@ -19,11 +23,21 @@ const DEFAULT_SURFACE = 'api'
  *
  * @param {Array} messages - req.body.messages
  * @param {string} [fallback=DEFAULT_SURFACE] - surface for unmatched requests
+ * @param {object} [options]
+ * @param {Array}  [options.tools] - req.body.tools[] (any OpenAI tool shape)
+ * @param {boolean} [options.forceOpenai] - X-ZeroKey-Tools: 1 header override
  * @returns {{ isReal: boolean, surface: string, matched: string|null }}
  */
-function classifySession(messages, fallback = DEFAULT_SURFACE) {
+function classifySession(messages, fallback = DEFAULT_SURFACE, options = {}) {
   const surface = surfaceRegistry.resolveSurface(messages)
   if (surface) return { isReal: true, surface, matched: surface }
+
+  // No IDE fingerprint. A tools[] array (or the explicit header) means the
+  // caller wants tools; route to the identity-mapped 'openai' surface.
+  const hasTools = Array.isArray(options.tools) && options.tools.length > 0
+  if (hasTools || options.forceOpenai === true) {
+    return { isReal: true, surface: OPENAI_SURFACE, matched: OPENAI_SURFACE }
+  }
 
   // No surface recognized this system prompt: treat as an ephemeral/utility
   // call (title-gen, tool-optimizer, …) and use the fallback surface ('api').

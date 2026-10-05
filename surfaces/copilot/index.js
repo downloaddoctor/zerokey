@@ -53,7 +53,7 @@ module.exports = (t) => {
           console.warn('[WRITE] DELETE:', internal.path)
           fs.unlinkSync(internal.path)
         }
-      } catch { }
+      } catch {}
     },
   })
 

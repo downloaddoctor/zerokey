@@ -48,6 +48,11 @@ OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, **ChatGPT**, and 
 > `todos_add`, `todos_set`, `ask`) and any MCP tools registered via `tools[]` in the request
 > work out of the box if enabled — see [MCP & Custom Skills](#mcp--custom-skills). If model stops using tools correctly, say: **"Use MHI only."**
 
+> **Plain OpenAI clients (no IDE):** send any `tools[]` array (or the header
+> `X-ZeroKey-Tools: 1`) and the request is routed to the built-in `openai` surface —
+> identity-mapped MHI tools with the same grammar, no IDE system prompt required.
+> Requests with neither a matching IDE prompt nor `tools[]` stay tool-less (`api` surface).
+
 ## Contents
 
 - [Features](#features)

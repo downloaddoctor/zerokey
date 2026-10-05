@@ -117,7 +117,7 @@ module.exports = (t) => {
           console.warn('[WRITE] DELETE:', internal.path)
           fs.unlinkSync(internal.path)
         }
-      } catch { }
+      } catch {}
     },
   })
 
@@ -260,7 +260,7 @@ module.exports = (t) => {
             .join('') || this.shortenToolOutput(name, result)
         )
       }
-    } catch { }
+    } catch {}
     return this.shortenToolOutput(name, result)
   }
 }

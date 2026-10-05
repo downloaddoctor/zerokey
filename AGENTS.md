@@ -116,10 +116,12 @@ API
  OpenCode-flavoured headers recognised: x-zerokey-session, -root-session, -message-id, -part-id, -compaction-generation (aliases x-opencode-*)
 
 CONFIG
- Surfaces auto-discovered from surfaces/*.js (skip registry.js, base.js, specs.js); keyed by declared ideName
+ Surfaces auto-discovered from surfaces/<name>/index.js (skip registry.js, base.js, specs.js); keyed by declared ideName
  Providers auto-discovered from providers/<name>/index.js; skip providers/base/
  pnpm check runs scripts/check-modules.js
  openapi.json is hand-maintained / regenerated via scripts/gen-openapi.js (check before editing)
+ classifySession(messages, fallback?, { tools?, forceOpenai? }) → { isReal, surface, matched }:
+  real IDE fingerprint wins; else tools[] or X-ZeroKey-Tools: 1 → openai (tool-carrying); else fallback (api, no tools)
 
 BUILD
  pnpm install → postinstall sets core.hooksPath=.githooks
@@ -147,7 +149,9 @@ INVARIANTS
 
 EXTENSIONS
  New provider → providers/<name>/index.js exporting {name, displayName, models, promptLimit, setupSteps, validateFetch, validateCredentials, buildRouter}; registry auto-discovers
- New IDE surface → surfaces/<name>.js exporting (t) => {...}; set ideName + realSessionPrefix; registry auto-discovers
+ New IDE surface → surfaces/<name>/index.js exporting (t) => {...}; set ideName + realSessionPrefix; registry auto-discovers
+  Plain-OpenAI clients → surfaces/openai/index.js identity mapping; classifySession routes tools[]-bearing requests here when no IDE fingerprint matches
  New MHI executor → core/mhi/<name>.js + wire into core/mhi/index.js + test/core/mhi/<name>.test.js
  New skill → engine/triggers.js entry OR a new engine/extra/<name>.md (auto-registers as $<basename>)
  New MCP server → expose tools named mcp_<server>_<tool> in req.body.tools[]; auto-registers as $<server>
+ Token-threshold reinjection → provider index.js exports reinjectAt: [{tokens, fragment}]; pipeline re-injects $<fragment> on each crossing; pipeline sets session.lastTokenUsage after every finished turn

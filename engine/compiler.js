@@ -33,6 +33,7 @@ class ToolCompiler {
 
     this._promptLimit = (registry.get(provider)?.promptLimit ?? 64_000) - 64
     this.reinjectEvery = registry.get(provider)?.reinjectEvery ?? 0
+    this.reinjectAt = registry.get(provider)?.reinjectAt ?? []
 
     this.tools = tools
 

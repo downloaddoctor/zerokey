@@ -95,7 +95,11 @@ class StreamPipeline {
     this.session = isReal ? session : ephemeralSession(session)
 
     this.isNewSession = this.session.parentId == null
-    this.toolCalling = this.session.toolCalling ?? false
+    // The 'openai' surface exists only to carry tools for plain OpenAI clients
+    // (see utils/session-classifier.js). A stale session row with toolCalling
+    // false must not silently disable the tool loop the caller asked for by
+    // sending tools[].
+    this.toolCalling = ideName === 'openai' ? true : (this.session.toolCalling ?? false)
     this.haveInstructionsAPI = false
     this.ephemeralMode = !isReal
     this.rawMode = this.ephemeralMode ? true : !this.toolCalling
@@ -196,6 +200,7 @@ class StreamPipeline {
     if (finishReason === 'stop' || finishReason === 'length') {
       const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
       const totals = accumulate(this.session, turnUsage)
+      this.session.lastTokenUsage = turnUsage.total_tokens || 0
       this.writer.finish(finishReason, { ...turnUsage, session: totals })
       this._finished = true
       this.session.lastUsed = new Date().toISOString()
@@ -208,6 +213,7 @@ class StreamPipeline {
     this.flush()
     const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
     const totals = accumulate(this.session, turnUsage)
+    this.session.lastTokenUsage = turnUsage.total_tokens || 0
     this.writer.finish('stop', { ...turnUsage, session: totals })
     this._finished = true
     this.session.lastUsed = new Date().toISOString()
@@ -235,6 +241,7 @@ class StreamPipeline {
     // Real provider numbers win; estimate is the fallback. See engine/usage.js.
     const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
     const totals = accumulate(this.session, turnUsage)
+    this.session.lastTokenUsage = turnUsage.total_tokens || 0
     this.writer.finish('stop', { ...turnUsage, session: totals })
     this.session.lastUsed = new Date().toISOString()
     if (this.onFinalChunk) this.onFinalChunk()
@@ -251,6 +258,7 @@ class StreamPipeline {
     this.flush()
     const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
     const totals = accumulate(this.session, turnUsage)
+    this.session.lastTokenUsage = turnUsage.total_tokens || 0
     this.writer.finish('stop', { ...turnUsage, session: totals })
     this.session.lastUsed = new Date().toISOString()
     if (this.onFinalChunk) this.onFinalChunk()
@@ -298,6 +306,31 @@ class StreamPipeline {
           content: content,
         })
         console.debug(`[REINJECT] turn ${this.session.turnCount} — instructions re-injected`)
+      }
+    }
+
+    // Token-threshold reinjection. Providers declare `reinjectAt` as a list of
+    // { tokens, fragment } — every time accumulated completion tokens cross
+    // tokens*n for some positive integer n, the fragment is re-injected. This
+    // complements reinjectEvery (turn-based) for long single-turn generations.
+    const reinjectAt = this.compiler.reinjectAt
+    if (Array.isArray(reinjectAt) && reinjectAt.length) {
+      const used = this.session.lastTokenUsage || 0
+      if (used > 0) {
+        for (const rule of reinjectAt) {
+          if (!rule || !Number.isFinite(rule.tokens) || rule.tokens <= 0) continue
+          const step = Math.floor(used / rule.tokens)
+          const seenKey = `_reinjectStep_${rule.fragment}`
+          const prev = this.session[seenKey] || 0
+          if (step > prev && step > 0) {
+            this.session[seenKey] = step
+            const { content } = require('./instructions').getExtra(rule.fragment)
+            messages.push({ role: 'live_instructions', content })
+            console.debug(
+              `[REINJECT] tokens ${used} crossed ${rule.tokens}*${step} — $${rule.fragment} injected`,
+            )
+          }
+        }
       }
     }
 

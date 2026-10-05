@@ -28,6 +28,21 @@ The machine-readable contract is **[`openapi.json`](./openapi.json)** (OpenAPI 3
 | GET    | `/v1/models/:model`    | Get a specific model by ID                        |
 | POST   | `/v1/chat/completions` | Chat completions (SSE stream)                     |
 
+### Plain OpenAI clients (no IDE)
+
+When the request has no recognizable IDE system prompt but **does** carry a
+`tools[]` array (or the header `X-ZeroKey-Tools: 1`), ZeroKey routes to the
+built-in `openai` surface:
+
+- Generic tool names are passed through unchanged (identity mapping).
+- The internal MHI grammar is inlined into the system prompt.
+- The tool loop runs the same executors used by IDE surfaces (`read`, `write`,
+  `replace`, `ls`, `glob`, `grep`, `cmd`, `cmd_bg`, `cmd_poll`, `cmd_kill`,
+  `errors`, `fetch`, `view_image`, `todos_add`, `todos_set`, `ask`).
+
+Requests without a matching IDE prompt and without `tools[]` stay tool-less
+(the `api` surface) — useful for ephemeral calls like title generation.
+
 For request/response shapes, error categories, and SSE chunk examples, see `openapi.json` or `/docs`.
 
 ---
