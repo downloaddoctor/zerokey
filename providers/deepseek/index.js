@@ -1,11 +1,8 @@
 const { DeepSeekAPI } = require('./api')
-const { getSharedTransport } = require('./browser-transport')
 const { buildDeepSeekRouter } = require('./router')
 const { models, reasoning, promptLimit, setupSteps } = require('./config')
 
-// Same env switch as router.js — keeps validation and runtime on the same path.
-const TRANSPORT = (process.env.DEEPSEEK_TRANSPORT || 'browser').toLowerCase()
-
+// TODO: Add reinject $tools on 250K*n and $reminder on 50K*n on usage reaches
 module.exports = {
   name: 'deepseek',
   displayName: 'DeepSeek',
@@ -24,14 +21,11 @@ module.exports = {
   },
   createAPI: (options) => new DeepSeekAPI(options),
   validateCredentials: async (parsedFetch, username) => {
-    // Browser transport: auth = profile dir keyed by local alphanumeric key.
-    // localStorage.userToken presence is the only check — no fetch capture,
-    // no getCurrentUser() call. parsedFetch is accepted (and stored) only for
-    // DEEPSEEK_TRANSPORT=api.
-    const api = TRANSPORT === 'api' ? new DeepSeekAPI() : getSharedTransport({ username })
+    const api = new DeepSeekAPI()
 
     try {
       await api.initializeFromJSON(parsedFetch)
+      await api.getCurrentUser()
       return { success: true, user: username }
     } catch (error) {
       return { success: false, error: error.message }

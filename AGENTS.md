@@ -15,7 +15,7 @@ DIRECTORY
   mhi/ — internal tool loop executors (files, commands, parser, path-policy, view-image)
  engine/ — prompt pipeline, compiler, tool bridge, triggers, MCP, extra/*.md fragments
  providers/ — one folder per provider; base/BaseAPI.js shared HTTP/cookie layer
- surfaces/ — one flat file per IDE tool surface
+ surfaces/ — one folder per IDE tool surface (surfaces/<name>/index.js + template.json)
  routes/ — health, models, info, docs, diagnostics
  utils/ — SSE writer/reader, rate limiter, errors, headers, log, startup, cookie-jar
  test/ — node:test suites; test/invariants.test.js and test/modules.test.js enforce repo rules
@@ -55,9 +55,12 @@ MODULES
  providers/<name>/router.js — express router; runToolLoop wraps one upstream turn per round
  providers/<name>/stream-handler.js — provider SSE → OpenAI chunk deltas
  providers/base/BaseAPI.js — https agent, cookie jar, _fetch with timeout
- surfaces/registry.js — auto-discovers surfaces/*.js; resolveSurface(messages) by realSessionPrefix
+ surfaces/registry.js — auto-discovers surfaces/<name>/index.js; resolveSurface(messages) by realSessionPrefix
  surfaces/base.js — IDEToolSurface: tool()/format() registrar + resolve()
- surfaces/api.js — DEFAULT_SURFACE for unmatched (ephemeral) requests; no tools
+ surfaces/specs.js — generic tool specs (grammar, keys, repeatable) merged by IDEToolSurface#tool()
+ surfaces/api/index.js — DEFAULT_SURFACE for unmatched (ephemeral) requests; no tools
+ surfaces/<name>/index.js — IDE surface config fn (t) => {...}; declares ideName + realSessionPrefix
+ surfaces/<name>/template.json — captured system-prompt fingerprint for that IDE (docs/reference)
  routes/health.js — includes pid, provider, session, persistence, promptLimit
  utils/sse-writer.js — serialized SSE frames with backpressure; finish()/fail() idempotent
  utils/rate-limiter.js — sliding window 15/60s per label; setProviderCooldown on 429

@@ -13,7 +13,7 @@ class DeepSeekAPI extends BaseAPI {
   async initializeFromJSON({ headers }) {
     await this._powSolver.initialize()
     await super.initializeFromJSON({ headers })
-    if (this._log) console.debug('[DeepSeek] Initialized from capture JSON')
+    if (this._log) console.debug('[DEEPSEEK] Initialized from capture JSON')
   }
 
   async createChatSession() {
@@ -67,44 +67,6 @@ class DeepSeekAPI extends BaseAPI {
     } catch (error) {
       if (error.code === 'account_suspended' || error.code === 'session_create_failed') throw error
       throw new Error('Failed to create chat session: ' + error.message)
-    }
-  }
-
-  async warmupSession(chatSessionId) {
-    // Fire a unique math prompt to prime the session naturally before the real
-    // system/build prompt arrives on the second turn. Each session gets a
-    // different expression so the opening message is never identical.
-    const ops = [
-      () => {
-        const a = Math.floor(Math.random() * 900) + 100
-        const b = Math.floor(Math.random() * 900) + 100
-        return `What is ${a} + ${b}?`
-      },
-      () => {
-        const a = Math.floor(Math.random() * 900) + 100
-        const b = Math.floor(Math.random() * 90) + 10
-        return `What is ${a} - ${b}?`
-      },
-      () => {
-        const a = Math.floor(Math.random() * 90) + 10
-        const b = Math.floor(Math.random() * 90) + 10
-        return `What is ${a} × ${b}?`
-      },
-      () => {
-        const a = Math.floor(Math.random() * 900) + 100
-        const b = [2, 3, 4, 5, 6, 7, 8, 9][Math.floor(Math.random() * 8)]
-        return `What is ${a} ÷ ${b}? (round to 2 decimal places)`
-      },
-    ]
-    const prompt = ops[Math.floor(Math.random() * ops.length)]()
-    try {
-      const stream = await this.chatCompletion(chatSessionId, prompt, null, false, false, null, [])
-      await new Promise((resolve) => {
-        const { readSSE } = require('../../utils/sse-reader')
-        readSSE(stream, { onData: () => {}, onDone: resolve, onError: resolve })
-      })
-    } catch {
-      // non-critical — ignore warmup failures
     }
   }
 
@@ -227,7 +189,7 @@ class DeepSeekAPI extends BaseAPI {
 
     const fileId = body.data.biz_data.id
     if (this._log)
-      console.debug(`[DeepSeek] File uploaded: ${filename} (${size} bytes) → ${fileId}`)
+      console.debug(`[DEEPSEEK] File uploaded: ${filename} (${size} bytes) → ${fileId}`)
 
     return this._pollFile(fileId, filename)
   }
@@ -249,7 +211,7 @@ class DeepSeekAPI extends BaseAPI {
 
       if (file.status === 'SUCCESS') {
         if (this._log)
-          console.success(`[DeepSeek] File ready: ${fileId} (tokens: ${file.token_usage})`)
+          console.success(`[DEEPSEEK] File ready: ${fileId} (tokens: ${file.token_usage})`)
         return fileId
       }
 
@@ -281,7 +243,7 @@ class DeepSeekAPI extends BaseAPI {
   }
 
   async deleteAllSessions() {
-    if (this._log) console.debug('[DeepSeek] Deleting all sessions...')
+    if (this._log) console.debug('[DEEPSEEK] Deleting all sessions...')
     const res = await this._fetch(
       `${DeepSeekAPI.BASE_URL}/chat_session/delete_all`,
       { method: 'POST', headers: this._buildHeaders(), body: null },
@@ -293,7 +255,7 @@ class DeepSeekAPI extends BaseAPI {
       throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
     }
 
-    if (this._log) console.debug('[DeepSeek] All sessions deleted')
+    if (this._log) console.debug('[DEEPSEEK] All sessions deleted')
   }
 
   async deleteSession(chatSessionId) {

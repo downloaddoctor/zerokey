@@ -3,8 +3,8 @@ const path = require('path')
 
 const { IDEToolSurface } = require('./base')
 
-// Files in this directory that are NOT surfaces.
-const NON_SURFACE = new Set(['registry.js', 'base.js', 'specs.js'])
+// One folder per surface: surfaces/<name>/index.js (+ template.json capture).
+// base.js, specs.js and registry.js are shared files, not surfaces.
 
 /**
  * Auto-discovers and registers IDE tool surfaces.
@@ -28,18 +28,13 @@ class SurfaceRegistry {
 
   _autoDiscover() {
     const dir = __dirname
-    if (!fs.existsSync(dir)) {
-      console.warn(`[Surfaces] Directory not found: ${dir}`)
-      return
-    }
-
     const entries = fs.readdirSync(dir, { withFileTypes: true })
 
     for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith('.js')) continue
-      if (NON_SURFACE.has(entry.name)) continue
+      if (!entry.isDirectory()) continue
 
-      const filePath = path.join(dir, entry.name)
+      const filePath = path.join(dir, entry.name, 'index.js')
+      if (!fs.existsSync(filePath)) continue
       try {
         const configure = require(filePath)
         const fn = configure.default || configure
@@ -48,7 +43,7 @@ class SurfaceRegistry {
         // Key by the surface's declared ideName; fall back to the filename.
         const probe = new IDEToolSurface()
         fn(probe)
-        const key = probe.ideName || path.basename(entry.name, '.js')
+        const key = probe.ideName || entry.name
 
         this.surfaces.set(key, fn)
       } catch (error) {

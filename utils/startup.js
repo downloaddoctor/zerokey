@@ -143,7 +143,7 @@ function acquire(port) {
       if (lock !== null && lock.pid !== process.pid && pidAlive(lock.pid)) return 'busy'
 
       console.warn(
-        `Removed orphaned start lock for port ${port} (PID ${
+        `[PORT] Removed orphaned start lock for port ${port} (PID ${
           lock === null ? 'unreadable' : lock.pid
         }).`,
       )

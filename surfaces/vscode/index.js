@@ -1,5 +1,5 @@
 const fs = require('fs')
-const { getAllTags, filterAttachments } = require('./base')
+const { getAllTags, filterAttachments } = require('../base')
 
 function editToolOutputFormatter(s) {
   s = s.replaceAll(
@@ -117,7 +117,7 @@ module.exports = (t) => {
           console.warn('[WRITE] DELETE:', internal.path)
           fs.unlinkSync(internal.path)
         }
-      } catch {}
+      } catch { }
     },
   })
 
@@ -130,14 +130,14 @@ module.exports = (t) => {
   })
 
   t.tool('ask', 'vscode_askQuestions', {
-    params: { question: 'question' },
+    params: { ques: 'question' },
     array: { key: 'options', fields: { option: 'label', default: 'recommended' } },
-    default: { question: '', options: [] },
+    default: { ques: '', options: [] },
     transform: (values) => {
       values.questions = [
-        { header: 'question', question: values.question || '', options: values.options },
+        { header: 'question', question: values.ques || '', options: values.options },
       ]
-      delete values.question
+      delete values.ques
       delete values.options
     },
   })
@@ -260,7 +260,7 @@ module.exports = (t) => {
             .join('') || this.shortenToolOutput(name, result)
         )
       }
-    } catch {}
+    } catch { }
     return this.shortenToolOutput(name, result)
   }
 }

@@ -277,13 +277,12 @@ function write(level, message) {
 
   const line =
     new Date().toISOString() + ' [' + level.toUpperCase().padEnd(5) + '] ' + redact(message)
-  processSaver.log(line)
-
-  if (level === 'error') process.stderr.write(line + '\n')
+  processSaver.log(line.replaceAll('\n', '\\n'))
 }
 
 // -- console methods now also write to the file ---------------------------
 
+// TODO: how about all the console auto finds the file location from where they are called and print prefix [file_loc/ file_name] message so that it will be easier to see, also how to tackle that if the log does want to show its own prefix then how to handle it or will be given by the log, make sure everything in O(1)
 console.warn = function (...args) {
   _warn(...mapArgs(args, (s) => text.yellow(redact(s))))
   write('warn', formatArgs(args))

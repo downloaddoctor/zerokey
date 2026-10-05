@@ -13,7 +13,7 @@ const models = {
       vision: true,
       created: 1_784_736_000,
       context_length: 1_000_000,
-      max_output_length: 384_000,
+      max_output_length: 1_000_000,
       defaultReasoning: 'Search',
     },
   },
@@ -34,9 +34,6 @@ const promptLimit = 128_000
 const setupSteps = {
   url: 'https://chat.deepseek.com',
   requestFilter: '/api/v0/chat/completion',
-  instructions:
-    'Open DevTools → Network tab. Visit chat.deepseek.com and start a conversation. ' +
-    'Find a request to /api/v0/chat/completion. Right-click → Copy → Copy as fetch (Node.js).',
 }
 
 module.exports = { models, reasoning, promptLimit, setupSteps }

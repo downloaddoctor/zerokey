@@ -104,7 +104,7 @@ async function start({ db: store, preSelected, port }) {
   app.use('/v1/chat/completions', sequentialQueue(), prepareChatRequest, router)
 
   app.use((err, req, res, _next) => {
-    console.error(`[Server] Unhandled error: ${err.message || err}`)
+    console.error(`[SERVER] Unhandled error: ${err.message || err}`)
     const openaiErr = toOpenAIError(err, preSelected.provider)
     const status = openaiErr.error?.status || err.statusCode || err.status || 500
     try {

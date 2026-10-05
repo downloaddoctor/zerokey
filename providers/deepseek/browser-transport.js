@@ -2,9 +2,9 @@
 /**
  * DeepSeek browser transport — drives chat.deepseek.com through its own web UI.
  *
- * Same public surface as DeepSeekAPI (createChatSession, warmupSession,
- * chatCompletion, getCurrentUser, deleteSession, deleteAllSessions, uploadFile),
- * so providers/deepseek/router.js and stream-handler.js are unchanged.
+ * Same public surface as DeepSeekAPI (createChatSession, chatCompletion,
+ * getCurrentUser, deleteSession, deleteAllSessions, uploadFile), so
+ * providers/deepseek/router.js and stream-handler.js are unchanged.
  *
  * Prompt delivery: CDP Input.insertText — atomic, handles multi-KB prompts
  * without dropping characters (page.keyboard.type() is unusable for large text).
@@ -46,8 +46,9 @@ const { PassThrough } = require('stream')
 const { chromium } = require('playwright')
 const { humanDelay } = require('../../utils/human-delay')
 
-const TEMP_DIR = path.join(__dirname, '..', '..', 'temp')
-const PROFILES_ROOT = path.join(TEMP_DIR, 'profiles', 'deepseek')
+const { CONFIG } = require('../../config/constants')
+
+const PROFILES_ROOT = path.join(CONFIG.DATA_DIR, 'profiles', 'deepseek')
 const START_URL = 'https://chat.deepseek.com/'
 const COMPLETION_PATH = '/api/v0/chat/completion'
 
@@ -348,6 +349,7 @@ class DeepSeekBrowserTransport {
 
   async warmupSession(_chatSessionId) {}
 
+  // TODO: Every time it should be different, means it should like each time diferent then addtion or mutliple or other
   _warmupPrompt() {
     const a = Math.floor(Math.random() * 900) + 100
     const b = Math.floor(Math.random() * 900) + 100
@@ -464,40 +466,6 @@ class DeepSeekBrowserTransport {
     } catch {
       /* non-fatal */
     }
-  }
-
-  // ── Users / sessions ─────────────────────────────────────────────────────
-
-  async getCurrentUser() {
-    await this._ensureContext()
-    return this._page.evaluate(async () => {
-      const r = await fetch('https://chat.deepseek.com/api/v0/users/current', {
-        credentials: 'include',
-      })
-      return r.json()
-    })
-  }
-
-  async deleteSession(chatSessionId) {
-    await this._ensureContext()
-    await this._page.evaluate(async (sid) => {
-      await fetch('https://chat.deepseek.com/api/v0/chat_session/delete', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ chat_session_id: sid }),
-      })
-    }, chatSessionId)
-  }
-
-  async deleteAllSessions() {
-    await this._ensureContext()
-    await this._page.evaluate(async () => {
-      await fetch('https://chat.deepseek.com/api/v0/chat_session/delete_all', {
-        method: 'POST',
-        credentials: 'include',
-      })
-    })
   }
 
   // Upload via the real UI. Caller passes { filename, data, size, mimeType }

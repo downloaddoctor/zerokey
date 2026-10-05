@@ -1,4 +1,4 @@
-const { getAllTags } = require('./base')
+const { getAllTags } = require('../base')
 
 // Configure an IDEToolSurface instance for OpenCode.
 module.exports = (t) => {
@@ -13,18 +13,18 @@ module.exports = (t) => {
     params: { path: 'filePath', old: 'oldString', new: 'newString' },
   })
   t.tool('ask', 'question', {
-    params: { question: 'question' },
+    params: { ques: 'question' },
     array: { key: 'options', fields: { option: 'label' } },
-    default: { question: '', options: [] },
+    default: { ques: '', options: [] },
     transform: (values) => {
       values.questions = [
         {
           header: 'question',
-          question: values.question || '',
+          question: values.ques || '',
           options: values.options.map((op) => ((op.description = '             '), op)),
         },
       ]
-      delete values.question
+      delete values.ques
       delete values.options
     },
   })

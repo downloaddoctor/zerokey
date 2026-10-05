@@ -11,9 +11,11 @@
  * instances share temp/db/zerokey.db (users and sessions), each on its own
  * port. ZEROKEY_EXACT_PORT=1 refuses a busy start port instead of moving.
  */
+const db = require('./core/state/db')
 const startup = require('./utils/startup')
 const { CONFIG } = require('./config/constants')
-const db = require('./core/state/db')
+
+require('./utils/log')
 
 async function run() {
   const port = await startup.claimFirstFree({
@@ -22,7 +24,7 @@ async function run() {
     exact: CONFIG.EXACT_PORT,
   })
   if (port !== CONFIG.PORT) {
-    console.info(`Port ${CONFIG.PORT} busy, using ${port}.`)
+    console.warn(`[PORT] ${CONFIG.PORT} busy, using ${port}.`)
   }
 
   await startup.postClaim(port)
@@ -30,7 +32,7 @@ async function run() {
   const store = db.open()
 
   const { SessionSelector } = require('./core/session-selector')
-  const selector = new SessionSelector({ db: store })
+  const selector = new SessionSelector(store)
   const provider = process.env.ZEROKEY_PROVIDER || process.argv[2]
   const user = process.env.ZEROKEY_USER || process.argv[3]
   const session = process.env.ZEROKEY_SESSION || process.argv[4]
@@ -68,9 +70,13 @@ async function run() {
     process.exit(2)
   }
 
-  console.info(
-    `Session: ${preSelected.user} / ${preSelected.provider} / ${preSelected.sessionName} (${preSelected.sessionTags})`,
-  )
+  const _tags = [
+    preSelected.user,
+    preSelected.provider,
+    preSelected.sessionName,
+    preSelected.session.model,
+  ].join(' · ')
+  console.info(`\n[SERVER] ${_tags}\n         ${preSelected.sessionTags}`)
 
   const app = require('./app')
   await app.start({ db: store, preSelected, port })

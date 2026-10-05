@@ -2,30 +2,24 @@
 
 const fs = require('fs')
 const path = require('path')
-const SYNTAX = require('../engine/syntax')
+const prompts = require('prompts')
 const { spawn } = require('child_process')
 
-const prompts = require('prompts')
-
+const SYNTAX = require('../engine/syntax')
 const registry = require('../providers/registry')
-const { text } = require('../utils/log')
 const usersState = require('./state/users')
 const sessionsState = require('./state/sessions')
+
+const { text } = require('../utils/log')
 
 const BACKSLASH = String.fromCharCode(0x5c)
 
 class SessionSelector {
   /**
-   * @param {object} options
-   * @param {object} options.db - open SQLite handle (required for real use)
+   * @param {object} db - open SQLite handle (required for real use)
    */
-  constructor(options = {}) {
-    this._dataDir = path.join(__dirname, '..', 'temp')
-    this._db = options.db || null
-    this.TIMEOUT_MS = 0
-    if (!fs.existsSync(this._dataDir)) {
-      fs.mkdirSync(this._dataDir, { recursive: true })
-    }
+  constructor(db) {
+    this._db = db
   }
 
   async select(showRecent, provider, username, sessionName) {
@@ -95,7 +89,6 @@ class SessionSelector {
   }
 
   async _stepContinueRecentSession() {
-    if (!this._db) return null
     const all = this._listAllUsers()
     const resolved = []
 
@@ -230,7 +223,6 @@ class SessionSelector {
   }
 
   _listAllUsers() {
-    if (!this._db) return []
     return usersState.list(this._db)
   }
 
@@ -351,7 +343,6 @@ class SessionSelector {
         continue
       }
 
-      if (!this._db) return { username, parsedFetch }
       return usersState.create(this._db, this.provider, username, { parsedFetch })
     }
   }
@@ -408,7 +399,7 @@ class SessionSelector {
   }
 
   _listSessionsForCurrentUser() {
-    if (!this._db || !this.user || !this.user.id) return []
+    if (!this.user || !this.user.id) return []
     return sessionsState.listForUser(this._db, this.user.id)
   }
 
@@ -461,7 +452,7 @@ class SessionSelector {
     const modelMeta = providerModels.models?.[answers.model]
     const vision = modelMeta?.vision ?? Boolean(providerDef.defaultVision)
 
-    if (!this._db || !this.user || !this.user.id) {
+    if (!this.user || !this.user.id) {
       return {
         name: answers.name || defaultName,
         toolCalling: answers.toolCalling ?? true,

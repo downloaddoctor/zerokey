@@ -53,7 +53,7 @@ module.exports = (t) => {
           console.warn('[WRITE] DELETE:', internal.path)
           fs.unlinkSync(internal.path)
         }
-      } catch {}
+      } catch { }
     },
   })
 
@@ -63,7 +63,7 @@ module.exports = (t) => {
   })
 
   t.tool('ask', 'ask_user', {
-    params: { question: 'question' },
+    params: { ques: 'question' },
     array: {
       key: 'choices',
       fields: { option: 'label' },

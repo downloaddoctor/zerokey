@@ -46,9 +46,10 @@ const specs = {
 
   ask: {
     desc: 'Ask the user a clarifying question. The ONLY way to request clarification — never plain text.',
-    grammar: 'question={str}',
-    eg: [{ question: 'Which port should the server listen on?' }],
-    repeatable: { option: true, default: true },
+    grammar: 'ques={str:20-200}(¦option={str})+',
+    eg: [{ ques: 'Which port should the server listen on?', option: '7250' }],
+    keys: { option: true },
+    repeatable: { option: true },
   },
 
   ls: {
@@ -164,4 +165,4 @@ const specs = {
   },
 }
 
-module.exports = { specs, TODO_ARRAY_FIELDS }
+module.exports = { specs }

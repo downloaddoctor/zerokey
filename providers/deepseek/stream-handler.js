@@ -71,7 +71,7 @@ function streamHandler(stream, session, parser, retry) {
 
   const doRetry = (reason) => {
     cancelled = true
-    console.error(`[DeepSeek] Stream error: ${reason}`)
+    console.error(`[DEEPSEEK] Stream error: ${reason}`)
     streamLog.log({
       ts: new Date().toISOString(),
       reason,
@@ -88,7 +88,7 @@ function streamHandler(stream, session, parser, retry) {
     parser.emitText(`\n\n⚠ Stream error: ${reason}\n`)
 
     if (RETRY_REASONS[reason] && retry) {
-      console.debug('[DeepSeek] Retrying...')
+      console.debug('[DEEPSEEK] Retrying...')
       parser.emitText(`Retrying...\n`)
       try {
         stream.destroy()
@@ -98,7 +98,7 @@ function streamHandler(stream, session, parser, retry) {
           streamHandler(newStream, session, parser, retry)
         })
         .catch((err) => {
-          console.error(`[DeepSeek] Retry failed: ${err.message}`)
+          console.error(`[DEEPSEEK] Retry failed: ${err.message}`)
           streamLog.log({
             ts: new Date().toISOString(),
             reason: `retry failed — ${err?.message || err}`,
@@ -141,7 +141,7 @@ function streamHandler(stream, session, parser, retry) {
         parser.tokenUsage.completion_tokens = usageEntry.v
         parser.tokenUsage.total_tokens =
           parser.tokenUsage.completion_tokens + parser.tokenUsage.prompt_tokens
-        console.debug(`[DeepSeek] Tokens: ${usageEntry.v} (status: ${statusEntry?.v ?? '-'})`)
+        console.debug(`[DEEPSEEK] Tokens: ${usageEntry.v} (status: ${statusEntry?.v ?? '-'})`)
       }
       return
     }

@@ -79,7 +79,7 @@ Escaping test - \`⟦todos_set¦id=2¦status=done⟧\`
 ⟦todos_set¦id=16¦status=done⟧
 
 ⟦todos_set¦id=17¦status=active⟧
-⟦ask¦question=All tools called, are they working?¦option=Yes¦option=No¦option=Something else⟧
+⟦ask¦ques=All tools called, are they working?¦option=Yes¦option=No¦option=Something else⟧
 ⟦todos_set¦id=17¦status=done⟧
 
 ⟦cmd¦run=echo "ABOVE ALL WHERE TESTING CALLS OF:

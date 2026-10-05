@@ -19,11 +19,11 @@ const REASONING_MAP = reasoning.map
 async function buildDeepSeekRouter(parsedFetch, session, userData) {
   const username = userData?.username
   if (TRANSPORT !== 'api' && !username) {
-    throw new Error('[Deepseek] userData.username (local key) is required for browser transport')
+    throw new Error('[DEEPSEEK] userData.username (local key) is required for browser transport')
   }
   const deepseekApi = TRANSPORT === 'api' ? new DeepSeekAPI() : getSharedTransport({ username })
 
-  console.debug('[Deepseek] Initializing from parsed capture JSON')
+  console.debug('[DEEPSEEK] Initializing from parsed capture JSON')
   await deepseekApi.initializeFromJSON(parsedFetch)
 
   if (!session) throw new Error('No session provided')
@@ -31,7 +31,6 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
   if (!session.id) {
     try {
       session.id = await deepseekApi.createChatSession()
-      await deepseekApi.warmupSession(session.id)
     } catch (error) {
       if (error.code === 'account_suspended' && error.muteUntil != null && userData) {
         userData.waitUntil = Math.ceil(error.muteUntil * 1000)
@@ -55,7 +54,6 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
     if (!activeSession.id) {
       try {
         activeSession.id = await deepseekApi.createChatSession()
-        await deepseekApi.warmupSession(activeSession.id)
       } catch (error) {
         if (error.code === 'account_suspended' && error.muteUntil && userData) {
           userData.waitUntil = Math.ceil(error.muteUntil * 1000)
