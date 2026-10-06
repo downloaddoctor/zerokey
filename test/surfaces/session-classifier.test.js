@@ -54,6 +54,20 @@ test('progress-message utility prompt stays ephemeral even when tools[] is prese
   assert.strictEqual(classifySession(messages, { tools }).isReal, false)
 })
 
+test('resolveUtility matches a surface-declared utility prefix', () => {
+  const reg = require('../../surfaces/registry')
+  const msgs = sys('You are an expert in crafting ultra-compact titles for chatbot conversations.')
+  const hit = reg.resolveUtility(msgs)
+  assert.ok(hit, 'expected a utility match')
+  assert.strictEqual(typeof hit.surface, 'string')
+  assert.ok(hit.matched.startsWith('You are an expert in crafting ultra-compact titles'))
+})
+
+test('resolveUtility returns null for a real IDE fingerprint', () => {
+  const reg = require('../../surfaces/registry')
+  assert.strictEqual(reg.resolveUtility(sys('You are an expert AI programming assistant')), null)
+})
+
 test('an explicit fallback is accepted but the same surface is returned', () => {
   // The old per-call fallback is no longer meaningful: everything without an
   // IDE fingerprint maps to the single openai surface.

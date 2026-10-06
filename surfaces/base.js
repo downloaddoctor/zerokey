@@ -45,6 +45,11 @@ class IDEToolSurface {
     this.ideName = null
     this.newSessionStartLength = 0
     this.realSessionPrefix = null
+    // System-prompt prefixes for IDE-internal utility calls (title-gen,
+    // progress messages, summarizer, terminal quick fix, …). Each surface
+    // declares its own; matched by prefix because utility prompts are short
+    // and stable, unlike the real 20–30 KB IDE fingerprint.
+    this.utilityPrefixes = []
     // Declarative flags consumed by engine/compiler, engine/triggers and
     // engine/mcp/inject so they never name a specific surface:
     //   browserTools     — this surface exposes the $browser/$playwright families
@@ -115,6 +120,25 @@ class IDEToolSurface {
       typeof this.realSessionPrefix === 'string' &&
       content.startsWith(this.realSessionPrefix)
     )
+  }
+
+  /**
+   * Does this system-prompt content match an IDE-internal utility call
+   * declared by this surface via `this.utilityPrefixes`? Utilities carry no
+   * IDE fingerprint and may still carry tools[] — they must never write into
+   * a real session.
+   *
+   * @param {string} content - the first (system) message content
+   * @returns {string|null} the matched prefix, or null
+   */
+  isUtilityPrompt(content) {
+    if (typeof content !== 'string') return null
+    for (const prefix of this.utilityPrefixes) {
+      if (typeof prefix === 'string' && prefix && content.startsWith(prefix)) {
+        return prefix
+      }
+    }
+    return null
   }
 
   shortenToolOutput(name, output) {

@@ -104,6 +104,13 @@ module.exports = (t) => {
   t.ideName = 'vscode'
   t.newSessionStartLength = 3
   t.realSessionPrefix = 'You are an expert AI programming assistant'
+  // VS Code issues these as separate LLM calls (title generation, progress
+  // messages). Add new prefixes here when VS Code ships a new utility
+  // (summarizer, terminal quick fix, commit message, tool/MCP optimiser, …).
+  t.utilityPrefixes = [
+    'You are an expert in crafting ultra-compact titles',
+    'You are an expert in writing short, catchy, and encouraging progress messages',
+  ]
   t.browserTools = true
   t.formatters = DEFAULT_FORMATTERS
 

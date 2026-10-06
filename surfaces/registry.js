@@ -115,6 +115,31 @@ class SurfaceRegistry {
 
     return null
   }
+
+  /**
+   * Decide whether a request is an IDE-internal utility call (title-gen,
+   * progress messages, summarizer, terminal quick fix, …) by asking every
+   * surface whether its declared utilityPrefixes match the system prompt.
+   * Utilities carry no IDE fingerprint and may still carry tools[] — they
+   * must never write into the real session.
+   *
+   * @param {Array} messages - req.body.messages
+   * @returns {{ surface: string, matched: string }|null}
+   */
+  resolveUtility(messages) {
+    this._ensureDiscovered()
+    const first = Array.isArray(messages) ? messages[0] : null
+    if (!first || first.role !== 'system' || typeof first.content !== 'string') return null
+
+    for (const [key, configure] of this.surfaces) {
+      const surface = new IDEToolSurface()
+      configure(surface)
+      const matched = surface.isUtilityPrompt(first.content)
+      if (matched) return { surface: key, matched }
+    }
+
+    return null
+  }
 }
 
 const registry = new SurfaceRegistry()

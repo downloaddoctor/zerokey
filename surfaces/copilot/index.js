@@ -23,6 +23,12 @@ module.exports = (t) => {
   t.ideName = 'copilot'
   t.newSessionStartLength = 2
   t.realSessionPrefix = 'Follow Microsoft content policies.'
+  // Copilot SDK surfaces share Microsoft's utility prompts; add SDK-specific
+  // prefixes here when they appear.
+  t.utilityPrefixes = [
+    'You are an expert in crafting ultra-compact titles',
+    'You are an expert in writing short, catchy, and encouraging progress messages',
+  ]
   t.browserTools = true
   t.browserNameMap = {
     click_element: 'clickElement',

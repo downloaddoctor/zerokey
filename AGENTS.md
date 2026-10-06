@@ -55,11 +55,11 @@ MODULES
  providers/<name>/router.js — express router; runToolLoop wraps one upstream turn per round
  providers/<name>/stream-handler.js — provider SSE → OpenAI chunk deltas
  providers/base/BaseAPI.js — https agent, cookie jar, _fetch with timeout
- surfaces/registry.js — auto-discovers surfaces/<name>/index.js; resolveSurface(messages) by realSessionPrefix
- surfaces/base.js — IDEToolSurface: tool()/format() registrar + resolve()
+ surfaces/registry.js — auto-discovers surfaces/<name>/index.js; resolveSurface(messages) by realSessionPrefix; resolveUtility(messages) by utilityPrefixes
+ surfaces/base.js — IDEToolSurface: tool()/format() registrar + resolve(); realSessionPrefix (real IDE fingerprint) + utilityPrefixes (IDE-internal utility calls)
  surfaces/specs.js — generic tool specs (grammar, keys, repeatable) merged by IDEToolSurface#tool()
  surfaces/openai/index.js — DEFAULT_SURFACE (realSessionPrefix null); identity-mapped tools for plain OpenAI clients; raw mode when no tools[]
- surfaces/<name>/index.js — IDE surface config fn (t) => {...}; declares ideName + realSessionPrefix
+ surfaces/<name>/index.js — IDE surface config fn (t) => {...}; declares ideName + realSessionPrefix + utilityPrefixes
  surfaces/<name>/template.json — captured system-prompt fingerprint for that IDE (docs/reference)
  routes/health.js — includes pid, provider, session, persistence, promptLimit
  utils/sse-writer.js — serialized SSE frames with backpressure; finish()/fail() idempotent
@@ -121,7 +121,7 @@ CONFIG
  pnpm check runs scripts/check-modules.js
  openapi.json is hand-maintained / regenerated via scripts/gen-openapi.js (check before editing)
  classifySession(messages, options) → { isReal, surface, matched }:
-  real IDE fingerprint wins; else openai — real if tools[] present or forceOpenai, else ephemeral; known IDE utility prompts (title-gen, progress messages — UTILITY_PREFIXES in utils/session-classifier.js) are always ephemeral even with tools[] (raw mode, cloned session, real chatSessionId/parentId untouched)
+  real IDE fingerprint wins; else utility prompt (surface-declared utilityPrefixes, matched via registry.resolveUtility) is always ephemeral even with tools[]; else openai — real if tools[] present or forceOpenai, else ephemeral (raw mode, cloned session, real chatSessionId/parentId untouched)
 
 BUILD
  pnpm install → postinstall sets core.hooksPath=.githooks
@@ -149,7 +149,7 @@ INVARIANTS
 
 EXTENSIONS
  New provider → providers/<name>/index.js exporting {name, displayName, models, promptLimit, setupSteps, validateFetch, validateCredentials, buildRouter}; registry auto-discovers
- New IDE surface → surfaces/<name>/index.js exporting (t) => {...}; set ideName + realSessionPrefix; registry auto-discovers
+ New IDE surface → surfaces/<name>/index.js exporting (t) => {...}; set ideName + realSessionPrefix + utilityPrefixes; registry auto-discovers
   Plain-OpenAI clients → surfaces/openai/index.js identity mapping; classifySession routes tools[]-bearing requests here when no IDE fingerprint matches
  New MHI executor → core/mhi/<name>.js + wire into core/mhi/index.js + test/core/mhi/<name>.test.js
  New skill → engine/triggers.js entry OR a new engine/extra/<name>.md (auto-registers as $<basename>)
