@@ -30,7 +30,7 @@ banner() {
     echo "  ${C_CYAN}  / // _ \\ '__/ _ \\| ' // _ \\ | | |${C_RESET}"
     echo "  ${C_CYAN} / /|  __/ | | (_) | . \\  __/ |_| |${C_RESET}"
     echo "  ${C_CYAN}/____\\___|_|  \\___/|_|\\_\\___|\\__, |${C_RESET}"
-    echo "  ${C_CYAN}                            |___/ ${C_RESET}"
+    echo "  ${C_CYAN}                             |___./ ${C_RESET}"
     echo "  ${C_GRAY}  ZeroKey - local AI proxy${C_RESET}"
     echo ""
 }

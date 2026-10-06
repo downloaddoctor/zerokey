@@ -40,6 +40,13 @@ function collectGrammarTools(payload, config) {
     }
   }
 
+  // A client that sent its own tools[] is the source of truth: advertise exactly
+  // what it declared, never the built-ins. The built-ins are already documented
+  // in engine/extra/instructions.md <mhi_list>, so re-seeding them here would
+  // duplicate the tool list in the prompt. Built-ins are only seeded on turns
+  // where the client sent no tools at all (e.g. plain OpenAI SDK callers).
+  if (seen.size > 0) return [...seen.values()]
+
   if (config.MHI_FILE_TOOLS) {
     for (const name of ['read', 'ls', 'glob', 'grep', 'write', 'replace']) {
       if (!seen.has(name)) {
@@ -161,10 +168,28 @@ async function runToolLoop(options) {
     return { assistantText: result.assistantText, rounds: 1 }
   }
 
-  let payload = toolBridge.preparePayload({
-    ...options.payload,
-    tools: grammarTools,
-  })
+  // The <mhi_tools> grammar block is only for the 'openai' surface — a plain
+  // client with no native tool channel. IDE surfaces (opencode, copilot,
+  // vscode, …) already declare their own tools to the model through the
+  // compiler's native mapping; re-listing them in a grammar block duplicates
+  // the tool list on every turn. ZeroKey's own executors (view_image, cmd,
+  // …) stay callable on those surfaces because they are registered in
+  // compiler.tools, not because they appear in the prompt.
+  //
+  // Injection is gated on isNewSession, matching how instructions.md
+  // (<mhi_list>) is injected by compiler.buildPrompt: the grammar is part of
+  // the opening context, not a per-turn reminder. On later turns the block is
+  // already in the conversation history, so re-prepending it would duplicate
+  // the tool list on every request.
+  const surfaceName = options.pipeline?.compiler?.ideName
+  const isNewSession = options.pipeline?.isNewSession === true
+  const injectGrammar = surfaceName === 'openai' && isNewSession
+  let payload = injectGrammar
+    ? toolBridge.preparePayload({
+        ...options.payload,
+        tools: grammarTools,
+      })
+    : options.payload
 
   const workspace = internalWorkspaceContext(config)
   let rounds = 0

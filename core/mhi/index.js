@@ -117,6 +117,22 @@ function evaluateAssistant(text) {
   try {
     parsed = parser.parseAssistantText(text)
   } catch (error) {
+    if (error.code === 'mhi_unknown_tool') {
+      // The model invented a tool name (e.g. "cat", "MHI(ls)"). A generic
+      // "resend" repair just repeats the same bad block, so name the valid
+      // tools instead and let it pick a real one.
+      const valid = Object.keys(parser.DEFINITIONS).join(', ')
+      return {
+        kind: 'continue',
+        prompt:
+          'MHI(parser): ERROR [mhi_unknown_tool] ' +
+          (error.message || 'Unknown tool.') +
+          ' Valid tools: ' +
+          valid +
+          '. Use one of these or answer in plain prose with no blocks.',
+        reason: 'mhi_unknown_tool',
+      }
+    }
     console.error('parser.parseAssistantText() failed:', error)
     return {
       kind: 'continue',

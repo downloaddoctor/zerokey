@@ -34,6 +34,7 @@ async function chatgptStreamHandler(stream, session, parser) {
     lastEventType = data.type || data.o || data.p || typeof data.v
 
     if (typeof data === 'string') {
+      if (data === 'v1') return
       // The upstream occasionally sends bare text deltas without a wrapper.
       if (data.length > 0) {
         producedOutput = true

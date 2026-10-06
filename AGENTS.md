@@ -32,8 +32,8 @@ MODULES
  server.js — claimFirstFree → postClaim → db.open → SessionSelector → app.start → signal shutdown
  config/constants.js — CONFIG: PORT, PORT_RANGE, EXACT_PORT, DATA_DIR, DB_FILE, LOG_*, MHI_* capability flags
  core/chat-router.js — provider seam: seedSession, persistAfterTurn, per-request generation rebase
- core/session-selector.js — interactive prompts: provider → user (fetch capture) → session; headless preselection
- core/state/db.js — node:sqlite DatabaseSync; WAL; fail-closed on newer schema_version; one-shot legacy import
+ core/session-selector.js — interactive prompts: provider → user (create/update auth/delete; fetch capture) → session; headless preselection
+ core/state/db.js — node:sqlite DatabaseSync; WAL; fail-closed on newer schema_version; additive columns via ADDED_COLUMNS (idempotent ALTER TABLE ADD COLUMN); one-shot legacy import
  core/state/users.js — Proxy row; assigning any field schedules a 50 ms debounced flush
  core/state/sessions.js — Proxy row; same debounce; compaction via generation bump clears id/parentId
  core/mhi/loop.js — runToolLoop: one turn → evaluateAssistant → executeCalls → appendResult, cap MHI_MAX_ROUNDS
@@ -77,12 +77,12 @@ ARCHITECTURE
  SSE [DONE] written once by pipeline.flushFinish() after the loop resolves
  Persistence: users.parsedFetch + sessions.id/parentId written through Proxy set traps, flushed on res finish/close
  Compaction: incoming x-zerokey-compaction-generation > row.generation → id/parentId cleared, old id appended to metadata.pendingPreviousConversationIds
- Fail-closed schema: db.open refuses a DB whose meta.schema_version exceeds SCHEMA_VERSION (2)
+ Fail-closed schema: db.open refuses a DB whose meta.schema_version exceeds SCHEMA_VERSION (3)
  DeepSeek uses a real Chromium profile (providers/deepseek/browser-transport.js) — not a lightweight HTTP path
 
 SCHEMA
  users(id PK, provider, username, parsed_fetch, instructions_hash, instructions_applied_at, wait_until, wait_reason, state_json, created_at, updated_at, UNIQUE(provider, username))
- sessions(user_id FK→users.id CASCADE, name, id, parent_id, generation, tool_calling, vision, model, todos_json, turn_count, dynamic_tools_hash, mcp_injected_json, state, metadata_json, last_used, created_at, state_json, updated_at, PK(user_id,name))
+ sessions(user_id FK→users.id CASCADE, name, id, parent_id, generation, tool_calling, vision, model, todos_json, turn_count, dynamic_tools_hash, mcp_injected_json, state, metadata_json, last_token_usage, usage_totals_json, last_used, created_at, state_json, updated_at, PK(user_id,name))
  meta(key PK, value) — holds schema_version and legacy_import_done
  Column map is snake_case; JS objects camelCase via core/state/users.js and core/state/sessions.js
  Rule: lifecycle data only — never prompt or response content

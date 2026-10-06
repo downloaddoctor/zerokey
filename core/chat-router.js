@@ -59,6 +59,8 @@ function seedSession(selected, sessionContext) {
     dynamicToolsHash: row.dynamicToolsHash ?? selected.session?.dynamicToolsHash ?? null,
     mcpInjected: row.mcpInjected ?? selected.session?.mcpInjected ?? false,
     metadata: row.metadata || {},
+    lastTokenUsage: row.lastTokenUsage ?? selected.session?.lastTokenUsage ?? 0,
+    _usageTotals: row.usageTotals ?? selected.session?._usageTotals ?? null,
     persistent: true,
   }
   return { provider, session, row, userId, sessionName, db: sessionContext.db }
@@ -76,6 +78,8 @@ function persistAfterTurn(seed, session) {
     seed.row.turnCount = session.turnCount ?? seed.row.turnCount
     seed.row.dynamicToolsHash = session.dynamicToolsHash ?? seed.row.dynamicToolsHash
     seed.row.mcpInjected = session.mcpInjected ?? seed.row.mcpInjected
+    seed.row.lastTokenUsage = session.lastTokenUsage ?? seed.row.lastTokenUsage
+    seed.row.usageTotals = session._usageTotals ?? seed.row.usageTotals
     seed.row.lastUsed = Date.now()
     seed.row.state = session.id ? 'idle' : 'unbound'
     seed.session.lastUsed = seed.row.lastUsed

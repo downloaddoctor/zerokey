@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   mcp_injected_json  TEXT,
   state              TEXT,
   metadata_json      TEXT,
+  last_token_usage   INTEGER,
+  usage_totals_json  TEXT,
   last_used          INTEGER,
   created_at         INTEGER,
   state_json         TEXT,

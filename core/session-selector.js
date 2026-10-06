@@ -182,6 +182,7 @@ class SessionSelector {
         }
       })
       choices.push({ title: text.cyan('Create new user'), value: '__new__' })
+      choices.push({ title: text.yellow('Update user (renew auth)'), value: '__update__' })
       choices.push({ title: text.red('Delete user'), value: '__delete__' })
 
       const { username } = await prompts(
@@ -195,6 +196,7 @@ class SessionSelector {
       )
 
       if (username === '__new__') return this._promptNewUser()
+      if (username === '__update__') return this._updateUser(providerUsers)
       if (username === '__delete__') return this._deleteUser(savedUsers)
       return providerUsers.find((u) => u.username === username)
     }
@@ -272,6 +274,42 @@ class SessionSelector {
     if (!rawUsername) return null
     const username = String(rawUsername).trim().toLowerCase()
 
+    const parsedFetch = await this._captureFetch(username)
+    if (!parsedFetch) return null
+
+    return usersState.create(this._db, this.provider, username, { parsedFetch })
+  }
+
+  async _updateUser(providerUsers) {
+    const { target } = await prompts(
+      {
+        type: 'select',
+        name: 'target',
+        message: 'Update auth for which user (' + this.provider + ')?',
+        choices: [
+          ...providerUsers.map((u) => ({ title: u.username, value: u.username })),
+          { title: 'Back', value: '__back__' },
+        ],
+      },
+      { onCancel: () => process.exit(0) },
+    )
+
+    if (!target || target === '__back__') return this._stepUserLogin()
+
+    const user = providerUsers.find((u) => u.username === target)
+    if (!user) return this._stepUserLogin()
+
+    console.info('\n  -- Update User: ' + target + ' --\n', 1)
+
+    const parsedFetch = await this._captureFetch(target)
+    if (!parsedFetch) return this._stepUserLogin()
+
+    user.parsedFetch = parsedFetch
+    console.info('  ' + text.green('√') + ' Auth refreshed for "' + target + '".\n')
+    return user
+  }
+
+  async _captureFetch(username) {
     const provider = registry.get(this.provider)
     const providerUrl = provider.setupSteps?.url
     if (providerUrl) {
@@ -346,7 +384,7 @@ class SessionSelector {
         continue
       }
 
-      return usersState.create(this._db, this.provider, username, { parsedFetch })
+      return parsedFetch
     }
   }
 

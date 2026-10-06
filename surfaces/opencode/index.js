@@ -37,11 +37,11 @@ module.exports = (t) => {
       values.questions = [
         {
           header: 'question',
-          question: values.ques || '',
+          question: values.question || '',
           options: values.options.map((op) => ((op.description = '             '), op)),
         },
       ]
-      delete values.ques
+      delete values.question
       delete values.options
     },
   })

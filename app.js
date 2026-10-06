@@ -32,6 +32,10 @@ const prepareChatRequest = (req, res, next) => {
   if (!validateMessages(req.body?.messages, res)) return
   StreamPipeline.setSSEHeaders(res)
   const { isReal, surface, matched } = classifySession(req.body?.messages)
+  if (!isReal) {
+    console.debug(`[SERVER] EPHEMERAL ${req.method} ${req.originalUrl} — surface=${surface}`)
+  }
+
   req.surface = surface
   req.isRealSession = isReal
   req.matchedSurface = matched

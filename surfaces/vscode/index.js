@@ -39,8 +39,7 @@ const DEFAULT_FORMATTERS = {
       return answers.skipped
         ? 'NO ANSWER'
         : [answers.selected[0], answers.freeText].filter(Boolean).join('\n')
-    } catch (caughtErr) {
-      console.error('JSON.parse() failed:', caughtErr)
+    } catch {
       return s
     }
   },
@@ -53,8 +52,7 @@ const DEFAULT_FORMATTERS = {
       if (filePath) {
         try {
           return fs.readFileSync(filePath[1], 'utf-8')
-        } catch (caughtErr) {
-          console.error('fs.readFileSync() failed:', caughtErr)
+        } catch {
           return `[LARGE OUTPUT] read → ${filePath[1]}`
         }
       }

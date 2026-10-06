@@ -47,7 +47,6 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
     const pipeline = new StreamPipeline(res, session, 'deepseek', req.surface, req.isRealSession)
 
     if (pipeline.ephemeralMode) {
-      console.log(req.body)
       pipeline.sendFinalChunk()
       return
     }

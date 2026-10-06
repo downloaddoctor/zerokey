@@ -33,6 +33,45 @@ function isUnauthorized(error) {
 }
 
 /**
+ * A 404 whose body says the upstream conversation was deleted. The auth is
+ * still valid — only the conversation id is gone, so the caller must clear
+ * the persisted id/parentId and let the next chatCompletion create a fresh
+ * conversation. Detected by status + body marker, never by status alone: a
+ * plain 404 could be an unrelated route change.
+ */
+function isConversationDeleted(error) {
+  if (!error) return false
+  const status =
+    Number.isInteger(error.status) && error.status > 0
+      ? error.status
+      : Number.isInteger(error.statusCode) && error.statusCode > 0
+        ? error.statusCode
+        : null
+  if (status !== 404) return false
+  const text = String(error.message || '')
+  return text.includes('conversation_deleted') || text.includes('Conversation has been deleted')
+}
+
+/**
+ * Run fn() once. On a conversation_deleted 404, clear the session's upstream
+ * conversation ids and retry exactly once so a fresh conversation is created.
+ * Any other error propagates.
+ */
+async function withConversationRecovery(session, fn) {
+  try {
+    return await fn()
+  } catch (error) {
+    if (!isConversationDeleted(error)) throw error
+    console.warn(
+      'ChatGPT conversation was deleted upstream; clearing session ids and retrying once.',
+    )
+    session.id = null
+    session.parentId = null
+    return fn()
+  }
+}
+
+/**
  * Force-reload the browser capture from disk so the client re-seeds headers
  * and cookies. The capture file is the source of truth; the process keeps no
  * backstop copy.
@@ -142,8 +181,10 @@ function wrap(api) {
 module.exports = {
   ONE_SHOT_401,
   forceReloadCapture,
+  isConversationDeleted,
   isUnauthorized,
   refreshSentinelSafe,
   withAuthRecovery,
+  withConversationRecovery,
   wrap,
 }

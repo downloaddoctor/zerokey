@@ -27,18 +27,20 @@ const COLUMN_MAP = {
   mcpInjected: 'mcp_injected_json',
   state: 'state',
   metadata: 'metadata_json',
+  lastTokenUsage: 'last_token_usage',
+  usageTotals: 'usage_totals_json',
   lastUsed: 'last_used',
   createdAt: 'created_at',
   updatedAt: 'updated_at',
 }
 
-const BLOB_KEYS = new Set(['todos', 'metadata', 'mcpInjected'])
+const BLOB_KEYS = new Set(['todos', 'metadata', 'mcpInjected', 'usageTotals'])
 const FLUSH_MS = 50
 const MAX_GENERATION = Number.MAX_SAFE_INTEGER
 const SELECT_COLUMNS =
   'user_id, name, id, parent_id, generation, tool_calling, vision, model, ' +
   'todos_json, turn_count, dynamic_tools_hash, mcp_injected_json, state, metadata_json, ' +
-  'last_used, created_at, state_json, updated_at'
+  'last_token_usage, usage_totals_json, last_used, created_at, state_json, updated_at'
 
 const pending = new Map()
 
@@ -76,6 +78,8 @@ function rowToSession(row) {
     mcpInjected: parseBlob(row.mcp_injected_json, null),
     state: row.state ?? null,
     metadata: parseBlob(row.metadata_json, {}),
+    lastTokenUsage: row.last_token_usage ?? null,
+    usageTotals: parseBlob(row.usage_totals_json, null),
     lastUsed: row.last_used ?? null,
     createdAt: row.created_at ?? null,
     updatedAt: row.updated_at,
@@ -143,12 +147,12 @@ function schedule(db, session) {
       try {
         flush(db, session)
       } catch (error) {
-        console.error('flush() failed:', error)
         // A flush scheduled just before the caller closed the database is
-        // expected in short-lived processes (tests). Any other error is
-        // reported once.
+        // expected in short-lived processes (tests, shutdown). Stay silent
+        // for that case; report anything else once.
         const message = error && error.message ? error.message : String(error)
         if (!/database is not open/i.test(message)) {
+          console.error('flush() failed:', error)
           console.error('sessions flush failed: ' + message)
         }
       }

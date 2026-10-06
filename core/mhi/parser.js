@@ -56,7 +56,12 @@ function parseBlock(rawBody) {
     throw new MhiParseError('mhi_block_too_large', 'A block is too large.')
   }
   const parts = SYNTAX.splitPayload(rawBody).filter((p) => p !== '')
-  const tool = String(parts.shift() || '').trim()
+  let tool = String(parts.shift() || '').trim()
+  // The model sometimes echoes a prior result header ("MHI(ls): ...") back as
+  // a call. Unwrap the MHI(...) wrapper so a real tool name underneath still
+  // resolves; anything else stays as-is and fails the lookup below.
+  const echo = tool.match(/^MHI\(([A-Za-z0-9_]+)\)$/)
+  if (echo) tool = echo[1]
   const definition = DEFINITIONS[tool]
   if (!definition) {
     throw new MhiParseError('mhi_unknown_tool', 'Unknown tool: ' + (tool || '(empty)'))

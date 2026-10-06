@@ -21,7 +21,15 @@ const { DatabaseSync } = require('node:sqlite')
 const { CONFIG } = require('../../config/constants')
 
 const SCHEMA_FILE = path.join(__dirname, 'schema.sql')
-const SCHEMA_VERSION = 2
+const SCHEMA_VERSION = 3
+
+// Columns added after the initial schema. CREATE TABLE IF NOT EXISTS will not
+// add them to an existing database, so each is applied with an idempotent
+// ALTER TABLE ADD COLUMN. [table, column, type].
+const ADDED_COLUMNS = [
+  ['sessions', 'last_token_usage', 'INTEGER'],
+  ['sessions', 'usage_totals_json', 'TEXT'],
+]
 
 function open(options = {}) {
   const file = options.file || CONFIG.DB_FILE
@@ -34,6 +42,7 @@ function open(options = {}) {
 
   assertSupportedSchema(db)
   db.exec(fs.readFileSync(SCHEMA_FILE, 'utf8'))
+  applyAddedColumns(db)
   setMeta(db, 'schema_version', SCHEMA_VERSION)
 
   if (options.migrateUsers !== false) {
@@ -89,6 +98,16 @@ function assertSupportedSchema(db) {
   }
 }
 
+function applyAddedColumns(db) {
+  for (const [table, column, type] of ADDED_COLUMNS) {
+    const exists = db
+      .prepare('SELECT 1 AS present FROM pragma_table_info(?) WHERE name = ?')
+      .get(table, column)
+    if (exists) continue
+    db.exec('ALTER TABLE ' + table + ' ADD COLUMN ' + column + ' ' + type)
+  }
+}
+
 function setMeta(db, key, value) {
   db.prepare(
     'INSERT INTO meta (key, value) VALUES (?, ?) ' +
@@ -104,8 +123,10 @@ function getMeta(db, key) {
 module.exports = {
   SCHEMA_VERSION,
   SCHEMA_FILE,
+  ADDED_COLUMNS,
   open,
   assertSupportedSchema,
+  applyAddedColumns,
   setMeta,
   getMeta,
 }
