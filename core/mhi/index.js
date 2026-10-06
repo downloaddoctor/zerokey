@@ -165,7 +165,7 @@ function evaluateAssistant(text) {
  */
 function appendResult(payload, resultText) {
   const messages = Array.isArray(payload.messages) ? payload.messages.map((m) => ({ ...m })) : []
-  messages.push({ role: 'user', content: resultText })
+  messages.push({ role: 'mhi', content: resultText })
   return { ...payload, messages, attachments: [] }
 }
 

@@ -36,7 +36,7 @@ MODULES
  core/state/db.js — node:sqlite DatabaseSync; WAL; fail-closed on newer schema_version; additive columns via ADDED_COLUMNS (idempotent ALTER TABLE ADD COLUMN); one-shot legacy import
  core/state/users.js — Proxy row; assigning any field schedules a 50 ms debounced flush
  core/state/sessions.js — Proxy row; same debounce; compaction via generation bump clears id/parentId
- core/mhi/loop.js — runToolLoop: one turn → evaluateAssistant → executeCalls → appendResult, cap MHI_MAX_ROUNDS
+ core/mhi/loop.js — runToolLoop: one turn → evaluateAssistant → executeCalls → appendResult (role 'mhi', passed verbatim by compiler._handlers.mhi — no USER: prefix), cap MHI_MAX_ROUNDS
  core/mhi/index.js — executor dispatch; every failure returns {ok:false, code, output} — never throws except on abort
  core/mhi/files.js — read/ls/glob/grep/write/replace; write refuses overwrite; replace requires exactly one match
  core/mhi/commands.js — allowlisted programs; write/network gated by capability flags

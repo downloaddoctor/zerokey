@@ -11,6 +11,7 @@ const models = {
       id: 'claude-sonnet-5-5',
       name: 'Claude Sonnet 5.5',
       vision: true,
+      recommendedForTools: true,
       created: 1_772_736_000,
       context_length: 1_000_000,
       max_output_length: 128_000,

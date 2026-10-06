@@ -80,10 +80,11 @@ test('formatResults joins text and collects attachments', () => {
   assert.equal(attachments.length, 1)
 })
 
-test('appendResult adds a user turn', () => {
+test('appendResult adds an mhi turn', () => {
   const payload = { messages: [{ role: 'user', content: 'hi' }] }
   const next = mhi.appendResult(payload, 'MHI(read): ok')
   assert.equal(next.messages.length, 2)
+  assert.equal(next.messages[1].role, 'mhi')
   assert.equal(next.messages[1].content, 'MHI(read): ok')
 })
 

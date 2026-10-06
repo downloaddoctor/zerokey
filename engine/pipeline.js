@@ -297,10 +297,7 @@ class StreamPipeline {
       this.session.turnCount = (this.session.turnCount || 0) + 1
       if (this.session.turnCount > 1 && this.session.turnCount % reinjectEvery === 0) {
         const { content } = require('./instructions').getExtra('reminder')
-        messages.push({
-          role: 'live_instructions',
-          content: content,
-        })
+        this._injectLive(messages, content)
         console.debug(`[REINJECT] turn ${this.session.turnCount} — instructions re-injected`)
       }
     }
@@ -321,7 +318,7 @@ class StreamPipeline {
           if (step > prev && step > 0) {
             this.session[seenKey] = step
             const { content } = require('./instructions').getExtra(rule.fragment)
-            messages.push({ role: 'live_instructions', content })
+            this._injectLive(messages, content)
             console.debug(
               `[REINJECT] tokens ${used} crossed ${rule.tokens}*${step} — $${rule.fragment} injected`,
             )
@@ -332,11 +329,10 @@ class StreamPipeline {
 
     if (this.session._driftWarning) {
       this.session._driftWarning = false
-      messages.push({
-        role: 'live_instructions',
-        content:
-          'Your previous response emitted duplicate or too many tool calls. Those results are already in the conversation. Do not repeat them. Take the single next unfinished step of the task.',
-      })
+      this._injectLive(
+        messages,
+        'Your previous response emitted duplicate or too many tool calls. Those results are already in the conversation. Do not repeat them. Take the single next unfinished step of the task.',
+      )
       console.debug('[LOOP] drift reminder injected')
     }
 
@@ -352,6 +348,21 @@ class StreamPipeline {
     const built = this.compiler.buildPrompt(prompt, this)
 
     return { prompt: built, handled: false }
+  }
+
+  // Insert a live_instructions message BEFORE the latest user/mhi turn so the
+  // reminder precedes the message it applies to, and the last message stays
+  // the user turn (skill triggers read messages[messages.length - 1]).
+  _injectLive(messages, content) {
+    let at = messages.length
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const role = messages[i] && messages[i].role
+      if (role === 'user' || role === 'mhi') {
+        at = i
+        break
+      }
+    }
+    messages.splice(at, 0, { role: 'live_instructions', content })
   }
 
   // ── error handling ─────────────────────────────────────────────────────
