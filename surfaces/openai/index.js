@@ -1,16 +1,14 @@
 'use strict'
 
-// The 'openai' surface — a tool-carrying surface for plain OpenAI-API clients
-// that send `tools[]` but no recognizable IDE system prompt. It declares an
-// identity mapping for every generic tool (native name === generic name) and
-// passes user/system text through unchanged, so a client that speaks the
-// OpenAI tool-calling shape can use ZeroKey's internal MHI executors without
-// an IDE.
+// The 'openai' surface — the default for any client that is not a known IDE.
+// Declares an identity mapping for every generic tool (native name === generic
+// name) and passes user/system text through unchanged, so a plain OpenAI-API
+// client can drive ZeroKey's internal MHI executors without an IDE.
 //
 // Never matched by system-prompt prefix: `realSessionPrefix` stays null, so
 // registry.resolveSurface() cannot select it. utils/session-classifier.js
-// reaches it only when the request carries a tools[] array (or the
-// X-ZeroKey-Tools: 1 header) — see classifySession.
+// reaches it whenever no IDE fingerprint and no utility prefix match — see
+// classifySession.
 module.exports = (t) => {
   t.ideName = 'openai'
   t.newSessionStartLength = 0

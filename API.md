@@ -30,18 +30,20 @@ The machine-readable contract is **[`openapi.json`](./openapi.json)** (OpenAPI 3
 
 ### Plain OpenAI clients (no IDE)
 
-When the request has no recognizable IDE system prompt but **does** carry a
-`tools[]` array (or the header `X-ZeroKey-Tools: 1`), ZeroKey routes to the
-built-in `openai` surface:
+When the request has no recognizable IDE system prompt and is not a known IDE
+utility call, ZeroKey routes to the built-in `openai` surface:
 
 - Generic tool names are passed through unchanged (identity mapping).
 - The internal MHI grammar is inlined into the system prompt.
+- Whether a tool loop runs is decided by the session's `toolCalling` flag (set
+  in the wizard), not by whether `tools[]` is present in the request body.
 - The tool loop runs the same executors used by IDE surfaces (`read`, `write`,
   `replace`, `ls`, `glob`, `grep`, `cmd`, `cmd_bg`, `cmd_poll`, `cmd_kill`,
   `errors`, `fetch`, `view_image`, `todos_add`, `todos_set`, `ask`).
 
-Requests without a matching IDE prompt and without `tools[]` stay tool-less
-(the `api` surface) — useful for ephemeral calls like title generation.
+Known IDE-internal utility calls (title generation, progress messages,
+summarizer, terminal quick fix, …) are declared per surface and are always
+ephemeral — they never write into the session.
 
 For request/response shapes, error categories, and SSE chunk examples, see `openapi.json` or `/docs`.
 

@@ -39,18 +39,15 @@ test('openai surface is never auto-matched by system-prompt prefix', () => {
   assert.strictEqual(matched, null)
 })
 
-test('classifySession routes no-fingerprint requests to openai: real with tools, ephemeral without', () => {
+test('classifySession routes no-fingerprint requests to openai as real turns', () => {
   const messages = [
     { role: 'system', content: 'You are a helpful assistant.' },
     { role: 'user', content: 'Read package.json.' },
   ]
 
-  const tools = [{ type: 'function', function: { name: 'read' } }]
-  const result = classifySession(messages, { tools })
+  const result = classifySession(messages)
   assert.strictEqual(result.surface, 'openai')
   assert.strictEqual(result.isReal, true)
-  assert.strictEqual(classifySession(messages).isReal, false)
-  assert.strictEqual(classifySession(messages, { forceOpenai: true }).isReal, true)
   assert.strictEqual(result.matched, 'openai')
 })
 

@@ -69,7 +69,7 @@ MODULES
 
 ARCHITECTURE
  Request flow: app.js middleware → sequentialQueue → prepareChatRequest → buildRouter(preSelected)
- classifySession(messages, {tools, forceOpenai}) resolves the IDE surface from the system prompt; X-ZeroKey-Tools: 1 only forces a no-fingerprint request onto openai as real
+ classifySession(messages) resolves the IDE surface from the system prompt; no fingerprint + no utility → openai (real turn; pipeline decides tools via session.toolCalling)
  StreamPipeline.setup → restoreMcpInjections → compiler.uploadAndFormatPrompt → buildPrompt
  Provider router calls runToolLoop with a per-turn closure that streams via the pipeline
  One upstream turn per round; intermediate assistant text is invisible to the client (deferFinish)
@@ -120,8 +120,8 @@ CONFIG
  Providers auto-discovered from providers/<name>/index.js; skip providers/base/
  pnpm check runs scripts/check-modules.js
  openapi.json is hand-maintained / regenerated via scripts/gen-openapi.js (check before editing)
- classifySession(messages, options) → { isReal, surface, matched }:
-  real IDE fingerprint wins; else utility prompt (surface-declared utilityPrefixes, matched via registry.resolveUtility) is always ephemeral even with tools[]; else openai — real if tools[] present or forceOpenai, else ephemeral (raw mode, cloned session, real chatSessionId/parentId untouched)
+ classifySession(messages) → { isReal, surface, matched }:
+  real IDE fingerprint wins; else utility prompt (surface-declared utilityPrefixes, matched via registry.resolveUtility) is ephemeral; else openai — a real turn (raw mode still skips instructions/skills/MCP; cloned session; real chatSessionId/parentId untouched)
 
 BUILD
  pnpm install → postinstall sets core.hooksPath=.githooks
