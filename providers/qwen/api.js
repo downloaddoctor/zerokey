@@ -30,7 +30,8 @@ function parseWaitMs(num, template) {
 function uuid() {
   try {
     return crypto.randomUUID()
-  } catch {
+  } catch (caughtErr) {
+    console.error('crypto.randomUUID() failed:', caughtErr)
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
       const r = (Math.random() * 16) | 0
       const v = c === 'x' ? r : (r & 0x3) | 0x8
@@ -212,11 +213,15 @@ class QwenAPI {
     // text/event-stream in that case, so sniff and convert to a thrown error.
     const contentType = res.headers.get('content-type') || ''
     if (!contentType.includes('text/event-stream')) {
-      const text = await res.text().catch(() => '')
+      const text = await res.text().catch((caughtErr) => {
+        console.error('res.text() failed:', caughtErr)
+        return ''
+      })
       let parsed = null
       try {
         parsed = JSON.parse(text)
-      } catch {
+      } catch (caughtErr) {
+        console.error('JSON.parse() failed:', caughtErr)
         // not JSON either; fall through to a generic error below
       }
 
@@ -250,11 +255,15 @@ class QwenAPI {
    * Falls back to a plain text error if the body isn't JSON/doesn't match.
    */
   async _buildQwenError(res) {
-    const errText = await res.text().catch(() => '')
+    const errText = await res.text().catch((caughtErr) => {
+      console.error('res.text() failed:', caughtErr)
+      return ''
+    })
     let parsed = null
     try {
       parsed = JSON.parse(errText)
-    } catch {
+    } catch (caughtErr) {
+      console.error('JSON.parse() failed:', caughtErr)
       // not JSON, fall through to plain text error
     }
 
@@ -287,7 +296,8 @@ class QwenAPI {
         },
         false,
       )
-    } catch {
+    } catch (caughtErr) {
+      console.error('this._fetch() failed:', caughtErr)
       // non-critical — ignore failures
     }
   }
@@ -304,7 +314,10 @@ class QwenAPI {
     )
 
     if (!res.ok && res.status !== 404) {
-      const text = await res.text().catch(() => '')
+      const text = await res.text().catch((caughtErr) => {
+        console.error('res.text() failed:', caughtErr)
+        return ''
+      })
       throw new Error(`Qwen deleteSession HTTP ${res.status}: ${text.slice(0, 200)}`)
     }
   }
@@ -395,6 +408,7 @@ class QwenAPI {
         agent: this._httpAgent,
       })
     } catch (err) {
+      console.error('qwen: fetch failed for ' + url + ':', err)
       clearTimeout(timer)
       if (err.name === 'AbortError') {
         const errorObj = {

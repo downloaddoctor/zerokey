@@ -64,6 +64,7 @@ class BaseAPI {
         agent: this._httpAgent,
       })
     } catch (err) {
+      console.error('BaseAPI: fetch failed for ' + url + ':', err)
       clearTimeout(timer)
       if (err.name === 'AbortError') {
         const error = new Error(`Request timed out after ${timeoutMs / 1000}s`)

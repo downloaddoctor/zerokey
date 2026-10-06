@@ -36,6 +36,7 @@ class DeepSeekHash {
 
       return this
     } catch (error) {
+      console.error('fs.readFileSync() failed:', error)
       console.error('Failed to initialize WASM:', error)
       throw error
     }

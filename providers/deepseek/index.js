@@ -35,6 +35,7 @@ module.exports = {
       await api.getCurrentUser()
       return { success: true, user: username }
     } catch (error) {
+      console.error('deepseek: initializeFromJSON failed:', error)
       return { success: false, error: error.message }
     }
   },

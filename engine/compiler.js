@@ -449,7 +449,8 @@ class ToolCompiler {
     ) {
       try {
         return JSON.parse(value)
-      } catch {
+      } catch (caughtErr) {
+        console.error('JSON.parse() failed:', caughtErr)
         // not valid JSON — fall through and treat as a raw string
       }
     }

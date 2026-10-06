@@ -58,7 +58,7 @@ MODULES
  surfaces/registry.js — auto-discovers surfaces/<name>/index.js; resolveSurface(messages) by realSessionPrefix
  surfaces/base.js — IDEToolSurface: tool()/format() registrar + resolve()
  surfaces/specs.js — generic tool specs (grammar, keys, repeatable) merged by IDEToolSurface#tool()
- surfaces/api/index.js — DEFAULT_SURFACE for unmatched (ephemeral) requests; no tools
+ surfaces/openai/index.js — DEFAULT_SURFACE (realSessionPrefix null); identity-mapped tools for plain OpenAI clients; raw mode when no tools[]
  surfaces/<name>/index.js — IDE surface config fn (t) => {...}; declares ideName + realSessionPrefix
  surfaces/<name>/template.json — captured system-prompt fingerprint for that IDE (docs/reference)
  routes/health.js — includes pid, provider, session, persistence, promptLimit
@@ -69,7 +69,7 @@ MODULES
 
 ARCHITECTURE
  Request flow: app.js middleware → sequentialQueue → prepareChatRequest → buildRouter(preSelected)
- classifySession(messages) resolves the IDE surface purely from the system prompt — no headers trusted
+ classifySession(messages, {tools, forceOpenai}) resolves the IDE surface from the system prompt; X-ZeroKey-Tools: 1 only forces a no-fingerprint request onto openai as real
  StreamPipeline.setup → restoreMcpInjections → compiler.uploadAndFormatPrompt → buildPrompt
  Provider router calls runToolLoop with a per-turn closure that streams via the pipeline
  One upstream turn per round; intermediate assistant text is invisible to the client (deferFinish)
@@ -120,8 +120,8 @@ CONFIG
  Providers auto-discovered from providers/<name>/index.js; skip providers/base/
  pnpm check runs scripts/check-modules.js
  openapi.json is hand-maintained / regenerated via scripts/gen-openapi.js (check before editing)
- classifySession(messages, fallback?, { tools?, forceOpenai? }) → { isReal, surface, matched }:
-  real IDE fingerprint wins; else tools[] or X-ZeroKey-Tools: 1 → openai (tool-carrying); else fallback (api, no tools)
+ classifySession(messages, options) → { isReal, surface, matched }:
+  real IDE fingerprint wins; else openai — real if tools[] present or forceOpenai, else ephemeral; known IDE utility prompts (title-gen, progress messages — UTILITY_PREFIXES in utils/session-classifier.js) are always ephemeral even with tools[] (raw mode, cloned session, real chatSessionId/parentId untouched)
 
 BUILD
  pnpm install → postinstall sets core.hooksPath=.githooks

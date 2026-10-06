@@ -306,6 +306,7 @@ class SessionSelector {
       try {
         parsedFetch = this._parseFetchDirect(fetchStr)
       } catch (e) {
+        console.error('this._parseFetchDirect() failed:', e)
         console.error('  ✖ Failed to parse fetch: ' + e.message + '\n')
         continue
       }
@@ -332,6 +333,7 @@ class SessionSelector {
         process.stdout.write('\r                                  ')
         process.stdout.write('\r  ' + text.green('√ Session verified') + '\n\n')
       } catch (e) {
+        console.error('this._validateLiveConnection() failed:', e)
         process.stdout.write(' \n\n')
         console.error('  ✖ Live check failed: ' + e.message + '\n')
         if (
@@ -515,6 +517,7 @@ class SessionSelector {
     try {
       await this._deleteProviderSessions()
     } catch (e) {
+      console.error('this._deleteProviderSessions() failed:', e)
       console.warn('\n  Provider cleanup failed: ' + e.message)
     }
     process.stdout.write(
@@ -530,6 +533,7 @@ class SessionSelector {
     try {
       fs.rmSync(this._profileDirFor(target.toLowerCase()), { recursive: true, force: true })
     } catch (e) {
+      console.error('fs.rmSync() failed:', e)
       console.warn('  Failed to remove profile dir: ' + e.message)
     }
     console.info('  ' + text.green('√') + ' User "' + target + '" removed.\n')
@@ -580,6 +584,7 @@ class SessionSelector {
         process.stdout.write(text.dim('\r  Deleting ' + deleted + '/' + toDelete.length))
         await api.deleteSession(session.id)
       } catch (e) {
+        console.error('session-selector: delete counter failed:', e)
         console.warn('\n  Failed ' + session.id + ': ' + e.message)
       }
     }
@@ -598,6 +603,7 @@ class SessionSelector {
         fs.unlinkSync(tmp)
         resolve(content.length > 0 ? content : null)
       } catch {
+        // Editor wrote nothing or the temp file is gone; treat as cancel.
         resolve(null)
       }
     })
@@ -650,7 +656,8 @@ class SessionSelector {
     if (opts.body && typeof opts.body === 'string') {
       try {
         body = JSON.parse(opts.body)
-      } catch {
+      } catch (caughtErr) {
+        console.error('JSON.parse() failed:', caughtErr)
         body = {}
       }
     }
@@ -676,7 +683,8 @@ class SessionSelector {
       if (mins < 60) return mins + 'm ago'
       if (mins < 1440) return Math.floor(mins / 60) + 'h ago'
       return Math.floor(mins / 1440) + 'd ago'
-    } catch {
+    } catch (caughtErr) {
+      console.error('session-selector: bad timestamp ' + isoString + ':', caughtErr)
       return 'unknown'
     }
   }

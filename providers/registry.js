@@ -41,6 +41,7 @@ class ProviderRegistry {
           this.providers.set(providerDef.name, providerDef)
         }
       } catch (error) {
+        console.error('require() failed:', error)
         console.error(`[Registry] Failed to load ${entry.name}:`, error.message)
       }
     }

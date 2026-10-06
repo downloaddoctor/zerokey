@@ -81,7 +81,8 @@ function imageDimensions(data, mimeType) {
         return validDimensions(width, height)
       }
     }
-  } catch {
+  } catch (caughtErr) {
+    console.error('view-image: png branch failed:', caughtErr)
     return null
   }
   return null
@@ -146,6 +147,7 @@ async function execute(call, options = {}) {
         ')',
     }
   } catch (error) {
+    console.error('view-image: scope resolution failed:', error)
     if (error && error.name === 'AbortError') throw error
     const code = error && typeof error.code === 'string' ? error.code : 'mhi_view_image_error'
     const message = error && error.message ? error.message : 'Unknown view_image error.'

@@ -135,6 +135,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
                 pipeline.scan('\n````')
                 pipeline.scan(limitMessageText(resetTime, mins))
               } catch (summaryErr) {
+                console.error('claudeApi.chatCompletion() failed:', summaryErr)
                 console.error(`[Claude] Summary failed: ${summaryErr.message}`)
                 emitLimitResponse(
                   pipeline,
@@ -149,6 +150,7 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
       })
       pipeline.flushFinish()
     } catch (error) {
+      console.error('runToolLoop() failed:', error)
       console.error(`[Claude] Route error: ${error.message}`)
 
       try {
@@ -169,7 +171,9 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
             `This user's usage quota has been reached`,
           )
         }
-      } catch {}
+      } catch (caughtErr) {
+        console.error('JSON.parse() failed:', caughtErr)
+      }
 
       if (pipeline.deferFinish) {
         pipeline.deferFinish = false
@@ -190,6 +194,7 @@ async function withRetry(fn, pipeline) {
     try {
       return await fn()
     } catch (error) {
+      console.error('claude router request failed:', error)
       if (error && error.status === 429) throw error
       const policy = retry.classify(error, pipeline && pipeline.signal)
       if (!policy.retry || attempt >= policy.maxAttempts) throw error
@@ -218,7 +223,7 @@ function limitMessageText(resetTime, mins) {
     OPEN +
     'ask' +
     SEP +
-    'question=' +
+    'ques=' +
     question +
     SEP +
     'option=Switch to another Claude user' +

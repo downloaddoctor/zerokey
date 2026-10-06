@@ -104,7 +104,10 @@ class ChatGPTAPI {
       agent: this._httpAgent,
     })
     if (!putRes.ok) {
-      const text = await putRes.text().catch(() => '')
+      const text = await putRes.text().catch((caughtErr) => {
+        console.error('putRes.text() failed:', caughtErr)
+        return ''
+      })
       throw new Error(`ChatGPT blob upload failed: HTTP ${putRes.status}: ${text.slice(0, 200)}`)
     }
 
@@ -128,7 +131,10 @@ class ChatGPTAPI {
     )
 
     if (!processRes.ok) {
-      const text = await processRes.text().catch(() => '')
+      const text = await processRes.text().catch((caughtErr) => {
+        console.error('processRes.text() failed:', caughtErr)
+        return ''
+      })
       throw new Error(
         `ChatGPT file processing failed: HTTP ${processRes.status}: ${text.slice(0, 200)}`,
       )
@@ -238,6 +244,7 @@ class ChatGPTAPI {
           if (body.cooldown_ms) cooldownMs = body.cooldown_ms
           else if (body.retry_after_ms) cooldownMs = body.retry_after_ms
         } catch (err) {
+          console.error('JSON.parse() failed:', err)
           /* use default */
           console.error(err)
         }
@@ -480,7 +487,9 @@ class ChatGPTAPI {
           headers: { ...this._headers },
           body: this._bodyTemplate,
         })
-      } catch {}
+      } catch (caughtErr) {
+        console.error('this._onCaptureChanged() failed:', caughtErr)
+      }
     }
   }
 
@@ -499,7 +508,10 @@ class ChatGPTAPI {
     })
 
     if (!res.ok && res.status !== 404) {
-      const text = await res.text().catch(() => '')
+      const text = await res.text().catch((caughtErr) => {
+        console.error('res.text() failed:', caughtErr)
+        return ''
+      })
       throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
     }
   }
@@ -579,6 +591,7 @@ class ChatGPTAPI {
         agent: this._httpAgent,
       })
     } catch (err) {
+      console.error('chatgpt: fetch failed for ' + url + ':', err)
       clearTimeout(timer)
       if (err.name === 'AbortError') {
         const errorObj = {

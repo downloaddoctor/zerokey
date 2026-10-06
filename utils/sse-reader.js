@@ -41,7 +41,6 @@ async function readSSE(stream, { onData, onDone, onError, onBytes }) {
     try {
       onData(data)
     } catch (err) {
-      console.error(err)
       onError(err)
     }
   }

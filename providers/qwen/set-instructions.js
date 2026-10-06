@@ -38,6 +38,7 @@ async function setQwenInstructions(qwenApi, userData, toolCalling = true) {
     console.warn(`[Qwen] Failed to set instructions: ${res.status} ${data}`)
     return false
   } catch (err) {
+    console.error('qwenApi._fetch() failed:', err)
     console.warn('[Qwen] Instructions API error:', err.message)
     return false
   }

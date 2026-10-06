@@ -15,7 +15,8 @@ const REASONING_MAP = reasoning.map
 function generateUUID() {
   try {
     return crypto.randomUUID()
-  } catch {
+  } catch (caughtErr) {
+    console.error('crypto.randomUUID() failed:', caughtErr)
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
       const r = (Math.random() * 16) | 0
       const v = c === 'x' ? r : (r & 0x3) | 0x8
@@ -233,7 +234,10 @@ class ClaudeAPI extends BaseAPI {
     })
 
     if (!res.ok && res.status !== 404) {
-      const text = await res.text().catch(() => '')
+      const text = await res.text().catch((caughtErr) => {
+        console.error('res.text() failed:', caughtErr)
+        return ''
+      })
       throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
     }
   }

@@ -57,7 +57,8 @@ function isWithin(root, candidate) {
 function realPath(value) {
   try {
     return fs.realpathSync.native ? fs.realpathSync.native(value) : fs.realpathSync(value)
-  } catch {
+  } catch (caughtErr) {
+    console.error('path-policy: realpath failed:', caughtErr)
     return null
   }
 }
@@ -175,6 +176,7 @@ function scope(options) {
       fs.lstatSync(candidate)
       throw new MhiFileError('mhi_file_exists', 'write creates new files only.')
     } catch (error) {
+      console.error('fs.lstatSync() failed:', error)
       if (error instanceof MhiFileError) throw error
       if (!error || error.code !== 'ENOENT') {
         throw new MhiFileError('mhi_path_unreadable', 'Target path could not be checked.')

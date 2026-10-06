@@ -92,7 +92,9 @@ function streamHandler(stream, session, parser, retry) {
       parser.emitText(`Retrying...\n`)
       try {
         stream.destroy()
-      } catch {}
+      } catch (caughtErr) {
+        console.error('stream.destroy() failed:', caughtErr)
+      }
       retry()
         .then((newStream) => {
           streamHandler(newStream, session, parser, retry)

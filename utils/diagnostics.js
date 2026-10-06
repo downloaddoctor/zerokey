@@ -54,7 +54,9 @@ function versionPayload(startedAt) {
   let pkg = {}
   try {
     pkg = require('../package.json')
-  } catch {}
+  } catch (caughtErr) {
+    console.error('require() failed:', caughtErr)
+  }
   return {
     name: pkg.name || 'zerokey-proxy',
     version: pkg.version || 'unknown',
@@ -75,6 +77,7 @@ function providerStatusPayload(provider, preSelected) {
         ? provider.ready()
         : { ok: true, detail: 'provider does not expose ready()' }
   } catch (error) {
+    console.error('provider.ready() threw:', error)
     readiness = {
       ok: false,
       detail: error && error.message ? error.message : String(error),
@@ -100,6 +103,7 @@ function diagnosePayload(options) {
       counts.schemaVersion =
         store.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get()?.value ?? null
     } catch (error) {
+      console.error('diagnostics: reading session counts failed:', error)
       counts.error = error.message
     }
   }

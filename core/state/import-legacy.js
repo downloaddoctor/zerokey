@@ -25,7 +25,8 @@ function legacyFile() {
 function readJson(file) {
   try {
     return JSON.parse(fs.readFileSync(file, 'utf8'))
-  } catch {
+  } catch (caughtErr) {
+    console.error('JSON.parse() failed:', caughtErr)
     return null
   }
 }
@@ -87,6 +88,7 @@ function importOnce(db) {
     db.prepare('INSERT INTO meta (key, value) VALUES (?, ?)').run(META_KEY, String(Date.now()))
     db.exec('COMMIT')
   } catch (error) {
+    console.error('legacy import: could not iterate providers:', error)
     db.exec('ROLLBACK')
     return { imported: 0, skipped: true, reason: 'error:' + error.message }
   }

@@ -19,6 +19,7 @@ module.exports = {
       const user = await api.getCurrentUser()
       return { success: true, user: user.name || 'unknown' }
     } catch (error) {
+      console.error('api.getCurrentUser() failed:', error)
       return { success: false, error: error.message }
     }
   },

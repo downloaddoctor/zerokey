@@ -82,12 +82,14 @@ function streamHandler(stream, session, parser, retry, onFinished) {
     if (trail % 2 === 1) body = body.slice(0, -1)
     try {
       return JSON.parse('"' + body + '"')
-    } catch {
+    } catch (caughtErr) {
+      console.error('JSON.parse() failed:', caughtErr)
       for (let cut = body.length - 1; cut >= 0; cut--) {
         if (body[cut] === BACKSLASH) continue
         try {
           return JSON.parse('"' + body.slice(0, cut + 1) + '"')
-        } catch {
+        } catch (caughtErr) {
+          console.error('JSON.parse() failed:', caughtErr)
           continue
         }
       }
@@ -126,7 +128,9 @@ function streamHandler(stream, session, parser, retry, onFinished) {
         parser.emitText('Retrying...\n')
         try {
           stream.destroy?.()
-        } catch {}
+        } catch (caughtErr) {
+          console.error('stream.destroy?.() failed:', caughtErr)
+        }
         retry()
           .then((newStream) => {
             streamHandler(newStream, session, parser, retry, onFinished)

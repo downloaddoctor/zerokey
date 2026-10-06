@@ -39,7 +39,8 @@ const DEFAULT_FORMATTERS = {
       return answers.skipped
         ? 'NO ANSWER'
         : [answers.selected[0], answers.freeText].filter(Boolean).join('\n')
-    } catch {
+    } catch (caughtErr) {
+      console.error('JSON.parse() failed:', caughtErr)
       return s
     }
   },
@@ -52,7 +53,8 @@ const DEFAULT_FORMATTERS = {
       if (filePath) {
         try {
           return fs.readFileSync(filePath[1], 'utf-8')
-        } catch {
+        } catch (caughtErr) {
+          console.error('fs.readFileSync() failed:', caughtErr)
           return `[LARGE OUTPUT] read → ${filePath[1]}`
         }
       }
@@ -64,7 +66,8 @@ const DEFAULT_FORMATTERS = {
       if (filePath) {
         try {
           return fs.readFileSync(filePath[1], 'utf-8')
-        } catch {
+        } catch (caughtErr) {
+          console.error('fs.readFileSync() failed:', caughtErr)
           return `[LARGE OUTPUT] read → ${filePath[1]}`
         }
       }
@@ -117,7 +120,9 @@ module.exports = (t) => {
           console.warn('[WRITE] DELETE:', internal.path)
           fs.unlinkSync(internal.path)
         }
-      } catch {}
+      } catch (caughtErr) {
+        console.error('vscode surface: resolving internal.path failed:', caughtErr)
+      }
     },
   })
 
@@ -135,9 +140,9 @@ module.exports = (t) => {
     default: { ques: '', options: [] },
     transform: (values) => {
       values.questions = [
-        { header: 'question', question: values.ques || '', options: values.options },
+        { header: 'question', question: values.question || '', options: values.options },
       ]
-      delete values.ques
+      delete values.question
       delete values.options
     },
   })
@@ -260,7 +265,9 @@ module.exports = (t) => {
             .join('') || this.shortenToolOutput(name, result)
         )
       }
-    } catch {}
+    } catch (caughtErr) {
+      console.error('JSON.parse() failed:', caughtErr)
+    }
     return this.shortenToolOutput(name, result)
   }
 }

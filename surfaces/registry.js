@@ -47,6 +47,7 @@ class SurfaceRegistry {
 
         this.surfaces.set(key, fn)
       } catch (error) {
+        console.error('require() failed:', error)
         console.error(`[Surfaces] Failed to load ${entry.name}:`, error.message)
       }
     }

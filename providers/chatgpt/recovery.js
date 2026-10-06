@@ -43,6 +43,7 @@ async function forceReloadCapture(api) {
   try {
     data = JSON.parse(fs.readFileSync(file, 'utf8'))
   } catch (error) {
+    console.error('JSON.parse() failed:', error)
     if (error && error.code === 'ENOENT') return { ok: false, reason: 'no_users_file' }
     return { ok: false, reason: 'users_file_unreadable' }
   }
@@ -60,6 +61,7 @@ async function forceReloadCapture(api) {
       await api.initializeFromJSON(entry.parsedFetch)
       return { ok: true, username }
     } catch (error) {
+      console.error('api.initializeFromJSON() failed:', error)
       console.warn(
         'Force-reload of capture failed for user ' + username + ': ' + (error.message || error),
       )
@@ -76,6 +78,7 @@ async function withAuthRecovery(api, fn) {
   try {
     return await fn()
   } catch (error) {
+    console.error('chatgpt recovery: wrapped call failed:', error)
     if (!isUnauthorized(error)) throw error
 
     console.warn('ChatGPT returned 401; forcing a capture reload and retrying once.')
@@ -117,6 +120,7 @@ async function refreshSentinelSafe(api) {
     }
     return { ok: false, reason: 'no_refresh_method' }
   } catch (error) {
+    console.error('chatgpt recovery: sentinel refresh failed:', error)
     console.warn('Sentinel refresh failed: ' + (error.message || error))
     return { ok: false, reason: error && error.message ? error.message : String(error) }
   }

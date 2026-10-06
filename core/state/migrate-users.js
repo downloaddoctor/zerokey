@@ -23,7 +23,8 @@ function usersFile() {
 function readJson(file) {
   try {
     return JSON.parse(fs.readFileSync(file, 'utf8'))
-  } catch {
+  } catch (caughtErr) {
+    console.error('JSON.parse() failed:', caughtErr)
     return null
   }
 }
@@ -119,6 +120,7 @@ function migrate(db, usersModule, sessionsModule) {
     metaSet(db, META_KEY, Date.now())
     db.exec('COMMIT')
   } catch (error) {
+    console.error('migrate-users: could not iterate providers:', error)
     db.exec('ROLLBACK')
     return { skipped: true, reason: 'error:' + error.message }
   }
@@ -126,6 +128,7 @@ function migrate(db, usersModule, sessionsModule) {
   try {
     fs.renameSync(file, file + '.migrated-' + Date.now())
   } catch (error) {
+    console.error('fs.renameSync() failed:', error)
     console.error('Could not rename users.json after migration: ' + (error.message || error))
   }
 

@@ -39,41 +39,26 @@ test('openai surface is never auto-matched by system-prompt prefix', () => {
   assert.strictEqual(matched, null)
 })
 
-test('classifySession routes a tools[]-bearing plain request to openai', () => {
+test('classifySession routes no-fingerprint requests to openai: real with tools, ephemeral without', () => {
   const messages = [
     { role: 'system', content: 'You are a helpful assistant.' },
     { role: 'user', content: 'Read package.json.' },
   ]
-  const tools = [{ type: 'function', function: { name: 'read', parameters: {} } }]
 
-  const withTools = classifySession(messages, undefined, { tools })
-  assert.strictEqual(withTools.surface, 'openai')
-  assert.strictEqual(withTools.isReal, true)
-  assert.strictEqual(withTools.matched, 'openai')
-
-  const forceHeader = classifySession(messages, undefined, { forceOpenai: true })
-  assert.strictEqual(forceHeader.surface, 'openai')
-  assert.strictEqual(forceHeader.isReal, true)
+  const tools = [{ type: 'function', function: { name: 'read' } }]
+  const result = classifySession(messages, { tools })
+  assert.strictEqual(result.surface, 'openai')
+  assert.strictEqual(result.isReal, true)
+  assert.strictEqual(classifySession(messages).isReal, false)
+  assert.strictEqual(classifySession(messages, { forceOpenai: true }).isReal, true)
+  assert.strictEqual(result.matched, 'openai')
 })
 
-test('classifySession still falls back to api without tools', () => {
-  const messages = [
-    { role: 'system', content: 'You are a helpful assistant.' },
-    { role: 'user', content: 'Hello.' },
-  ]
-
-  const noTools = classifySession(messages)
-  assert.strictEqual(noTools.surface, 'api')
-  assert.strictEqual(noTools.isReal, false)
-})
-
-test('classifySession still prefers a real IDE surface over openai', () => {
-  // vscode's fingerprint wins even when tools[] is also present.
+test('classifySession prefers a real IDE surface over openai', () => {
   const vscodePrefix = 'You are an expert AI programming assistant'
   const messages = [{ role: 'system', content: vscodePrefix + ' — and more.' }]
-  const tools = [{ type: 'function', function: { name: 'read', parameters: {} } }]
 
-  const result = classifySession(messages, undefined, { tools })
+  const result = classifySession(messages)
   assert.strictEqual(result.surface, 'vscode')
   assert.strictEqual(result.isReal, true)
 })

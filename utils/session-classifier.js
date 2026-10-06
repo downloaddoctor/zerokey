@@ -5,65 +5,63 @@
 // updating.
 //
 // The surface is resolved purely from the request's system prompt — there is no
-// header or client-supplied IDE to trust. `fallback` is used only when no
-// surface matches (ephemeral/utility calls), defaulting to 'api' — the no-tool
-// surface in surfaces/api.js.
+// header or client-supplied IDE to trust. A request with no IDE fingerprint
+// lands on the 'openai' surface: a real turn when it carries tools[] (or
+// X-ZeroKey-Tools: 1), otherwise an ephemeral utility call (title-gen,
+// summaries) that never touches the real session.
 
 const surfaceRegistry = require('../surfaces/registry')
 
-const DEFAULT_SURFACE = 'api'
-// A plain OpenAI client (no IDE system prompt) that carries tools[] is routed
-// to the identity-mapped 'openai' surface. It is a real turn (persistent
-// session, tool loop enabled) so the MHI executors run without an IDE.
-const OPENAI_SURFACE = 'openai'
+// The only surface with realSessionPrefix = null — never matched by fingerprint.
+const DEFAULT_SURFACE = 'openai'
+
+// IDE-internal utility calls (title-gen, ...) carry no fingerprint and can't be
+// tagged with headers, and they may carry tools[] too. They are matched by the
+// start of their system prompt and are always ephemeral, never a real turn.
+const UTILITY_PREFIXES = [
+  'You are an expert in crafting ultra-compact titles',
+  'You are an expert in writing short, catchy, and encouraging progress messages',
+]
 
 /**
  * Classify a request: which tool surface does it belong to, and is it a real
  * conversational turn?
  *
  * @param {Array} messages - req.body.messages
- * @param {string} [fallback=DEFAULT_SURFACE] - surface for unmatched requests
- * @param {object} [options]
- * @param {Array}  [options.tools] - req.body.tools[] (any OpenAI tool shape)
- * @param {boolean} [options.forceOpenai] - X-ZeroKey-Tools: 1 header override
  * @returns {{ isReal: boolean, surface: string, matched: string|null }}
  */
-function classifySession(messages, fallback = DEFAULT_SURFACE, options = {}) {
+function classifySession(messages, options = {}) {
   const surface = surfaceRegistry.resolveSurface(messages)
   if (surface) return { isReal: true, surface, matched: surface }
-
-  // No IDE fingerprint. A tools[] array (or the explicit header) means the
-  // caller wants tools; route to the identity-mapped 'openai' surface.
-  const hasTools = Array.isArray(options.tools) && options.tools.length > 0
-  if (hasTools || options.forceOpenai === true) {
-    return { isReal: true, surface: OPENAI_SURFACE, matched: OPENAI_SURFACE }
+  // No IDE fingerprint: a request carrying tools[] (or X-ZeroKey-Tools: 1) is a
+  // real openai turn. Anything else is an ephemeral utility call (title-gen,
+  // summaries) and must never write into the real session.
+  const first = Array.isArray(messages) ? messages[0] : null
+  const content =
+    first && first.role === 'system' && typeof first.content === 'string' ? first.content : ''
+  if (UTILITY_PREFIXES.some((p) => content.startsWith(p))) {
+    return { isReal: false, surface: DEFAULT_SURFACE, matched: DEFAULT_SURFACE }
   }
-
-  // No surface recognized this system prompt: treat as an ephemeral/utility
-  // call (title-gen, tool-optimizer, …) and use the fallback surface ('api').
-  return { isReal: false, surface: fallback, matched: null }
+  const hasTools = Array.isArray(options.tools) && options.tools.length > 0
+  const isReal = hasTools || options.forceOpenai === true
+  return { isReal, surface: DEFAULT_SURFACE, matched: DEFAULT_SURFACE }
 }
 
 /**
  * @param {Array} messages - req.body.messages
- * @param {string} [fallback]
- * @returns {boolean} true if this looks like a real conversational turn for
- *   a known IDE surface, false if it should be treated as an ephemeral call
+ * @returns {boolean} true — every request is a real turn; whether tools run is
+ *   decided by the session's toolCalling flag inside engine/pipeline.js
  */
-function isRealChatSession(messages, fallback) {
-  return classifySession(messages, fallback).isReal
+function isRealChatSession(messages) {
+  return classifySession(messages).isReal
 }
 
 /**
- * Resolve the exact tool surface for a request's messages, falling back to
- * `fallback` when no known surface matches.
- *
  * @param {Array} messages - req.body.messages
- * @param {string} [fallback]
  * @returns {string} the resolved IDE/tool-surface key
  */
-function resolveIde(messages, fallback) {
-  return classifySession(messages, fallback).surface
+function resolveIde(messages) {
+  return classifySession(messages).surface
 }
 
 module.exports = { isRealChatSession, resolveIde, classifySession, DEFAULT_SURFACE }

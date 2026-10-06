@@ -32,6 +32,7 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
     try {
       session.id = await deepseekApi.createChatSession()
     } catch (error) {
+      console.error('deepseek: createChatSession failed for session "' + session.name + '":', error)
       if (error.code === 'account_suspended' && error.muteUntil != null && userData) {
         userData.waitUntil = Math.ceil(error.muteUntil * 1000)
         userData.waitReason = 'account_suspended'
@@ -46,6 +47,7 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
     const pipeline = new StreamPipeline(res, session, 'deepseek', req.surface, req.isRealSession)
 
     if (pipeline.ephemeralMode) {
+      console.log(req.body)
       pipeline.sendFinalChunk()
       return
     }
@@ -55,6 +57,7 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
       try {
         activeSession.id = await deepseekApi.createChatSession()
       } catch (error) {
+        console.error('deepseek: rebind createChatSession failed:', error)
         if (error.code === 'account_suspended' && error.muteUntil && userData) {
           userData.waitUntil = Math.ceil(error.muteUntil * 1000)
           userData.waitReason = 'account_suspended'
@@ -128,6 +131,7 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
       })
       pipeline.flushFinish()
     } catch (error) {
+      console.error('runToolLoop() failed:', error)
       if (error.code === 'account_suspended' && error.muteUntil && userData) {
         userData.waitUntil = Math.ceil(error.muteUntil * 1000)
         userData.waitReason = 'account_suspended'
@@ -151,6 +155,7 @@ async function withRetry(fn, pipeline, label) {
     try {
       return await fn()
     } catch (error) {
+      console.error('deepseek router request failed:', error)
       if (error && error.code === 'account_suspended') throw error
       const policy = retry.classify(error, pipeline && pipeline.signal)
       if (!policy.retry || attempt >= policy.maxAttempts) throw error

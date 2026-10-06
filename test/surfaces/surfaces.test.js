@@ -5,7 +5,7 @@ const registry = require('../../surfaces/registry')
 
 test('registry auto-discovers the known surfaces', () => {
   const names = registry.getNames()
-  for (const expected of ['vscode', 'copilot', 'terax', 'opencode', 'api']) {
+  for (const expected of ['vscode', 'copilot', 'terax', 'opencode', 'openai']) {
     assert.ok(names.includes(expected), `missing surface: ${expected}`)
   }
 })
@@ -14,8 +14,7 @@ test('every surface resolves tools with a native name and the required mapping s
   for (const name of registry.getNames()) {
     const { tools, reverseMap, rawUser, system, user, tool } = registry.get(name)
 
-    // 'api' is the deliberately tool-less fallback surface.
-    if (name !== 'api') assert.ok(Object.keys(tools).length > 0, `${name}: no tools`)
+    assert.ok(Object.keys(tools).length > 0, `${name}: no tools`)
 
     assert.strictEqual(typeof rawUser, 'function', `${name}: rawUser`)
     assert.strictEqual(typeof system, 'function', `${name}: system`)

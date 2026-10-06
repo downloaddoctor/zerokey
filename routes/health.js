@@ -27,6 +27,7 @@ function buildHealthRouter(preSelected, context = {}) {
           legacy_import_done: Boolean(importDone),
         }
       } catch (error) {
+        console.error('store.prepare() failed:', error)
         persistence = { error: error.message }
       }
     }
@@ -43,7 +44,8 @@ function buildHealthRouter(preSelected, context = {}) {
             updated_at: row.updatedAt,
           }
         }
-      } catch {
+      } catch (caughtErr) {
+        console.error('sessions.get() failed:', caughtErr)
         sessionRow = null
       }
     }

@@ -121,7 +121,9 @@ function discardResponse(response) {
     return
   }
   if (typeof response.body.cancel === 'function') {
-    Promise.resolve(response.body.cancel()).catch(() => {})
+    Promise.resolve(response.body.cancel()).catch(() => {
+      // Cancelling a discarded body is best-effort.
+    })
   }
 }
 

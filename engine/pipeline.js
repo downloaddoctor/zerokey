@@ -95,11 +95,7 @@ class StreamPipeline {
     this.session = isReal ? session : ephemeralSession(session)
 
     this.isNewSession = this.session.parentId == null
-    // The 'openai' surface exists only to carry tools for plain OpenAI clients
-    // (see utils/session-classifier.js). A stale session row with toolCalling
-    // false must not silently disable the tool loop the caller asked for by
-    // sending tools[].
-    this.toolCalling = ideName === 'openai' ? true : (this.session.toolCalling ?? false)
+    this.toolCalling = this.session.toolCalling ?? false
     this.haveInstructionsAPI = false
     this.ephemeralMode = !isReal
     this.rawMode = this.ephemeralMode ? true : !this.toolCalling
@@ -232,7 +228,9 @@ class StreamPipeline {
       if (this.onFinalChunk) {
         try {
           this.onFinalChunk()
-        } catch {}
+        } catch (caughtErr) {
+          console.error('this.onFinalChunk() failed:', caughtErr)
+        }
       }
       return
     }
@@ -388,10 +386,19 @@ class StreamPipeline {
       error: serializeError(error),
     })
 
+    // Always reach the console with the full stack, even for post-finalization
+    // errors the client can no longer receive.
+    const stack = error && typeof error.stack === 'string' ? error.stack : null
+    const cause = error && error.cause
+    const causeStack = cause && typeof cause.stack === 'string' ? cause.stack : null
+    console.error(
+      `[${this.provider}] ${reason}\n${stack || detail}` +
+        (causeStack ? `\nCaused by: ${causeStack}` : ''),
+    )
+
     if (responseClosed || contentComplete) return
 
     this._finished = true
-    console.error(`[${this.provider}] ${source} error:\n`, error.message)
     const err = toOpenAIError(error, this.provider)
     this.emitAndEnd(`\n\n⚠ ${err.error.message}${err.error.action ? ' ' + err.error.action : ''}\n`)
   }

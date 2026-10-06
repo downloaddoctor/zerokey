@@ -65,6 +65,7 @@ class DeepSeekAPI extends BaseAPI {
 
       return bizData.id || bizData.chat_session?.id
     } catch (error) {
+      console.error('humanDelay() failed:', error)
       if (error.code === 'account_suspended' || error.code === 'session_create_failed') throw error
       throw new Error('Failed to create chat session: ' + error.message)
     }
@@ -238,6 +239,7 @@ class DeepSeekAPI extends BaseAPI {
       )
       return resp.data.data.biz_data.challenge
     } catch (error) {
+      console.error('this._fetch() failed:', error)
       throw new Error('Failed to get POW challenge: ' + error.message)
     }
   }
@@ -251,7 +253,10 @@ class DeepSeekAPI extends BaseAPI {
     )
 
     if (!res.ok) {
-      const text = await res.text().catch(() => '')
+      const text = await res.text().catch((caughtErr) => {
+        console.error('res.text() failed:', caughtErr)
+        return ''
+      })
       throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
     }
 
@@ -270,7 +275,10 @@ class DeepSeekAPI extends BaseAPI {
     )
 
     if (!res.ok) {
-      const text = await res.text().catch(() => '')
+      const text = await res.text().catch((caughtErr) => {
+        console.error('res.text() failed:', caughtErr)
+        return ''
+      })
       throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
     }
   }

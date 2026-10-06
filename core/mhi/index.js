@@ -117,6 +117,7 @@ function evaluateAssistant(text) {
   try {
     parsed = parser.parseAssistantText(text)
   } catch (error) {
+    console.error('parser.parseAssistantText() failed:', error)
     return {
       kind: 'continue',
       prompt:

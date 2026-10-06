@@ -50,6 +50,7 @@ function probeHealth(port) {
           try {
             return resolve(JSON.parse(text))
           } catch {
+            // Not JSON: no listener of ours is answering here.
             return resolve(null)
           }
         })
@@ -90,6 +91,7 @@ function pidAlive(pid) {
     process.kill(pid, 0)
     return true
   } catch (err) {
+    // EPERM means the process exists but is not signalable by us: alive.
     return err.code === 'EPERM'
   }
 }
@@ -99,6 +101,7 @@ function readLock(port) {
     const data = JSON.parse(fs.readFileSync(lockFileFor(port), 'utf8'))
     return Number.isInteger(data.pid) ? data : null
   } catch {
+    // Missing or corrupt lock file: treat as no owner.
     return null
   }
 }
@@ -149,7 +152,9 @@ function acquire(port) {
       )
       try {
         fs.unlinkSync(file)
-      } catch {}
+      } catch {
+        // Another instance may have already cleared it.
+      }
       // Loop again; the next iteration tries the exclusive create fresh.
     }
   }
@@ -161,7 +166,9 @@ function release(port) {
   if (lock === null || lock.pid !== process.pid) return
   try {
     fs.unlinkSync(lockFileFor(port))
-  } catch {}
+  } catch {
+    // Already gone: nothing to release.
+  }
 }
 
 /**

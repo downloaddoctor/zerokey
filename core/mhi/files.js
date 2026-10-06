@@ -38,7 +38,8 @@ function decodeUtf8(buffer) {
     throw new MhiFileError('mhi_binary_file', 'Binary files are not processed.')
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(buffer)
-  } catch {
+  } catch (caughtErr) {
+    console.error('files: TextDecoder construction failed:', caughtErr)
     throw new MhiFileError('mhi_invalid_utf8', 'File is not valid UTF-8.')
   }
 }
@@ -83,6 +84,7 @@ function atomicWrite(target, content, replaceExisting) {
       try {
         fs.linkSync(temporary, target)
       } catch (error) {
+        console.error('fs.linkSync() failed:', error)
         if (error && (error.code === 'EEXIST' || error.code === 'EPERM')) {
           throw new MhiFileError('mhi_file_exists', 'write creates new files only.')
         }
@@ -94,11 +96,15 @@ function atomicWrite(target, content, replaceExisting) {
     if (descriptor !== null) {
       try {
         fs.closeSync(descriptor)
-      } catch {}
+      } catch (caughtErr) {
+        console.error('fs.closeSync() failed:', caughtErr)
+      }
     }
     try {
       fs.unlinkSync(temporary)
-    } catch {}
+    } catch (caughtErr) {
+      console.error('fs.unlinkSync() failed:', caughtErr)
+    }
   }
 }
 
@@ -195,7 +201,8 @@ function globOperation(call, fileScope, signal) {
     let entries
     try {
       entries = fs.readdirSync(directory, { withFileTypes: true })
-    } catch {
+    } catch (caughtErr) {
+      console.error('fs.readdirSync() failed:', caughtErr)
       return
     }
     for (const entry of entries) {
@@ -207,7 +214,8 @@ function globOperation(call, fileScope, signal) {
       let stat
       try {
         stat = fs.lstatSync(full)
-      } catch {
+      } catch (caughtErr) {
+        console.error('fs.lstatSync() failed:', caughtErr)
         continue
       }
       if (stat.isSymbolicLink()) continue
@@ -268,6 +276,7 @@ function safeSearch(call) {
   try {
     regex = new RegExp(source, 'u')
   } catch (error) {
+    console.error('grep: invalid regex /' + source + '/:', error)
     throw new MhiFileError('mhi_regex_invalid', 'Invalid regex: ' + error.message)
   }
   return (line) => regex.test(line)
@@ -283,7 +292,8 @@ function grepOperation(call, fileScope, signal, options = {}) {
   if (cwd) {
     try {
       basePath = fileScope.existingDirectory(cwd).path
-    } catch {
+    } catch (caughtErr) {
+      console.error('fileScope.existingDirectory() failed:', caughtErr)
       basePath = fileScope.rootPath
     }
   }
@@ -301,6 +311,7 @@ function grepOperation(call, fileScope, signal, options = {}) {
     try {
       safeDirectory = fileScope.existingDirectory(directory)
     } catch (error) {
+      console.error('fileScope.existingDirectory() failed:', error)
       if (
         !isRoot &&
         error &&
@@ -313,7 +324,8 @@ function grepOperation(call, fileScope, signal, options = {}) {
     let entries
     try {
       entries = fs.readdirSync(safeDirectory.path, { withFileTypes: true })
-    } catch {
+    } catch (caughtErr) {
+      console.error('fs.readdirSync() failed:', caughtErr)
       return
     }
     for (const entry of entries) {
@@ -325,7 +337,8 @@ function grepOperation(call, fileScope, signal, options = {}) {
       let stat
       try {
         stat = fs.lstatSync(full)
-      } catch {
+      } catch (caughtErr) {
+        console.error('fs.lstatSync() failed:', caughtErr)
         continue
       }
       if (stat.isSymbolicLink()) continue
@@ -337,7 +350,8 @@ function grepOperation(call, fileScope, signal, options = {}) {
       let safeFile
       try {
         safeFile = fileScope.existingFile(full)
-      } catch {
+      } catch (caughtErr) {
+        console.error('fileScope.existingFile() failed:', caughtErr)
         continue
       }
       files += 1
@@ -351,7 +365,8 @@ function grepOperation(call, fileScope, signal, options = {}) {
       let text
       try {
         text = decodeUtf8(fs.readFileSync(safeFile.path))
-      } catch {
+      } catch (caughtErr) {
+        console.error('decodeUtf8() failed:', caughtErr)
         continue
       }
       const lines = text.split(/\r?\n/)
@@ -437,6 +452,7 @@ async function execute(call, options = {}) {
       output: boundedOutput(result.output),
     }
   } catch (error) {
+    console.error('files: scope resolution failed:', error)
     if (error && error.name === 'AbortError') throw error
     const code = error && typeof error.code === 'string' ? error.code : 'mhi_file_error'
     const message = error && error.message ? error.message : 'Unknown file error.'
@@ -451,6 +467,7 @@ async function executeMany(calls, options = {}) {
     try {
       results.push(await execute(call, options))
     } catch (error) {
+      console.error('files: glob/grep result collection failed:', error)
       if (error && error.name === 'AbortError') throw error
       const code = error && typeof error.code === 'string' ? error.code : 'mhi_file_error'
       const message = error && error.message ? error.message : 'Unknown file error.'

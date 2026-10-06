@@ -34,11 +34,7 @@ app.use(express.json({ limit: '50mb' }))
 const prepareChatRequest = (req, res, next) => {
   if (!validateMessages(req.body?.messages, res)) return
   StreamPipeline.setSSEHeaders(res)
-  const forceOpenai = req.headers['x-zerokey-tools'] === '1'
-  const { isReal, surface, matched } = classifySession(req.body?.messages, undefined, {
-    tools: req.body?.tools,
-    forceOpenai,
-  })
+  const { isReal, surface, matched } = classifySession(req.body?.messages)
   req.surface = surface
   req.isRealSession = isReal
   req.matchedSurface = matched
@@ -76,6 +72,7 @@ async function start({ db: store, preSelected, port }) {
     const provider = registry.get(preSelected.provider)
     providerStatus = diagnostics.providerStatusPayload(provider, preSelected)
   } catch (error) {
+    console.error('failed to require a route module:', error)
     providerStatus = { error: error.message }
   }
 
@@ -102,13 +99,14 @@ async function start({ db: store, preSelected, port }) {
       sessionName: preSelected.sessionName,
     })
   } catch (error) {
+    console.error('buildRouter() failed for provider ' + preSelected.provider + ':', error)
     console.error(`Failed to build initial router: ${error.message || error}`)
     throw error
   }
   app.use('/v1/chat/completions', sequentialQueue(), prepareChatRequest, router)
 
   app.use((err, req, res, _next) => {
-    console.error(`[SERVER] Unhandled error: ${err.message || err}`)
+    console.error(`[SERVER] Unhandled error: ${err && err.stack ? err.stack : String(err)}`)
     const openaiErr = toOpenAIError(err, preSelected.provider)
     const status = openaiErr.error?.status || err.statusCode || err.status || 500
     try {
@@ -123,7 +121,9 @@ async function start({ db: store, preSelected, port }) {
           `Body: ${JSON.stringify(body, null, 2)}`,
         ].join('\n'),
       )
-    } catch {}
+    } catch (caughtErr) {
+      console.error('error handler could not serialize req.body:', caughtErr)
+    }
     if (!res.headersSent) res.status(status).json(openaiErr)
     else res.end()
   })

@@ -17,6 +17,17 @@ const { CONFIG } = require('./config/constants')
 
 require('./utils/log')
 
+// Nothing may fail silently: log the full stack of every stray error.
+process.on('uncaughtException', (err, origin) => {
+  console.error(`[PROCESS] ${origin}: ${err && err.stack ? err.stack : String(err)}`)
+  process.exit(1)
+})
+process.on('unhandledRejection', (reason) => {
+  console.error(
+    `[PROCESS] unhandledRejection: ${reason && reason.stack ? reason.stack : String(reason)}`,
+  )
+})
+
 async function run() {
   const port = await startup.claimFirstFree({
     start: CONFIG.PORT,
@@ -42,7 +53,9 @@ async function run() {
     startup.release(port)
     try {
       store.close()
-    } catch {}
+    } catch {
+      // Best-effort close on shutdown; ignore.
+    }
   }
 
   let preSelected = null
@@ -84,7 +97,9 @@ async function run() {
   const shutdown = (signal) => {
     try {
       selector.flush()
-    } catch {}
+    } catch {
+      // Best-effort flush on shutdown; ignore.
+    }
     console.info(`Signal ${signal} received, shutting down.`)
     app.stop().then(
       () => {
@@ -102,7 +117,9 @@ async function run() {
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
     try {
       process.on(signal, () => shutdown(signal))
-    } catch {}
+    } catch {
+      // Some signals are unavailable on this platform; ignore.
+    }
   }
 
   process.on('exit', () => startup.release(port))

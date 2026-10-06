@@ -37,7 +37,8 @@ function parseBlob(value, fallback) {
   try {
     const parsed = JSON.parse(value)
     return parsed && typeof parsed === 'object' ? parsed : fallback
-  } catch {
+  } catch (caughtErr) {
+    console.error('JSON.parse() failed:', caughtErr)
     return fallback
   }
 }
@@ -117,6 +118,7 @@ function schedule(db, user) {
       try {
         flush(db, user)
       } catch (error) {
+        console.error('flush() failed:', error)
         const message = error && error.message ? error.message : String(error)
         if (!/database is not open/i.test(message)) {
           console.error('users flush failed: ' + message)

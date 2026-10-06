@@ -42,7 +42,9 @@ function harToCapture(harPath, outputDir) {
     let host = 'unknown'
     try {
       host = new URL(url).hostname
-    } catch {}
+    } catch {
+      // Non-URL input: keep the "unknown" host fallback.
+    }
 
     const ts = capture.meta.timestamp
       ? new Date(capture.meta.timestamp).toISOString().replace(/[:.]/g, '-')

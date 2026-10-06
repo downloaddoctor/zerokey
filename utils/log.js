@@ -49,7 +49,12 @@ function redact(value) {
   else {
     try {
       out = String(value)
-    } catch {
+    } catch (caughtErr) {
+      process.stderr.write(
+        'logger error: ' +
+          String(caughtErr && caughtErr.stack ? caughtErr.stack : caughtErr) +
+          '\n',
+      )
       return '<unprintable>'
     }
   }
@@ -80,10 +85,18 @@ function formatArg(value) {
   if (typeof value === 'string') return value
   if (value === null || value === undefined) return String(value)
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  if (value instanceof Error) return value.stack || value.message
+  if (value instanceof Error) {
+    // A foreign prepareStackTrace can make .stack a non-string; never trust it.
+    const own = typeof value.stack === 'string' ? value.stack : String(value.stack || value.message)
+    const cause = value.cause
+    return cause instanceof Error ? own + '\nCaused by: ' + formatArg(cause) : own
+  }
   try {
     return JSON.stringify(value)
-  } catch {
+  } catch (caughtErr) {
+    process.stderr.write(
+      'logger error: ' + String(caughtErr && caughtErr.stack ? caughtErr.stack : caughtErr) + '\n',
+    )
     return String(value)
   }
 }
@@ -128,7 +141,11 @@ const _error = console.error.bind(console)
 const _debug = console.debug.bind(console)
 
 function mapArgs(args, fn) {
-  return args.map((a) => (typeof a === 'string' ? fn(a) : a))
+  // Error arguments become their redacted stack, so console.error(msg, err)
+  // always shows the full trace without the caller formatting it.
+  return args.map((a) =>
+    a instanceof Error ? fn(formatArg(a)) : typeof a === 'string' ? fn(a) : a,
+  )
 }
 
 /**
@@ -163,7 +180,10 @@ function listRotated(logDir, name) {
   let entries
   try {
     entries = fs.readdirSync(logDir)
-  } catch {
+  } catch (caughtErr) {
+    process.stderr.write(
+      'logger error: ' + String(caughtErr && caughtErr.stack ? caughtErr.stack : caughtErr) + '\n',
+    )
     return []
   }
   const out = []
@@ -184,7 +204,13 @@ function pruneRotated(logDir, name, keep) {
   for (let i = 0; i < excess; i += 1) {
     try {
       fs.unlinkSync(rotated[i].file)
-    } catch {}
+    } catch (caughtErr) {
+      process.stderr.write(
+        'logger error: ' +
+          String(caughtErr && caughtErr.stack ? caughtErr.stack : caughtErr) +
+          '\n',
+      )
+    }
   }
 }
 
@@ -219,7 +245,13 @@ class LogSaver {
       }
 
       fs.appendFileSync(this.logFile, line + '\n', 'utf8')
-    } catch {}
+    } catch (caughtErr) {
+      process.stderr.write(
+        'logger error: ' +
+          String(caughtErr && caughtErr.stack ? caughtErr.stack : caughtErr) +
+          '\n',
+      )
+    }
   }
 }
 
@@ -272,21 +304,28 @@ function write(level, message) {
 // so the cost is one short walk instead of stringifying the whole trace. The
 // log.js frame itself is always skipped.
 
-const MAX_STACK_FRAMES = 4
+const MAX_STACK_FRAMES = 6
 const SELF_FILE = __filename
 
-let _prepareStackSave = null
-
 function _captureCaller() {
-  // Only install our prepareStackTrace once — it is global V8 state.
-  if (_prepareStackSave === null) {
-    _prepareStackSave = Error.prepareStackTrace
-    Error.prepareStackTrace = (_err, structured) => structured
-  }
+  // prepareStackTrace is global V8 state (Playwright and others call
+  // error.stack.split) — install it only for this capture, always restore.
+  const previousPrepare = Error.prepareStackTrace
   const previousLimit = Error.stackTraceLimit
-  Error.stackTraceLimit = MAX_STACK_FRAMES
-  const stack = new Error().stack
-  Error.stackTraceLimit = previousLimit
+  let stack
+  try {
+    Error.prepareStackTrace = (_err, structured) => structured
+    Error.stackTraceLimit = MAX_STACK_FRAMES
+    stack = new Error().stack
+  } catch (caughtErr) {
+    process.stderr.write(
+      'logger error: ' + String(caughtErr && caughtErr.stack ? caughtErr.stack : caughtErr) + '\n',
+    )
+    stack = null
+  } finally {
+    Error.prepareStackTrace = previousPrepare
+    Error.stackTraceLimit = previousLimit
+  }
 
   if (!Array.isArray(stack)) return null
   for (const frame of stack) {

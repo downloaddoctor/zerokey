@@ -95,7 +95,9 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
               resolve()
             }
             const onFinished = (responseId) => {
-              qwenApi.selectMessage(activeSession.id, responseId).catch(() => {})
+              qwenApi.selectMessage(activeSession.id, responseId).catch((caughtErr) => {
+                console.error('qwenApi.selectMessage() failed:', caughtErr)
+              })
             }
             streamHandler(qwenStream, activeSession, pipeline, retryFn, onFinished)
           })
@@ -104,6 +106,7 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
       })
       pipeline.flushFinish()
     } catch (error) {
+      console.error('runToolLoop() failed:', error)
       if (error?.code === 'RateLimited' && userData) {
         const waitMs = typeof error.waitMs === 'number' ? error.waitMs : 24 * 60 * 60 * 1000
         userData.waitUntil = Date.now() + waitMs
@@ -128,6 +131,7 @@ async function withRetry(fn, pipeline) {
     try {
       return await fn()
     } catch (error) {
+      console.error('qwen router request failed:', error)
       if (error && error.code === 'RateLimited') throw error
       const policy = retry.classify(error, pipeline && pipeline.signal)
       if (!policy.retry || attempt >= policy.maxAttempts) throw error

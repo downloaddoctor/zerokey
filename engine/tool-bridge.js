@@ -203,7 +203,8 @@ function coerceArguments(params, schema) {
     ) {
       try {
         out[key] = JSON.parse(value)
-      } catch {
+      } catch (caughtErr) {
+        console.error('tool-bridge: JSON.parse failed for key "' + key + '":', caughtErr)
         out[key] = value
       }
     } else {

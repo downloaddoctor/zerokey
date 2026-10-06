@@ -83,7 +83,8 @@ function parseArguments(raw) {
   if (typeof raw === 'string') {
     try {
       value = JSON.parse(raw)
-    } catch {
+    } catch (caughtErr) {
+      console.error('JSON.parse() failed:', caughtErr)
       throw new MhiCommandError('mhi_cmd_args_invalid', 'args must be a JSON array of strings.')
     }
   }
@@ -154,7 +155,8 @@ function ensureProgramToken(program) {
 function realPath(value) {
   try {
     return fs.realpathSync.native ? fs.realpathSync.native(value) : fs.realpathSync(value)
-  } catch {
+  } catch (caughtErr) {
+    console.error('commands: realpath failed:', caughtErr)
     return null
   }
 }
@@ -368,17 +370,22 @@ function terminatePidTree(pid) {
           windowsHide: true,
           shell: false,
         })
-      } catch {
+      } catch (caughtErr) {
+        console.error('spawn() failed:', caughtErr)
         try {
           process.kill(pid, 'SIGKILL')
-        } catch {}
+        } catch (caughtErr) {
+          console.error('process.kill() failed:', caughtErr)
+        }
         done()
         return
       }
       killer.once('error', () => {
         try {
           process.kill(pid, 'SIGKILL')
-        } catch {}
+        } catch (caughtErr) {
+          console.error('process.kill() failed:', caughtErr)
+        }
         done()
       })
       killer.once('close', done)
@@ -387,10 +394,13 @@ function terminatePidTree(pid) {
   }
   try {
     process.kill(-pid, 'SIGKILL')
-  } catch {
+  } catch (caughtErr) {
+    console.error('process.kill() failed:', caughtErr)
     try {
       process.kill(pid, 'SIGKILL')
-    } catch {}
+    } catch (caughtErr) {
+      console.error('process.kill() failed:', caughtErr)
+    }
   }
   return Promise.resolve()
 }
@@ -426,7 +436,8 @@ function processIdentity(pid) {
         shell: false,
       },
     )
-  } catch {
+  } catch (caughtErr) {
+    console.error('spawnSync() failed:', caughtErr)
     return null
   }
   if (!result || result.status !== 0 || typeof result.stdout !== 'string') return null
@@ -439,7 +450,8 @@ function processIdentity(pid) {
         : null
     if (!Number.isSafeInteger(startedAt) || startedAt <= 0 || executable === null) return null
     return { startedAt, executable }
-  } catch {
+  } catch (caughtErr) {
+    console.error('JSON.parse() failed:', caughtErr)
     return null
   }
 }
@@ -519,6 +531,7 @@ function runProcess(resolved, args, cwd, options) {
         detached: process.platform !== 'win32',
       })
     } catch (error) {
+      console.error('spawn() failed:', error)
       finish(new MhiCommandError('mhi_cmd_spawn_failed', 'Could not start: ' + error.message))
       return
     }
@@ -581,6 +594,7 @@ async function execute(call, options = {}) {
     }
     return { tool: 'cmd', ok: true, output }
   } catch (error) {
+    console.error('prepareExecution() failed:', error)
     if (error && error.name === 'AbortError') throw error
     const code = error && typeof error.code === 'string' ? error.code : 'mhi_cmd_error'
     const message = error && error.message ? error.message : 'Unknown command error.'

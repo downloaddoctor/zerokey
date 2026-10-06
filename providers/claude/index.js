@@ -26,6 +26,7 @@ module.exports = {
       const profile = await api.getCurrentUser()
       return { success: true, user: profile.account?.name || 'unknown' }
     } catch (error) {
+      console.error('api.getCurrentUser() failed:', error)
       return { success: false, error: error.message }
     }
   },

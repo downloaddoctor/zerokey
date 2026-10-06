@@ -26,7 +26,9 @@ async function buildChatGPTRouter(parsedFetch, session) {
     if (pipeline.ephemeralMode) {
       pipeline.onFinalChunk = () => {
         if (pipeline.session.id) {
-          chatgptApi.deleteSession(pipeline.session.id).catch(() => {})
+          chatgptApi.deleteSession(pipeline.session.id).catch((caughtErr) => {
+            console.error('chatgptApi.deleteSession() failed:', caughtErr)
+          })
         }
       }
       pipeline.sendFinalChunk()
@@ -77,6 +79,7 @@ async function buildChatGPTRouter(parsedFetch, session) {
       })
       pipeline.flushFinish()
     } catch (error) {
+      console.error('runToolLoop() failed:', error)
       if (pipeline.deferFinish) {
         pipeline.deferFinish = false
         pipeline._finished = false
@@ -102,6 +105,7 @@ async function withRetry(fn, pipeline) {
     try {
       return await fn()
     } catch (error) {
+      console.error('chatgpt router request failed:', error)
       const policy = retry.classify(error, pipeline && pipeline.signal)
       if (!policy.retry || attempt >= policy.maxAttempts) throw error
       retry.discardResponse(error.response)

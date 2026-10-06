@@ -32,6 +32,7 @@ async function setClaudeInstructions(claudeApi, userData, toolCalling = true) {
       return false
     }
   } catch (err) {
+    console.error('claudeApi._fetch() failed:', err)
     console.warn('[Claude] Instructions API error:', err.message)
     return false
   }

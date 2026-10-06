@@ -80,6 +80,7 @@ function persistAfterTurn(seed, session) {
     seed.row.state = session.id ? 'idle' : 'unbound'
     seed.session.lastUsed = seed.row.lastUsed
   } catch (error) {
+    console.error('sessions flush failed:', error)
     console.warn('Session persistence failed: ' + (error.message || error))
   }
 }
@@ -100,6 +101,7 @@ async function buildRouter(selected, sessionContext) {
         const user = users.getById(db, userId)
         if (user) user.parsedFetch = nextCapture
       } catch (error) {
+        console.error('users.getById() failed for id ' + userId + ':', error)
         console.warn('Credential persistence failed: ' + (error.message || error))
       }
     }

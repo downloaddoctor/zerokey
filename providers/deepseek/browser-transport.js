@@ -144,6 +144,7 @@ class DeepSeekBrowserTransport {
     try {
       await this._page.goto(url, { waitUntil: 'commit', timeout: 30_000 })
     } catch (err) {
+      console.error('this._page.goto() failed:', err)
       if (this._log) console.debug(`[DeepSeek/browser] goto ${url} → ${err.message}`)
     }
   }
@@ -186,6 +187,7 @@ class DeepSeekBrowserTransport {
               }
               window.__dsDone()
             } catch (e) {
+              console.error('browser-transport: SSE read loop failed:', e)
               window.__dsError(String(e && e.message ? e.message : e))
             }
           })()
@@ -195,6 +197,7 @@ class DeepSeekBrowserTransport {
             headers: response.headers,
           })
         } catch (e) {
+          console.error('browser-transport: navigation loop failed:', e)
           window.__dsError('tee failed: ' + (e && e.message ? e.message : e))
           return response
         }
@@ -223,6 +226,7 @@ class DeepSeekBrowserTransport {
               if (text) window.__dsChunk(Array.from(new TextEncoder().encode(text)))
               window.__dsDone()
             } catch (e) {
+              console.error('browser-transport: response parse failed:', e)
               window.__dsError(String(e && e.message ? e.message : e))
             }
           }
@@ -248,7 +252,8 @@ class DeepSeekBrowserTransport {
           }
           localStorage.setItem('userToken', JSON.stringify({ value, __version: '0' }))
           return true
-        } catch {
+        } catch (caughtErr) {
+          console.error('localStorage.getItem() failed:', caughtErr)
           return false
         }
       }, this._seedToken)
@@ -258,6 +263,7 @@ class DeepSeekBrowserTransport {
         await this._gotoFast(START_URL)
       }
     } catch (err) {
+      console.error('this._page.evaluate() failed:', err)
       if (this._log) console.debug(`[DeepSeek/browser] userToken inject failed: ${err.message}`)
     }
   }
@@ -270,11 +276,15 @@ class DeepSeekBrowserTransport {
           try {
             const raw = localStorage.getItem('userToken')
             return raw ? Boolean(JSON.parse(raw).value) : false
-          } catch {
+          } catch (caughtErr) {
+            console.error('localStorage.getItem() failed:', caughtErr)
             return false
           }
         })
-        .catch(() => false)
+        .catch((caughtErr) => {
+          console.error('Unexpected error:', caughtErr)
+          return false
+        })
       if (has) return true
       await this._page.waitForTimeout(LOGIN_POLL_MS)
     }
@@ -283,7 +293,9 @@ class DeepSeekBrowserTransport {
 
   async close() {
     if (this._context) {
-      await this._context.close().catch(() => {})
+      await this._context.close().catch((caughtErr) => {
+        console.error('this._context.close() failed:', caughtErr)
+      })
       this._context = null
       this._page = null
       this._cdp = null
@@ -325,7 +337,8 @@ class DeepSeekBrowserTransport {
           .filter({ hasText: /^New chat$/ })
           .first()
         await btn.click({ timeout: 5000 })
-      } catch {
+      } catch (caughtErr) {
+        console.error('browser-transport: page unavailable:', caughtErr)
         await this._gotoFast(`${START_URL}a/chat`)
       }
     }
@@ -403,7 +416,8 @@ class DeepSeekBrowserTransport {
         .locator('textarea, div[contenteditable="true"]')
         .first()
         .waitFor({ state: 'visible', timeout: timeoutMs })
-    } catch {
+    } catch (caughtErr) {
+      console.error('this._page failed:', caughtErr)
       /* send will surface the error if composer never appears */
     }
   }
@@ -474,7 +488,8 @@ class DeepSeekBrowserTransport {
           `[DeepSeek/browser] toggle "${labelText}" did not reach ${desiredOn} (last=${last})`,
         )
       }
-    } catch {
+    } catch (caughtErr) {
+      console.error('this._page failed:', caughtErr)
       /* non-fatal */
     }
   }

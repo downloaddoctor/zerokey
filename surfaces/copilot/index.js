@@ -53,7 +53,9 @@ module.exports = (t) => {
           console.warn('[WRITE] DELETE:', internal.path)
           fs.unlinkSync(internal.path)
         }
-      } catch {}
+      } catch (caughtErr) {
+        console.error('copilot surface: resolving internal.path failed:', caughtErr)
+      }
     },
   })
 
