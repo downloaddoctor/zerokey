@@ -48,7 +48,7 @@ class SessionSelector {
       while (this.user.waitUntil && this.user.waitUntil > Date.now()) {
         const mins = Math.ceil((this.user.waitUntil - Date.now()) / 60000)
         const resetsAt = this._formatResetTime(this.user.waitUntil)
-        console.warn('\n' + waitPolicy.userMessage(this.user.username, resetsAt, mins) + '\n')
+        console.warn('\n' + waitPolicy.userMessage(this.user.username, resetsAt, mins) + '\n', 1)
 
         const availableUsers = providerUsers.filter(
           (u) => u.username !== this.user.username && (!u.waitUntil || u.waitUntil <= Date.now()),
@@ -63,6 +63,7 @@ class SessionSelector {
           const resetsAtSoonest = this._formatResetTime(soonest.ts)
           console.error(
             '\n' + waitPolicy.allMessage(soonest.username, resetsAtSoonest, minsLeft) + '\n',
+            1,
           )
           return this.select(false)
         }
@@ -256,7 +257,7 @@ class SessionSelector {
   }
 
   async _promptNewUser() {
-    console.info('\n  -- Create New User --\n')
+    console.info('\n  -- Create New User --\n', 1)
 
     const { username: rawUsername } = await prompts(
       {
@@ -274,7 +275,7 @@ class SessionSelector {
     const provider = registry.get(this.provider)
     const providerUrl = provider.setupSteps?.url
     if (providerUrl) {
-      console.debug.mix('\n  Opening ' + text.blue(providerUrl) + ' in your browser...')
+      console.debug.mix('\n  Opening ' + text.blue(providerUrl) + ' in your browser...', 1)
       this._openBrowser(providerUrl)
     }
 
@@ -286,13 +287,14 @@ class SessionSelector {
       steps.push('  4. Right-click - Copy - Copy as fetch')
     }
 
-    console.debug('\n  Paste the full fetch() call from browser DevTools:')
-    steps.forEach((s) => console.debug.mix(s))
-    console.debug('')
+    console.debug('\n  Paste the full fetch() call from browser DevTools:', 1)
+    steps.forEach((s) => console.debug.mix(s, 1))
+    console.debug('', 1)
 
     while (true) {
       console.debug(
         '  Notepad will open - paste your fetch() call, save (Ctrl+S), close Notepad.\n',
+        1,
       )
       const fetchStr = await this._openEditor()
 
@@ -306,8 +308,7 @@ class SessionSelector {
       try {
         parsedFetch = this._parseFetchDirect(fetchStr)
       } catch (e) {
-        console.error('this._parseFetchDirect() failed:', e)
-        console.error('  ✖ Failed to parse fetch: ' + e.message + '\n')
+        console.error('  ✖ Failed to parse fetch: ' + e.message + '\n', e, 1)
         continue
       }
 
@@ -317,6 +318,7 @@ class SessionSelector {
           '  ✖ Fetch is missing required headers:\n' +
             missing.map((h) => '     - ' + h).join('\n') +
             '\n',
+          1,
         )
         if (
           !(await this._retryOrCancel(
@@ -333,9 +335,8 @@ class SessionSelector {
         process.stdout.write('\r                                  ')
         process.stdout.write('\r  ' + text.green('√ Session verified') + '\n\n')
       } catch (e) {
-        console.error('this._validateLiveConnection() failed:', e)
         process.stdout.write(' \n\n')
-        console.error('  ✖ Live check failed: ' + e.message + '\n')
+        console.error('  ✖ Live check failed: ' + e.message + '\n', e, 1)
         if (
           !(await this._retryOrCancel(
             'Credentials rejected by provider - what would you like to do?',
@@ -517,7 +518,6 @@ class SessionSelector {
     try {
       await this._deleteProviderSessions()
     } catch (e) {
-      console.error('this._deleteProviderSessions() failed:', e)
       console.warn('\n  Provider cleanup failed: ' + e.message)
     }
     process.stdout.write(
@@ -533,7 +533,6 @@ class SessionSelector {
     try {
       fs.rmSync(this._profileDirFor(target.toLowerCase()), { recursive: true, force: true })
     } catch (e) {
-      console.error('fs.rmSync() failed:', e)
       console.warn('  Failed to remove profile dir: ' + e.message)
     }
     console.info('  ' + text.green('√') + ' User "' + target + '" removed.\n')
@@ -584,7 +583,6 @@ class SessionSelector {
         process.stdout.write(text.dim('\r  Deleting ' + deleted + '/' + toDelete.length))
         await api.deleteSession(session.id)
       } catch (e) {
-        console.error('session-selector: delete counter failed:', e)
         console.warn('\n  Failed ' + session.id + ': ' + e.message)
       }
     }
@@ -656,8 +654,7 @@ class SessionSelector {
     if (opts.body && typeof opts.body === 'string') {
       try {
         body = JSON.parse(opts.body)
-      } catch (caughtErr) {
-        console.error('JSON.parse() failed:', caughtErr)
+      } catch {
         body = {}
       }
     }
@@ -683,8 +680,7 @@ class SessionSelector {
       if (mins < 60) return mins + 'm ago'
       if (mins < 1440) return Math.floor(mins / 60) + 'h ago'
       return Math.floor(mins / 1440) + 'd ago'
-    } catch (caughtErr) {
-      console.error('session-selector: bad timestamp ' + isoString + ':', caughtErr)
+    } catch {
       return 'unknown'
     }
   }

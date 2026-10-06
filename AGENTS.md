@@ -66,7 +66,7 @@ MODULES
  utils/rate-limiter.js — sliding window 15/60s per label; setProviderCooldown on 429
  utils/startup.js — per-port lock file temp/db/.start.<port>.lock; probeHealth/postClaim
  utils/errors.js — classifyError → toOpenAIError (two calling conventions)
- utils/log.js — one zerokey.log for everything; console.* rewired (colour + [TAG] + redact + mirror); console.error('msg', err[, ctx]) auto-emits a multi-line block (where/context/stack) when an Error is present — the ONE entry point; formatError renders an Error → Name/msg|code|status + stack + caused-by chain
+ utils/log.js — one zerokey.log (ts,pid,level,tag,msg,where,error,code,status,context,stack) separated by engine/syntax.js SEP (not a comma), one line per record; console.* rewired (colour + auto [FILE] tag + redact + mirror); console.error('msg', err[, ctx]) fills all columns — the ONE entry point; O(1) per call (cached tag, in-memory size, depth-capped causes); formatError renders Error → Name/msg|code|status + frames + caused-by
 
 ARCHITECTURE
  Request flow: app.js middleware → sequentialQueue → prepareChatRequest → buildRouter(preSelected)
@@ -143,7 +143,7 @@ TESTING
 INVARIANTS
  One server process = one preSelected session; restart to switch session/user
  No API keys, cookies, or credential values in logs or commit messages
- Errors go through console.error('msg', err[, context]) — log.js turns that into a structured block inline in zerokey.log; never stringify an Error by hand, never instantiate a LogSaver for errors
+ Errors go through console.error('msg', err[, context]) — log.js turns that into one CSV row in zerokey.log; never stringify an Error by hand, never instantiate a LogSaver for errors
  One log file, no errors.log — the error block sits right after the lifecycle lines that led to it, so the preceding context travels with it
  Internal executors never throw on normal failure — they return {ok:false, code, output}
  Path policy: all MHI file/cmd paths confined to the resolved workspace root (realpath-checked)

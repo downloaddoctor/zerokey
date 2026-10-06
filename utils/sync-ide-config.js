@@ -178,7 +178,7 @@ async function syncIdeConfig(preSelected, port) {
     fs.renameSync(tmpPath, TARGET_PATH)
 
     console.success('[SERVER] ZeroKey model synced to VS Code.')
-    console.log('         Select in VS Code Chat →', text.cyan(modelName), '\n')
+    console.log('         Select in VS Code Chat →', text.cyan(modelName), '\n', 1)
   } catch (error) {
     console.debug(`[IDE-CFG] Sync skipped (non-fatal): ${error.message}`)
   }
