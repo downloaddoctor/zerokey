@@ -1,0 +1,54 @@
+name: prefix-drift
+
+# Nightly (and on-demand) check that the upstream prompt prefixes ZeroKey
+# matches still exist in the source repos. Deliberately NOT a pull-request
+# gate: it needs the network and would break on a GitHub outage. It opens an
+# issue when a watched prefix has moved or disappeared.
+#
+# When it fires: read the issue, open the URL, append the new prefix to
+# surfaces/<name>/index.js AND test/surfaces/prefixes.snapshot.json, keep the
+# old one, and update prefixes.sources.json if the file moved.
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check for prefix drift
+        id: drift
+        continue-on-error: true
+        run: node scripts/check-prefix-drift.js | tee drift.txt
+
+      - name: Open an issue on drift
+        if: steps.drift.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "$(gh issue list --search 'prefix drift in:title' --state open --json number --jq '.[].number')" ]; then
+            echo "An open prefix-drift issue already exists; skipping."
+            exit 0
+          fi
+          {
+            echo "The nightly prefix-drift check found a watched prompt prefix that is no longer in its upstream source."
+            echo
+            echo '```'
+            cat drift.txt
+            echo '```'
+            echo
+            echo 'To resolve: read the URL, append the new prefix to `surfaces/<name>/index.js` AND `test/surfaces/prefixes.snapshot.json` (keep the old one), and update `prefixes.sources.json` if the file moved.'
+          } > body.md
+          gh issue create --title "prefix drift: upstream prompt source changed" --body-file body.md
