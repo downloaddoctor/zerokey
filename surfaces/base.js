@@ -45,6 +45,10 @@ class IDEToolSurface {
     this.ideName = null
     this.newSessionStartLength = 0
     this.realSessionPrefix = null
+    // Additional real fingerprints for older versions of the same IDE. The
+    // system prompt changes across releases; users on an old build still ship
+    // the old string. Combined with realSessionPrefix inside isRealSession.
+    this.realSessionPrefixAliases = []
     // System-prompt prefixes for IDE-internal utility calls (title-gen,
     // progress messages, summarizer, terminal quick fix, …). Each surface
     // declares its own; matched by prefix because utility prompts are short
@@ -115,11 +119,13 @@ class IDEToolSurface {
    * @returns {boolean}
    */
   isRealSession(content) {
-    return (
-      typeof content === 'string' &&
-      typeof this.realSessionPrefix === 'string' &&
-      content.startsWith(this.realSessionPrefix)
-    )
+    if (typeof content !== 'string') return false
+    const prefixes = []
+    if (typeof this.realSessionPrefix === 'string') prefixes.push(this.realSessionPrefix)
+    if (Array.isArray(this.realSessionPrefixAliases)) {
+      prefixes.push(...this.realSessionPrefixAliases)
+    }
+    return prefixes.some((p) => typeof p === 'string' && p.length > 0 && content.startsWith(p))
   }
 
   /**

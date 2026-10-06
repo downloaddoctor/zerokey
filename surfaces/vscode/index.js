@@ -104,12 +104,21 @@ module.exports = (t) => {
   t.ideName = 'vscode'
   t.newSessionStartLength = 3
   t.realSessionPrefix = 'You are an expert AI programming assistant'
-  // VS Code issues these as separate LLM calls (title generation, progress
-  // messages). Add new prefixes here when VS Code ships a new utility
-  // (summarizer, terminal quick fix, commit message, tool/MCP optimiser, …).
+  // VS Code issues these as separate LLM calls (not real chat turns).
+  // Sources (microsoft/vscode):
+  //   https://github.com/microsoft/vscode/blob/main/extensions/copilot/src/extension/prompts/node/panel/chatTitle.tsx
+  //   https://github.com/microsoft/vscode/blob/main/extensions/copilot/src/extension/prompts/node/panel/progressMessages.tsx
+  //   https://github.com/microsoft/vscode/blob/main/extensions/copilot/src/extension/prompts/node/panel/terminalQuickFix.tsx
+  //     (both TerminalQuickFixFileContextPrompt and TerminalQuickFixPrompt
+  //      share the same prefix, so one string covers both)
+  // Add new prefixes as VS Code ships them; never remove one.
   t.utilityPrefixes = [
+    // Chat title generation.
     'You are an expert in crafting ultra-compact titles',
+    // Progress messages shown while the model streams.
     'You are an expert in writing short, catchy, and encouraging progress messages',
+    // Terminal quick fix (file context + command suggestions).
+    'You are a programmer who specializes in using the command line.',
   ]
   t.browserTools = true
   t.formatters = DEFAULT_FORMATTERS

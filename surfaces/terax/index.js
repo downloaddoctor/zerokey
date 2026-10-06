@@ -5,6 +5,12 @@ module.exports = (t) => {
   t.ideName = 'terax'
   t.newSessionStartLength = 2
   t.realSessionPrefix = 'You are Terax, an AI agent'
+  // Terax has no LLM-backed utility prompt today: compact.ts
+  // (https://github.com/crynta/terax-ai/blob/main/src/modules/ai/lib/compact.ts)
+  // is a client-side message-elision algorithm with no LLM call, and the
+  // conversation title is derived from the first user message locally.
+  // Add prefixes here when Terax ships an LLM utility (summarizer, rename, …).
+  t.utilityPrefixes = []
 
   t.tool('read', 'read_file', { params: { path: 'path', offset: 'offset', limit: 'limit' } })
   t.tool('write', 'write_file', { params: { path: 'path', content: 'content' } })

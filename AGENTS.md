@@ -133,9 +133,11 @@ TESTING
  Framework: node:test with assert
  test/invariants.test.js — repo-wide invariants (naming, forbidden patterns)
  test/modules.test.js — module boundary rules; runs scripts/check-modules.js
+ test/surfaces/prefixes.test.js + prefixes.snapshot.json — append-only ledger: every shipped real/utility prefix must stay declared
  test/core/mhi/* — parser, files, path-policy, view-image
  test/providers/chatgpt-recovery.test.js, test/surfaces/*, test/engine/*
  New executors must add a matching test/core/mhi/*.test.js
+ Adding a surface prefix → declare in surfaces/<name>/index.js AND append to test/surfaces/prefixes.snapshot.json (same commit); never remove a shipped prefix
 
 INVARIANTS
  One server process = one preSelected session; restart to switch session/user
@@ -149,7 +151,7 @@ INVARIANTS
 
 EXTENSIONS
  New provider → providers/<name>/index.js exporting {name, displayName, models, promptLimit, setupSteps, validateFetch, validateCredentials, buildRouter}; registry auto-discovers
- New IDE surface → surfaces/<name>/index.js exporting (t) => {...}; set ideName + realSessionPrefix + utilityPrefixes; registry auto-discovers
+ New IDE surface → surfaces/<name>/index.js exporting (t) => {...}; set ideName + realSessionPrefix (+ realSessionPrefixAliases for older prompts) + utilityPrefixes; registry auto-discovers; test/surfaces/prefixes.test.js is append-only — never delete a shipped prefix
   Plain-OpenAI clients → surfaces/openai/index.js identity mapping; classifySession routes tools[]-bearing requests here when no IDE fingerprint matches
  New MHI executor → core/mhi/<name>.js + wire into core/mhi/index.js + test/core/mhi/<name>.test.js
  New skill → engine/triggers.js entry OR a new engine/extra/<name>.md (auto-registers as $<basename>)

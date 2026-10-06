@@ -4,7 +4,24 @@ const { getAllTags } = require('../base')
 module.exports = (t) => {
   t.ideName = 'opencode'
   t.newSessionStartLength = 2
-  t.realSessionPrefix = 'You are opencode'
+  // Current OpenCode prompt (sst/opencode @ dev):
+  // https://github.com/sst/opencode/blob/dev/packages/opencode/src/session/prompt/anthropic.txt
+  t.realSessionPrefix = 'You are OpenCode'
+  // Older OpenCode releases used lowercase "opencode"; users on those builds
+  // still ship the old prompt. Never remove — see test/surfaces/prefixes.test.js.
+  t.realSessionPrefixAliases = ['You are opencode']
+  // IDE-internal utility prompts. Sources (sst/opencode @ dev):
+  //   https://github.com/sst/opencode/blob/dev/packages/opencode/src/agent/prompt/title.txt
+  //   https://github.com/sst/opencode/blob/dev/packages/opencode/src/agent/prompt/summary.txt
+  //   https://github.com/sst/opencode/blob/dev/packages/opencode/src/agent/prompt/compaction.txt
+  //   https://github.com/sst/opencode/blob/dev/packages/opencode/src/agent/generate.txt
+  // Add new prefixes as OpenCode ships them; never remove one.
+  t.utilityPrefixes = [
+    'You are a title generator.',
+    'Summarize what was done in this conversation.',
+    'You are a context summarization agent.',
+    'You are an elite AI agent architect specializing',
+  ]
 
   t.tool('read', 'read', { params: { path: 'filePath', offset: 'offset', limit: 'limit' } })
   t.tool('write', 'write', { params: { path: 'filePath', content: 'content' } })

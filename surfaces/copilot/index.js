@@ -23,11 +23,15 @@ module.exports = (t) => {
   t.ideName = 'copilot'
   t.newSessionStartLength = 2
   t.realSessionPrefix = 'Follow Microsoft content policies.'
-  // Copilot SDK surfaces share Microsoft's utility prompts; add SDK-specific
-  // prefixes here when they appear.
+  // The Copilot SDK surface shares Microsoft's utility prompts. Sources:
+  //   https://github.com/microsoft/vscode/blob/main/extensions/copilot/src/extension/prompts/node/panel/chatTitle.tsx
+  //   https://github.com/microsoft/vscode/blob/main/extensions/copilot/src/extension/prompts/node/panel/progressMessages.tsx
+  //   https://github.com/microsoft/vscode/blob/main/extensions/copilot/src/extension/prompts/node/panel/terminalQuickFix.tsx
+  // Add new prefixes as the SDK ships them; never remove one.
   t.utilityPrefixes = [
     'You are an expert in crafting ultra-compact titles',
     'You are an expert in writing short, catchy, and encouraging progress messages',
+    'You are a programmer who specializes in using the command line.',
   ]
   t.browserTools = true
   t.browserNameMap = {

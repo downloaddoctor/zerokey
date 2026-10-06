@@ -1,0 +1,35 @@
+{
+  "vscode": {
+    "real": ["You are an expert AI programming assistant"],
+    "utility": [
+      "You are an expert in crafting ultra-compact titles",
+      "You are an expert in writing short, catchy, and encouraging progress messages",
+      "You are a programmer who specializes in using the command line."
+    ]
+  },
+  "copilot": {
+    "real": ["Follow Microsoft content policies."],
+    "utility": [
+      "You are an expert in crafting ultra-compact titles",
+      "You are an expert in writing short, catchy, and encouraging progress messages",
+      "You are a programmer who specializes in using the command line."
+    ]
+  },
+  "terax": {
+    "real": ["You are Terax, an AI agent"],
+    "utility": []
+  },
+  "opencode": {
+    "real": ["You are OpenCode", "You are opencode"],
+    "utility": [
+      "You are a title generator.",
+      "Summarize what was done in this conversation.",
+      "You are a context summarization agent.",
+      "You are an elite AI agent architect specializing"
+    ]
+  },
+  "openai": {
+    "real": [],
+    "utility": []
+  }
+}

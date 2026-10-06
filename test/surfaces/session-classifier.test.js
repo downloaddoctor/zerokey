@@ -63,6 +63,22 @@ test('resolveUtility matches a surface-declared utility prefix', () => {
   assert.ok(hit.matched.startsWith('You are an expert in crafting ultra-compact titles'))
 })
 
+test('resolveUtility matches the VS Code terminal quick fix prefix', () => {
+  // Both 'vscode' and 'copilot' declare Microsoft's utility prefixes (same
+  // prompt text), so the matched surface depends on discovery order — accept
+  // either Microsoft surface.
+  const reg = require('../../surfaces/registry')
+  const msgs = sys(
+    'You are a programmer who specializes in using the command line. Your task is to respond with a list of files',
+  )
+  const hit = reg.resolveUtility(msgs)
+  assert.ok(hit, 'expected a utility match')
+  assert.ok(
+    hit.surface === 'vscode' || hit.surface === 'copilot',
+    'expected a Microsoft surface, got: ' + hit.surface,
+  )
+})
+
 test('resolveUtility returns null for a real IDE fingerprint', () => {
   const reg = require('../../surfaces/registry')
   assert.strictEqual(reg.resolveUtility(sys('You are an expert AI programming assistant')), null)
