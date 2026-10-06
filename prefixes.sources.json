@@ -42,6 +42,12 @@
       "kind": "utility",
       "declared": "You are an elite AI agent architect specializing",
       "url": "https://raw.githubusercontent.com/sst/opencode/dev/packages/opencode/src/agent/generate.txt"
+    },
+    {
+      "surface": "terax",
+      "kind": "real",
+      "declared": "You are Terax, an AI agent",
+      "url": "https://raw.githubusercontent.com/crynta/terax-ai/main/src/modules/ai/config.ts"
     }
   ],
   "unwatched": [
@@ -62,12 +68,6 @@
       "kind": "real",
       "declared": "Follow Microsoft content policies.",
       "reason": "Copilot SDK prompt is delivered at runtime by the SDK, not in a public repo."
-    },
-    {
-      "surface": "terax",
-      "kind": "real",
-      "declared": "You are Terax, an AI agent",
-      "reason": "Not yet verified against crynta/terax-ai."
     }
   ]
 }
