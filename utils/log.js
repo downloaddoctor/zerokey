@@ -1,18 +1,15 @@
 'use strict'
 
 /**
- * ZeroKey logging.
+ * ZeroKey logging — one file (LOG_DIR/zerokey.log) for everything.
  *
- * Requiring this file rewires console.{log,warn,error,debug,info,success} to
- * colour, redact, prepend the caller's [file] tag (unless the call is already
- * self-tagged with a leading '['), and mirror every call to LOG_DIR/zerokey.log
- * at the matching level (success → info). The file write respects LOG_LEVEL.
+ * Requiring this file rewires console.* to colour, redact, prepend the
+ * caller's [FILE] tag, and mirror to disk at the matching level
+ * (success → info). write() respects LOG_LEVEL. Errors passed as an Error
+ * arg become a multi-line block (see buildErrorBlock).
  *
- * redact() / isSecretKey() strip bearer tokens, JWTs, data: URLs, SAS query
- * parameters, and any value under a secret-shaped key before it reaches disk.
- *
- * LogSaver writes LOG_DIR/<name>.log and rotates to <name>.<ISO>.log past
- * maxSize, pruning to LOG_KEEP files. Redaction is the default beforeSave.
+ * redact()/isSecretKey() strip bearer tokens, JWTs, data: URLs, SAS params,
+ * and secret-shaped keys before anything reaches disk.
  */
 
 const fs = require('fs')
@@ -86,10 +83,7 @@ function formatArg(value) {
   if (value === null || value === undefined) return String(value)
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
   if (value instanceof Error) {
-    // A foreign prepareStackTrace can make .stack a non-string; never trust it.
-    const own = typeof value.stack === 'string' ? value.stack : String(value.stack || value.message)
-    const cause = value.cause
-    return cause instanceof Error ? own + '\nCaused by: ' + formatArg(cause) : own
+    return formatError(value)
   }
   try {
     return JSON.stringify(value)
@@ -99,6 +93,49 @@ function formatArg(value) {
     )
     return String(value)
   }
+}
+
+/**
+ * LLM-first Error rendering. Shape:
+ *
+ *   <Name>: <message> | code=<code> status=<status> type=<type>
+ *   <stack frame 1>
+ *   <stack frame 2>
+ *   ...
+ *   caused by: <same shape, indented>
+ *
+ * Kept as plain text so every log line is grep-able and the full stack
+ * is always present — the first frame is the "where", the header is the
+ * "what", the tail fields are the "why". No colour codes here: the file
+ * mirror must stay machine-clean.
+ */
+function formatError(err, depth = 0) {
+  if (!(err instanceof Error)) return formatArg(err)
+  const indent = '  '.repeat(depth)
+  const parts = []
+  const name = err.name || 'Error'
+  const message = typeof err.message === 'string' ? err.message : String(err.message || '')
+  const meta = []
+  if (err.code !== undefined && err.code !== '') meta.push('code=' + err.code)
+  if (err.statusCode !== undefined) meta.push('status=' + err.statusCode)
+  else if (err.status !== undefined) meta.push('status=' + err.status)
+  if (err.type !== undefined && err.type !== '') meta.push('type=' + err.type)
+  parts.push(indent + name + ': ' + message + (meta.length ? ' | ' + meta.join(' ') : ''))
+
+  const stack = typeof err.stack === 'string' ? err.stack : ''
+  if (stack) {
+    const lines = stack.split('\n')
+    // Keep only 'at ...' frames; a multi-line message must not leak in as frames.
+    for (const line of lines) if (/^\s*at /.test(line)) parts.push(indent + line.trim())
+  }
+
+  if (err.cause instanceof Error) {
+    parts.push(indent + 'caused by:')
+    parts.push(formatError(err.cause, depth + 1))
+  } else if (err.cause !== undefined) {
+    parts.push(indent + 'caused by: ' + formatArg(err.cause))
+  }
+  return parts.join('\n')
 }
 
 function formatArgs(args) {
@@ -140,11 +177,26 @@ const _warn = console.warn.bind(console)
 const _error = console.error.bind(console)
 const _debug = console.debug.bind(console)
 
+function safeRedactValue(value) {
+  try {
+    return redactValue(value)
+  } catch {
+    // Circular or hostile object: fail closed rather than leak or crash the logger.
+    return '<unredactable>'
+  }
+}
+
 function mapArgs(args, fn) {
   // Error arguments become their redacted stack, so console.error(msg, err)
   // always shows the full trace without the caller formatting it.
   return args.map((a) =>
-    a instanceof Error ? fn(formatArg(a)) : typeof a === 'string' ? fn(a) : a,
+    a instanceof Error
+      ? fn(formatArg(a))
+      : typeof a === 'string'
+        ? fn(a)
+        : a && typeof a === 'object'
+          ? safeRedactValue(a)
+          : a,
   )
 }
 
@@ -255,29 +307,6 @@ class LogSaver {
   }
 }
 
-function serializeError(err) {
-  if (err == null) return null
-  if (typeof err !== 'object') return { value: err }
-
-  const out = {}
-  if (err instanceof Error || typeof err.stack === 'string') {
-    out.name = err.name
-    out.message = err.message
-    out.stack = err.stack
-  }
-  for (const key of ['status', 'statusCode', 'code', 'type', 'cause', 'cooldownMs']) {
-    if (err[key] !== undefined) {
-      out[key] = err[key] instanceof Error ? serializeError(err[key]) : err[key]
-    }
-  }
-  for (const [k, v] of Object.entries(err)) {
-    if (k in out) continue
-    out[k] = v instanceof Error ? serializeError(v) : v
-  }
-  if (Object.keys(out).length === 0) out.raw = err
-  return out
-}
-
 // -- process-wide lifecycle writer ----------------------------------------
 
 const LEVELS = { error: 0, warn: 1, info: 2, debug: 3, log: 4 }
@@ -289,27 +318,110 @@ const processSaver = new LogSaver({
   keep: CONFIG.LOG_KEEP,
 })
 
-function write(level, message) {
+/**
+ * Single-line entries escape newlines (grep-friendly); block entries keep
+ * real newlines and are bookended by blank lines.
+ *
+ * @param {'error'|'warn'|'info'|'debug'|'log'} level
+ * @param {string} message
+ * @param {{block?: boolean}} [opts]
+ */
+function write(level, message, opts) {
   if (LEVELS[level] === undefined) throw new Error('Unknown log level: ' + level)
   if (LEVELS[level] > (LEVELS[CONFIG.LOG_LEVEL] ?? LEVELS.info)) return
 
-  const line =
-    new Date().toISOString() + ' [' + level.toUpperCase().padEnd(5) + '] ' + redact(message)
-  processSaver.log(line.replaceAll('\n', '\\n'))
+  const stamp = new Date().toISOString()
+  const tag = '[' + level.toUpperCase().padEnd(5) + '] '
+  const safe = redact(message)
+  if (opts && opts.block) {
+    // Stamp the first line; indent the rest so the block reads as one unit.
+    const lines = safe.split('\n')
+    const head = stamp + ' ' + tag + lines[0]
+    const rest = lines.slice(1).map((l) => '                     ' + l)
+    processSaver.log('\n' + [head, ...rest].join('\n') + '\n')
+    return
+  }
+
+  const oneLine = safe.split('\n').join(String.fromCharCode(92) + 'n')
+  processSaver.log(stamp + ' ' + tag + oneLine)
+}
+// -- structured error block ------------------------------------------------
+//
+// Shape (findable via '[ERROR] ───'):
+//   2026-… [ERROR] ─── [TAG] summary ───
+//                        where: <file:line>
+//                        context: {...redacted...}
+//                        Error: msg | code=… status=…
+//                          at frame
+//                          caused by: …
+
+/**
+ * Build the block body for console.error('msg', err[, ctx]), or null if no
+ * Error is present (caller falls back to a single line). First string =
+ * summary, first Error = subject, remaining plain objects merge into context.
+ *
+ * @param {any[]} args  caller-tag-prefixed console args
+ * @returns {string|null}
+ */
+function buildErrorBlock(args) {
+  let summary = null
+  let err = null
+  const context = {}
+  for (const arg of args) {
+    if (err === null && arg instanceof Error) {
+      err = arg
+      continue
+    }
+    if (summary === null && typeof arg === 'string') {
+      summary = arg
+      continue
+    }
+    if (arg && typeof arg === 'object' && !Array.isArray(arg)) {
+      Object.assign(context, arg)
+    } else if (arg !== undefined) {
+      // Never drop extra args (second string, array, number, second Error).
+      ;(context.extra ||= []).push(arg instanceof Error ? formatError(arg) : arg)
+    }
+  }
+  if (err === null) return null
+
+  // Summary may carry [TAG] (from _prepareCall); don't double it.
+  let safeTag = String(context.tag || '').toUpperCase()
+  delete context.tag
+  let headlineText = summary || err.message || 'error'
+  const tagMatch = headlineText.match(/^\[([^\]]+)\]\s*(.*)$/)
+  if (tagMatch) {
+    if (!safeTag) safeTag = tagMatch[1].toUpperCase()
+    headlineText = tagMatch[2]
+  }
+  if (!safeTag) safeTag = 'APP'
+
+  const headline = '─── [' + safeTag + '] ' + headlineText + ' ───'
+  const body = [headline]
+
+  const whereMatch = typeof err.stack === 'string' ? err.stack.match(/\n\s*at\s+([^\n]+)/) : null
+  if (whereMatch) body.push('where: ' + whereMatch[1].trim())
+
+  if (Object.keys(context).length > 0) {
+    try {
+      body.push('context: ' + JSON.stringify(redactValue(context)))
+    } catch (caughtErr) {
+      body.push('context: <unserializable: ' + (caughtErr && caughtErr.message) + '>')
+    }
+  }
+
+  body.push(formatError(err))
+  return body.join('\n')
 }
 
 // -- caller-site prefix (one shallow stack walk per call) -----------------
-//
-// Uses V8's structured stack (Error.prepareStackTrace) with a hard frame cap,
-// so the cost is one short walk instead of stringifying the whole trace. The
-// log.js frame itself is always skipped.
+// Uses V8's structured stack with a frame cap; the log.js frame is skipped.
 
 const MAX_STACK_FRAMES = 6
 const SELF_FILE = __filename
 
 function _captureCaller() {
-  // prepareStackTrace is global V8 state (Playwright and others call
-  // error.stack.split) — install it only for this capture, always restore.
+  // prepareStackTrace is global V8 state — install only here, always restore.
   const previousPrepare = Error.prepareStackTrace
   const previousLimit = Error.stackTraceLimit
   let stack
@@ -340,8 +452,7 @@ function _captureCaller() {
 function _callerTag() {
   const caller = _captureCaller()
   if (!caller) return ''
-  // Files named index.js are ambiguous — use the parent dir name instead, and
-  // drop the .js suffix. Callers with a distinctive filename keep it as-is.
+  // index.js is ambiguous → use the parent dir name instead.
   let label = caller.file
   if (label === 'index.js' && caller.abs) {
     const parent = path.basename(path.dirname(caller.abs))
@@ -349,16 +460,19 @@ function _callerTag() {
   } else {
     label = label.replace(/\.js$/, '')
   }
-  return `[${label}] `
+  // Synthetic frames (node -e) have bracket-y names; strip so we never emit [[EVAL] ].
+  const clean = label.replace(/^\[+|\]+$/g, '')
+  return `[${clean.toUpperCase()}] `
 }
 
 // -- console methods now also write to the file ---------------------------
 
 /**
- * Attaches the caller tag to the first argument (unless the call is
- * self-tagged or ends with a `1` marker) and strips the marker.
+ * Prefix the first arg with the caller [TAG] unless self-tagged or a `1`
+ * marker is passed. Returns colour-ready args + a flat log line.
+ *
  * @param {any[]} rawArgs
- * @returns {{ args: any[], line: string }} console args + flat log line
+ * @returns {{ args: any[], line: string }}
  */
 function _prepareCall(rawArgs) {
   const hasMarker = rawArgs.length > 1 && rawArgs[rawArgs.length - 1] === 1
@@ -383,6 +497,13 @@ console.warn = function (...args) {
 console.error = function (...args) {
   const { args: clean, line } = _prepareCall(args)
   _error(...mapArgs(clean, (s) => text.red(redact(s))))
+
+  // console.error('msg', err[, ctx]) → structured block; else flat line.
+  const structured = buildErrorBlock(clean)
+  if (structured) {
+    write('error', structured, { block: true })
+    return
+  }
   write('error', line)
 }
 
@@ -426,7 +547,6 @@ module.exports = {
   LogSaver,
   isSecretKey,
   redact,
-  serializeError,
   text,
   tickWait,
 }

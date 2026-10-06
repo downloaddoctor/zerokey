@@ -1,9 +1,6 @@
 'use strict'
 
 const { readSSE } = require('../../utils/sse-reader')
-const { LogSaver, serializeError } = require('../../utils/log')
-
-const streamLog = new LogSaver({ name: 'qwen-error' })
 
 const RETRY_CODES = {
   quota_limit: true,
@@ -22,10 +19,8 @@ function streamHandler(stream, session, parser, retry, onFinished) {
   let finalized = false
   let superseded = false
 
-  const logIssue = (reason, extra = {}) => {
-    streamLog.log({
-      ts: new Date().toISOString(),
-      reason,
+  const logIssue = (summary, err, extra = {}) => {
+    console.error(`[QWEN] ${summary}`, err, {
       chatSessionId: session.id,
       parentMessageId: session.parentId,
       lastEventType,
@@ -116,8 +111,7 @@ function streamHandler(stream, session, parser, retry, onFinished) {
       err.code = code
       err.status = code || 500
       err.statusCode = err.status
-      logIssue('provider error — ' + err.message, {
-        error: serializeError(err),
+      logIssue('provider error — ' + err.message, err, {
         raw: data,
         retryable: !!RETRY_CODES[code] && !!retry,
       })
@@ -136,9 +130,7 @@ function streamHandler(stream, session, parser, retry, onFinished) {
             streamHandler(newStream, session, parser, retry, onFinished)
           })
           .catch((retryErr) => {
-            logIssue('retry failed — ' + (retryErr?.message || retryErr), {
-              error: serializeError(retryErr),
-            })
+            logIssue('retry failed — ' + (retryErr?.message || retryErr), retryErr)
             parser.emitText('\n⚠ Retry failed: ' + (retryErr?.message || retryErr) + '\n')
           })
         return

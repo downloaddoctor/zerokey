@@ -22,9 +22,6 @@ const { sequentialQueue } = require('./utils/sequential-queue')
 const { classifySession } = require('./utils/session-classifier')
 const { validateMessages } = require('./utils/route-helpers')
 const { StreamPipeline } = require('./engine/pipeline')
-const { LogSaver } = require('./utils/log')
-
-const errorLog = new LogSaver({ name: 'errors' })
 
 let httpServer = null
 
@@ -100,30 +97,27 @@ async function start({ db: store, preSelected, port }) {
     })
   } catch (error) {
     console.error('buildRouter() failed for provider ' + preSelected.provider + ':', error)
-    console.error(`Failed to build initial router: ${error.message || error}`)
+    console.error('Failed to build initial router:', error)
     throw error
   }
   app.use('/v1/chat/completions', sequentialQueue(), prepareChatRequest, router)
 
   app.use((err, req, res, _next) => {
-    console.error(`[SERVER] Unhandled error: ${err && err.stack ? err.stack : String(err)}`)
     const openaiErr = toOpenAIError(err, preSelected.provider)
     const status = openaiErr.error?.status || err.statusCode || err.status || 500
+    let body = null
     try {
-      const { tools: _, ...body } = req.body
-      errorLog.log(
-        [
-          `[${new Date().toISOString()}]`,
-          `${req.method} ${req.originalUrl}`,
-          `Status: ${status}`,
-          `Message: ${err.message || err}`,
-          err.stack || '',
-          `Body: ${JSON.stringify(body, null, 2)}`,
-        ].join('\n'),
-      )
+      const { tools: _, ...rest } = req.body || {}
+      body = rest
     } catch (caughtErr) {
       console.error('error handler could not serialize req.body:', caughtErr)
     }
+    console.error(`[SERVER] ${req.method} ${req.originalUrl} → ${status}`, err, {
+      provider: preSelected.provider,
+      status,
+      category: openaiErr.error?.category,
+      body,
+    })
     if (!res.headersSent) res.status(status).json(openaiErr)
     else res.end()
   })

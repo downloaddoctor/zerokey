@@ -3,10 +3,8 @@
 const SYNTAX = require('./syntax')
 const ToolCompiler = require('./compiler')
 const { toOpenAIError } = require('../utils/errors')
-const { LogSaver, serializeError } = require('../utils/log')
 const { createWriter } = require('../utils/sse-writer')
 
-const routeErrorLog = new LogSaver({ name: 'errors', maxSize: 1024 * 1024 })
 const {
   restoreMcpInjections,
   showAvailableMcpTags,
@@ -370,10 +368,8 @@ class StreamPipeline {
         ? `post-completion ${source} error — ${detail}`
         : `${source} error — ${detail}`
 
-    routeErrorLog.log({
-      ts: new Date().toISOString(),
-      provider: this.provider,
-      reason,
+    // Structured block goes to zerokey.log; console mirrors the same shape.
+    console.error(`[${this.provider.toUpperCase()}] ${reason}`, error, {
       chatSessionId: this.session?.chatSessionId,
       parentMessageId: this.session?.parentMessageId,
       model: this.session?.model,
@@ -383,18 +379,7 @@ class StreamPipeline {
       currentFragmentType: ctx.currentFragmentType,
       hasSentReasoningRole: ctx.hasSentReasoningRole,
       responseId: ctx.responseId,
-      error: serializeError(error),
     })
-
-    // Always reach the console with the full stack, even for post-finalization
-    // errors the client can no longer receive.
-    const stack = error && typeof error.stack === 'string' ? error.stack : null
-    const cause = error && error.cause
-    const causeStack = cause && typeof cause.stack === 'string' ? cause.stack : null
-    console.error(
-      `[${this.provider}] ${reason}\n${stack || detail}` +
-        (causeStack ? `\nCaused by: ${causeStack}` : ''),
-    )
 
     if (responseClosed || contentComplete) return
 

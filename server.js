@@ -19,13 +19,11 @@ require('./utils/log')
 
 // Nothing may fail silently: log the full stack of every stray error.
 process.on('uncaughtException', (err, origin) => {
-  console.error(`[PROCESS] ${origin}: ${err && err.stack ? err.stack : String(err)}`)
+  console.error(`[PROCESS] ${origin}:`, err)
   process.exit(1)
 })
 process.on('unhandledRejection', (reason) => {
-  console.error(
-    `[PROCESS] unhandledRejection: ${reason && reason.stack ? reason.stack : String(reason)}`,
-  )
+  console.error('[PROCESS] unhandledRejection:', reason)
 })
 
 async function run() {
@@ -107,7 +105,7 @@ async function run() {
         process.exit(0)
       },
       (err) => {
-        console.error(`Shutdown failed: ${err && err.message ? err.message : err}`)
+        console.error('Shutdown failed:', err)
         startup.release(port)
         process.exit(1)
       },
@@ -131,7 +129,7 @@ run().then(
     if (code !== null) process.exit(code)
   },
   (err) => {
-    console.error(`Start failed: ${err && err.stack ? err.stack : String(err)}`)
+    console.error('Start failed:', err)
     process.exit(1)
   },
 )

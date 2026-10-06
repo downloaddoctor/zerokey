@@ -281,9 +281,8 @@ module.exports = (t) => {
             .join('') || this.shortenToolOutput(name, result)
         )
       }
-    } catch (caughtErr) {
-      console.error('JSON.parse() failed:', caughtErr)
-    }
+    } catch {}
+
     return this.shortenToolOutput(name, result)
   }
 }

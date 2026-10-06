@@ -1,7 +1,4 @@
 const { readSSE } = require('../../utils/sse-reader')
-const { LogSaver, serializeError } = require('../../utils/log')
-
-const streamLog = new LogSaver({ name: 'deepseek-error' })
 
 const RETRY_REASONS = {
   'Messages too frequent. Try again later.': true,
@@ -71,10 +68,8 @@ function streamHandler(stream, session, parser, retry) {
 
   const doRetry = (reason) => {
     cancelled = true
-    console.error(`[DEEPSEEK] Stream error: ${reason}`)
-    streamLog.log({
-      ts: new Date().toISOString(),
-      reason,
+    const retryable = !!RETRY_REASONS[reason] && !!retry
+    console.error(`[DEEPSEEK] stream error — ${reason}`, lastError || new Error(reason), {
       chatSessionId: session.id,
       parentMessageId: session.parentId,
       currentFragmentType,
@@ -82,8 +77,7 @@ function streamHandler(stream, session, parser, retry) {
       dataCount,
       producedOutput,
       hasSentReasoningRole,
-      retryable: !!RETRY_REASONS[reason] && !!retry,
-      error: lastError,
+      retryable,
     })
     parser.emitText(`\n\n⚠ Stream error: ${reason}\n`)
 
@@ -100,15 +94,11 @@ function streamHandler(stream, session, parser, retry) {
           streamHandler(newStream, session, parser, retry)
         })
         .catch((err) => {
-          console.error(`[DEEPSEEK] Retry failed: ${err.message}`)
-          streamLog.log({
-            ts: new Date().toISOString(),
-            reason: `retry failed — ${err?.message || err}`,
+          console.error(`[DEEPSEEK] retry failed — ${err?.message || err}`, err, {
             chatSessionId: session.id,
             parentMessageId: session.parentId,
             dataCount,
             producedOutput,
-            error: serializeError(err),
           })
           parser.sendFinalChunk()
         })
@@ -123,7 +113,7 @@ function streamHandler(stream, session, parser, retry) {
     lastEventType = data.type || data.o || data.p || typeof data.v
 
     if (data.type === 'error') {
-      lastError = serializeError(data)
+      lastError = data
       doRetry(data.content)
       return
     }
