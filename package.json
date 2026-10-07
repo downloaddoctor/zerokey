@@ -14,7 +14,7 @@
     "format:fix": "prettier --write .",
     "check": "node scripts/check-modules.js",
     "check:prefixes": "node scripts/check-prefix-drift.js",
-    "test": "node --test \"test/**/*.test.js\"",
+    "test": "node --test --test-reporter=dot \"test/**/*.test.js\"",
     "precommit": "pnpm format && pnpm lint && pnpm check && pnpm test",
     "postinstall": "git config core.hooksPath .githooks"
   },

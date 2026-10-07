@@ -40,6 +40,8 @@ function uuid() {
   }
 }
 
+const { assertOk } = require('../../utils/http-error')
+
 class QwenAPI {
   static BASE_URL = QWEN_AI_BASE
 
@@ -313,13 +315,7 @@ class QwenAPI {
       false,
     )
 
-    if (!res.ok && res.status !== 404) {
-      const text = await res.text().catch((caughtErr) => {
-        console.error('res.text() failed:', caughtErr)
-        return ''
-      })
-      throw new Error(`Qwen deleteSession HTTP ${res.status}: ${text.slice(0, 200)}`)
-    }
+    await assertOk(res, { allow: [404], prefix: 'Qwen deleteSession ' })
   }
 
   async getCurrentUser() {
@@ -332,13 +328,11 @@ class QwenAPI {
       true,
     )
 
-    if (!res.ok || !res.data) {
-      throw new Error(`[Qwen] getCurrentUser: HTTP ${res.status}`)
-    }
+    await assertOk(res, { prefix: '[Qwen] getCurrentUser: ' })
 
     // Auths response carries a refreshed JWT — keep it in-memory for this
     // process so later requests use a fresh token (never persisted).
-    if (res.data.token) {
+    if (res.data?.token) {
       this._setToken(res.data.token)
     }
 

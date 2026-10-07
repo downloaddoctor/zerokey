@@ -75,6 +75,19 @@ test('extra console.error args are kept instead of dropped', () => {
   assert.ok(lines[1].includes('42'))
 })
 
+test('plain and error rows both carry the pid in the same column', () => {
+  const { lines } = runLogger([
+    'console.log("plain row")',
+    'console.error("[T] boom", new Error("bad"))',
+  ])
+  const columns = HEADER.split(SEP)
+  for (const row of lines.slice(1)) {
+    const fields = row.split(SEP)
+    assert.strictEqual(fields.length, columns.length, row)
+    assert.match(fields[1], /^\d+$/, row)
+  }
+})
+
 test('a circular cause does not crash the logger', () => {
   const { status, lines } = runLogger([
     'const e = new Error("loop")',

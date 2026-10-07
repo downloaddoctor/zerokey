@@ -17,6 +17,8 @@ const { humanDelay } = require('../../utils/human-delay')
  * We extract the real UA from the proof token config[4] and add it to every request.
  * Without User-Agent, Cloudflare returns 403.
  */
+const { assertOk } = require('../../utils/http-error')
+
 class ChatGPTAPI {
   constructor(options = {}) {
     this._log = options.log !== false
@@ -103,13 +105,7 @@ class ChatGPTAPI {
       body: data,
       agent: this._httpAgent,
     })
-    if (!putRes.ok) {
-      const text = await putRes.text().catch((caughtErr) => {
-        console.error('putRes.text() failed:', caughtErr)
-        return ''
-      })
-      throw new Error(`ChatGPT blob upload failed: HTTP ${putRes.status}: ${text.slice(0, 200)}`)
-    }
+    await assertOk(putRes, { prefix: 'ChatGPT blob upload failed: ' })
 
     // Step 3: trigger processing, wait for completion via SSE
     const processRes = await this._fetch(
@@ -130,15 +126,7 @@ class ChatGPTAPI {
       false,
     )
 
-    if (!processRes.ok) {
-      const text = await processRes.text().catch((caughtErr) => {
-        console.error('processRes.text() failed:', caughtErr)
-        return ''
-      })
-      throw new Error(
-        `ChatGPT file processing failed: HTTP ${processRes.status}: ${text.slice(0, 200)}`,
-      )
-    }
+    await assertOk(processRes, { prefix: 'ChatGPT file processing failed: ' })
 
     const bodyText = await processRes.text()
     if (!bodyText.includes('file.processing.completed')) {
@@ -452,9 +440,7 @@ class ChatGPTAPI {
       true,
     )
 
-    if (res.status !== 200 || !res.data) {
-      throw new Error(`Failed to get user info: HTTP ${res.status}`)
-    }
+    await assertOk(res, { prefix: 'Failed to get user info: ' })
 
     return res.data
   }
@@ -507,13 +493,7 @@ class ChatGPTAPI {
       body: JSON.stringify({ is_visible: false }),
     })
 
-    if (!res.ok && res.status !== 404) {
-      const text = await res.text().catch((caughtErr) => {
-        console.error('res.text() failed:', caughtErr)
-        return ''
-      })
-      throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
-    }
+    await assertOk(res, { allow: [404] })
   }
 
   // ─── Headers ──────────────────────────────────────────────────

@@ -55,7 +55,7 @@ MODULES
  providers/<name>/index.js — {name, displayName, models, promptLimit, setupSteps, validateFetch, validateCredentials, buildRouter}
  providers/<name>/router.js — express router; runToolLoop wraps one upstream turn per round; userData is a Proxy row, mutate fields directly (persistence is automatic)
  providers/<name>/stream-handler.js — provider SSE → OpenAI chunk deltas
- providers/base/BaseAPI.js — https agent, cookie jar, _fetch with timeout
+ providers/base/BaseAPI.js — https agent, cookie jar, _fetch with timeout; ChatGPT and Qwen keep their own _fetch (do not extend it)
  surfaces/registry.js — auto-discovers surfaces/<name>/index.js; resolveSurface(messages) by realSessionPrefix; resolveUtility(messages) by utilityPrefixes
  surfaces/base.js — IDEToolSurface: tool()/format() registrar + resolve(); realSessionPrefix (real IDE fingerprint) + utilityPrefixes (IDE-internal utility calls)
  surfaces/specs.js — generic tool specs (grammar, keys, repeatable) merged by IDEToolSurface#tool()
@@ -67,7 +67,8 @@ MODULES
  utils/rate-limiter.js — sliding window 15/60s per label; setProviderCooldown on 429
  utils/startup.js — per-port lock file temp/db/.start.<port>.lock; probeHealth/postClaim
  utils/errors.js — classifyError → toOpenAIError (two calling conventions)
- utils/log.js — one zerokey.log (ts,pid,level,tag,msg,where,error,code,status,context,stack) separated by engine/syntax.js SEP (not a comma), one line per record; console.* rewired (colour + auto [FILE] tag + redact + mirror); console.error('msg', err[, ctx]) fills all columns — the ONE entry point; O(1) per call (cached tag, in-memory size, depth-capped causes); formatError renders Error → Name/msg|code|status + frames + caused-by
+ utils/http-error.js — assertOk(res, {allow, prefix}) opt-in non-OK guard (reads body slice, throws Error with .status); not used in sentinel prepare/finalize (they set err.code/statusCode) nor completion calls (bodies parsed for rate-limit/cooldown)
+ utils/log.js — one zerokey.log (ts,pid,level,tag,msg,where,error,code,status,context,stack) separated by engine/syntax.js SEP (not a comma), one line per record; pid in the same column for plain and error rows; console.* rewired (colour + auto [FILE] tag + redact + mirror); console.error('msg', err[, ctx]) fills all columns — the ONE entry point; O(1) per call (cached tag, in-memory size, depth-capped causes); formatError renders Error → Name/msg|code|status + frames + caused-by
 
 ARCHITECTURE
  Request flow: app.js middleware → sequentialQueue → prepareChatRequest → buildRouter(preSelected)
@@ -130,6 +131,7 @@ BUILD
  pnpm start — server; pnpm test — node --test test/**/*.test.js
  pnpm lint (eslint), pnpm format (prettier check), pnpm format:fix
  pnpm precommit = format && lint && check && test — the gate .githooks/pre-commit runs
+ pnpm test uses --test-reporter=dot — dots plus failure details; run `node --test` directly for the full per-test list
 
 TESTING
  Framework: node:test with assert

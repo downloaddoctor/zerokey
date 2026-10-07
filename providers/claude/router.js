@@ -149,12 +149,14 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
       })
       pipeline.flushFinish()
     } catch (error) {
-      console.error('runToolLoop() failed:', error)
       console.error(`[Claude] Route error: ${error.message}`)
 
       try {
-        const raw = JSON.parse(error.message)
-        const payload = raw?.error?.message ? JSON.parse(raw.error.message) : null
+        const text = String(error.message || '')
+        const raw = text.startsWith('{') ? JSON.parse(text) : null
+        const inner = raw?.error?.message
+        const payload =
+          typeof inner === 'string' && inner.startsWith('{') ? JSON.parse(inner) : null
         const limit = payload?.resolved?.limit
         const reset = limit?.resets_at || payload?.windows?.['5h']?.resets_at || payload?.resetsAt
 

@@ -1,4 +1,5 @@
 const { BaseAPI } = require('../base/BaseAPI')
+const { assertOk } = require('../../utils/http-error')
 const { DeepSeekPOW } = require('./pow')
 const { humanDelay } = require('../../utils/human-delay')
 
@@ -252,13 +253,7 @@ class DeepSeekAPI extends BaseAPI {
       false,
     )
 
-    if (!res.ok) {
-      const text = await res.text().catch((caughtErr) => {
-        console.error('res.text() failed:', caughtErr)
-        return ''
-      })
-      throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
-    }
+    await assertOk(res)
 
     if (this._log) console.debug('[DEEPSEEK] All sessions deleted')
   }
@@ -274,13 +269,7 @@ class DeepSeekAPI extends BaseAPI {
       false,
     )
 
-    if (!res.ok) {
-      const text = await res.text().catch((caughtErr) => {
-        console.error('res.text() failed:', caughtErr)
-        return ''
-      })
-      throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
-    }
+    await assertOk(res)
   }
 
   async getCurrentUser() {
@@ -290,9 +279,7 @@ class DeepSeekAPI extends BaseAPI {
       true,
     )
 
-    if (res.status !== 200 || !res.data) {
-      throw new Error(`Failed to get user info: HTTP ${res.status}`)
-    }
+    await assertOk(res, { prefix: 'Failed to get user info: ' })
 
     return res.data
   }

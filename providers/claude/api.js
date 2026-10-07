@@ -1,6 +1,7 @@
 const crypto = require('crypto')
 
 const { BaseAPI } = require('../base/BaseAPI')
+const { assertOk } = require('../../utils/http-error')
 const { reasoning } = require('./config')
 const { humanDelay } = require('../../utils/human-delay')
 
@@ -208,7 +209,10 @@ class ClaudeAPI extends BaseAPI {
 
     if (!res.ok) {
       const errText = await res.text()
-      throw new Error(errText)
+      const failure = new Error(errText)
+      // Carry the HTTP status so withRetry/retry.classify can tell 401/429 from transient errors.
+      failure.status = res.status
+      throw failure
     }
 
     this._captureResponseHeaders(res)
@@ -233,13 +237,7 @@ class ClaudeAPI extends BaseAPI {
       body: JSON.stringify({ uuid: chatSessionId }),
     })
 
-    if (!res.ok && res.status !== 404) {
-      const text = await res.text().catch((caughtErr) => {
-        console.error('res.text() failed:', caughtErr)
-        return ''
-      })
-      throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
-    }
+    await assertOk(res, { allow: [404] })
   }
 
   /**
@@ -260,9 +258,7 @@ class ClaudeAPI extends BaseAPI {
       true,
     )
 
-    if (res.status !== 200 || !res.data) {
-      throw new Error(`Failed to get account profile: HTTP ${res.status}`)
-    }
+    await assertOk(res, { prefix: 'Failed to get account profile: ' })
 
     return res.data
   }

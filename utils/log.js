@@ -445,9 +445,8 @@ function toRecord(level, call) {
   }
   const body = redact(stripAnsi(formatArgs(call.rest)))
   return (
-    PID,
-    [csvField(stamp), level.toUpperCase(), csvField(call.tag), csvField(body)].join(SEP) +
-      CSV_EMPTY_TAIL
+    [csvField(stamp), PID, level.toUpperCase(), csvField(call.tag), csvField(body)].join(SEP) +
+    CSV_EMPTY_TAIL
   )
 }
 
