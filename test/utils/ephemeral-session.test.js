@@ -15,6 +15,15 @@ test('ephemeralSession drops the real conversation id and parent id', () => {
   assert.equal(real.parentId, 'msg-real')
 })
 
+test('ephemeralSession does not share usage totals with the real session', () => {
+  const real = { id: 'c', _usageTotals: { total_tokens: 5, turns: 1, last: { total_tokens: 99 } } }
+  const clone = ephemeralSession(real)
+  clone._usageTotals.last.total_tokens = 1
+  clone._usageTotals.total_tokens = 50
+  assert.equal(real._usageTotals.last.total_tokens, 99)
+  assert.equal(real._usageTotals.total_tokens, 5)
+})
+
 test('pipeline reports session.lastTokenUsage when a turn computes zero, however often', () => {
   const fake = Object.create(StreamPipeline.prototype)
   fake.tokenUsage = {}

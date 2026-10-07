@@ -344,14 +344,7 @@ class ChatGPTAPI extends BaseAPI {
       body: JSON.stringify({ p: sentinelProof }),
     })
 
-    if (!prepareRes.ok) {
-      const text = await prepareRes.text()
-      const err = new Error(`Sentinel prepare ${prepareRes.status}: ${text.slice(0, 200)}`)
-      err.code = prepareRes.status
-      err.status = prepareRes.status
-      err.statusCode = prepareRes.status
-      throw err
-    }
+    await assertOk(prepareRes, { prefix: 'Sentinel prepare ' })
 
     this._captureResponseHeaders(prepareRes)
 
@@ -386,14 +379,7 @@ class ChatGPTAPI extends BaseAPI {
       body: JSON.stringify(finalizeBody),
     })
 
-    if (!finalizeRes.ok) {
-      const text = await finalizeRes.text()
-      const err = new Error(`Sentinel finalize ${finalizeRes.status}: ${text.slice(0, 200)}`)
-      err.code = finalizeRes.status
-      err.status = finalizeRes.status
-      err.statusCode = finalizeRes.status
-      throw err
-    }
+    await assertOk(finalizeRes, { prefix: 'Sentinel finalize ' })
 
     this._captureResponseHeaders(finalizeRes)
 

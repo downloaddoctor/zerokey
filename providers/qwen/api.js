@@ -87,9 +87,14 @@ class QwenAPI extends BaseAPI {
       true,
     )
 
+    if (!res.ok) throw await this._buildQwenError(res)
+
     const id = res.data?.data?.id
     if (!id) {
-      throw new Error(`[Qwen] createChatSession: no chat id returned (HTTP ${res.status})`)
+      const snippet = JSON.stringify(res.data ?? null).slice(0, 300)
+      throw new Error(
+        `[Qwen] createChatSession: no chat id returned (HTTP ${res.status}) ${snippet}`,
+      )
     }
 
     if (this._log) console.debug('[Qwen] Created chat:', id)

@@ -116,13 +116,7 @@ class DeepSeekAPI extends BaseAPI {
       false,
     )
 
-    if (!res.ok) {
-      const errText = await res.text()
-      const err = new Error(`DeepSeek HTTP ${res.status}: ${errText.slice(0, 300)}`)
-      err.status = res.status
-      err.statusCode = res.status
-      throw err
-    }
+    await assertOk(res, { prefix: 'DeepSeek ', limit: 300 })
 
     const contentType = res.headers.get('content-type') || ''
     if (contentType.includes('application/json')) {

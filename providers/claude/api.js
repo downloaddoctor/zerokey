@@ -190,13 +190,8 @@ class ClaudeAPI extends BaseAPI {
       false,
     )
 
-    if (!res.ok) {
-      const errText = await res.text()
-      const failure = new Error(errText)
-      // Carry the HTTP status so withRetry/retry.classify can tell 401/429 from transient errors.
-      failure.status = res.status
-      throw failure
-    }
+    // assertOk carries .status so withRetry/retry.classify can tell 401/429 from transient errors.
+    await assertOk(res, { limit: 500 })
 
     this._captureResponseHeaders(res)
 

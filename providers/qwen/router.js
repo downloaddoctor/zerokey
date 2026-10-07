@@ -23,8 +23,15 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
   if (!session) throw new Error('No session provided')
 
   if (!session.id) {
-    const chatId = await qwenApi.createChatSession(session.model || 'qwen3.7-max')
-    session.id = chatId
+    // Non-fatal at startup: a transient upstream hiccup must not stop the server.
+    // The request handler below creates the chat lazily on first use.
+    try {
+      session.id = await qwenApi.createChatSession(session.model || 'qwen3.7-max')
+    } catch (error) {
+      console.warn(
+        '[Qwen] initial createChatSession failed, will retry on first request: ' + error.message,
+      )
+    }
   }
 
   const router = express.Router()

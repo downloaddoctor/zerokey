@@ -10,14 +10,15 @@
  * Throw an Error with `.status` when `res` is not OK, unless its status is in
  * `allow` (e.g. 404 on delete). One line replaces the manual `if (!res.ok)` blocks.
  */
-async function assertOk(res, { allow = [], prefix = '' } = {}) {
+async function assertOk(res, { allow = [], prefix = '', limit = 200 } = {}) {
   if (res.ok || allow.includes(res.status)) return
   const text = await res.text().catch((caughtErr) => {
     console.error('res.text() failed:', caughtErr)
     return ''
   })
-  const error = new Error(`${prefix}HTTP ${res.status}: ${text.slice(0, 200)}`)
+  const error = new Error(`${prefix}HTTP ${res.status}: ${text.slice(0, limit)}`)
   error.status = res.status
+  error.statusCode = res.status
   throw error
 }
 

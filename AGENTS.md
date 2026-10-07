@@ -70,7 +70,7 @@ MODULES
  utils/startup.js — per-port lock file temp/db/.start.<port>.lock; probeHealth/postClaim
  utils/errors.js — classifyError → toOpenAIError (two calling conventions)
  utils/uuid.js — uuid() v4 via crypto.randomUUID; the only UUID helper for provider clients
- utils/http-error.js — assertOk(res, {allow, prefix}) opt-in non-OK guard (reads body slice, throws Error with .status); not used in sentinel prepare/finalize (they set err.code/statusCode) nor completion calls (bodies parsed for rate-limit/cooldown)
+ utils/http-error.js — assertOk(res, {allow, prefix, limit}) opt-in non-OK guard (reads body slice, throws Error with .status/.statusCode); used by sentinel prepare/finalize, DeepSeek and Claude completion calls; not used where the body is parsed for structure (ChatGPT completion 429 cooldown, Qwen _buildQwenError → code/num/waitMs for RateLimited)
  utils/log.js — one zerokey.log (ts,pid,level,tag,msg,where,error,code,status,context,stack) separated by engine/syntax.js SEP (not a comma), one line per record; pid in the same column for plain and error rows; console.* rewired (colour + auto [FILE] tag + redact + mirror); console.error('msg', err[, ctx]) fills all columns — the ONE entry point; O(1) per call (cached tag, in-memory size, depth-capped causes); formatError renders Error → Name/msg|code|status + frames + caused-by
 
 ARCHITECTURE
@@ -165,4 +165,4 @@ EXTENSIONS
  New MHI executor → core/mhi/<name>.js + wire into core/mhi/index.js + test/core/mhi/<name>.test.js
  New skill → engine/triggers.js entry OR a new engine/extra/<name>.md (auto-registers as $<basename>)
  New MCP server → expose tools named mcp_<server>_<tool> in req.body.tools[]; auto-registers as $<server>
- Token-threshold reinjection → provider index.js exports reinjectAt: [{tokens, fragment}]; pipeline re-injects $<fragment> on each crossing; pipeline sets session.lastTokenUsage after every finished turn
+ Token-threshold reinjection → provider index.js exports reinjectAt: [{tokens, fragment}]; pipeline re-injects $<fragment> on each crossing; pipeline sets session.lastTokenUsage after every finished turn; _turnUsage() builds the usage frame for all finish paths and falls back to session.lastTokenUsage (source 'retained') when a turn computes zero; usage.accumulate stores the last real turn in session._usageTotals.last; ephemeral clones deep-copy usageTotals so utility calls never touch the real row; only Claude and DeepSeek set parser.tokenUsage (ChatGPT/Qwen use the chars/4 estimate)
