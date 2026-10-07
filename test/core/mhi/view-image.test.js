@@ -57,6 +57,43 @@ test('view_image returns an attachment for a valid GIF', async () => {
   assert.equal(result.attachment.mimeType, 'image/gif')
 })
 
+test('view_image reads an image from an extra workspace root in imageRoots', async () => {
+  reset()
+  const extraRoot = path.join(path.dirname(SCRATCH), 'mhi-view-image-extra')
+  fs.rmSync(extraRoot, { recursive: true, force: true })
+  fs.mkdirSync(extraRoot, { recursive: true })
+  const extraFile = path.join(extraRoot, 'extra.png')
+  fs.writeFileSync(extraFile, makePng())
+  try {
+    const result = await viewImage.execute(
+      { tool: 'view_image', params: { path: extraFile } },
+      { context: { rootPath: SCRATCH, imageRoots: [SCRATCH, extraRoot] } },
+    )
+    assert.equal(result.ok, true)
+    assert.equal(result.attachment.filename, 'extra.png')
+  } finally {
+    fs.rmSync(extraRoot, { recursive: true, force: true })
+  }
+})
+
+test('view_image still refuses paths outside every image root', async () => {
+  reset()
+  const outside = path.join(path.dirname(SCRATCH), 'mhi-view-image-outside', 'x.png')
+  const result = await viewImage.execute(
+    { tool: 'view_image', params: { path: outside } },
+    { context: { rootPath: SCRATCH, imageRoots: [SCRATCH] } },
+  )
+  assert.equal(result.ok, false)
+})
+
+test('internalWorkspaceContext adds each workspace root and its direct parent only', () => {
+  const { internalWorkspaceContext } = require('../../../core/mhi/loop')
+  const context = internalWorkspaceContext({ WORKSPACE_ROOTS: [SCRATCH] })
+  assert.ok(context.imageRoots.includes(SCRATCH))
+  assert.ok(context.imageRoots.includes(path.dirname(SCRATCH)))
+  assert.ok(!context.imageRoots.includes(path.dirname(path.dirname(SCRATCH))))
+})
+
 test('view_image refuses an unsupported extension', async () => {
   reset()
   const result = await viewImage.execute(

@@ -53,6 +53,14 @@ class ToolCompiler {
       live_instructions: (mes) => `<live_instructions>\n${mes.content}\n</live_instructions>`,
       mhi: (mes) => mes.content,
       user: async (mes, messages, isNewSession) => {
+        if (typeof mes.content !== 'string')
+          mes.content = Array.isArray(mes.content)
+            ? mes.content
+                .map((p) =>
+                  typeof p === 'string' ? p : p && typeof p.text === 'string' ? p.text : '',
+                )
+                .join('\n')
+            : String(mes.content ?? '')
         if (mes.content === '<attachments>') return ''
         if (mes.content.startsWith('<attachment ')) {
           mes.content = '<attachments>' + mes.content

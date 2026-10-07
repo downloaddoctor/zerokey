@@ -88,6 +88,26 @@ function imageDimensions(data, mimeType) {
   return null
 }
 
+function resolveImage(options, fileScope, supplied) {
+  const context = options.context || {}
+  const roots = Array.isArray(context.imageRoots) ? context.imageRoots : []
+  let firstError = null
+  try {
+    return fileScope.existingFile(supplied)
+  } catch (error) {
+    if (!(error instanceof MhiFileError)) throw error
+    firstError = error
+  }
+  for (const root of roots) {
+    try {
+      return scope({ ...options, context: { ...context, rootPath: root } }).existingFile(supplied)
+    } catch (error) {
+      if (!(error instanceof MhiFileError)) throw error
+    }
+  }
+  throw firstError
+}
+
 async function execute(call, options = {}) {
   if (options.enabled === false) {
     return {
@@ -99,7 +119,7 @@ async function execute(call, options = {}) {
   }
   try {
     const fileScope = scope(options)
-    const file = fileScope.existingFile(call.params.path)
+    const file = resolveImage(options, fileScope, call.params.path)
     const extension = path.extname(file.path).toLowerCase()
     const mimeType = MIME_EXTENSIONS.get(extension)
     if (!mimeType) {

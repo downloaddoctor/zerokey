@@ -142,7 +142,12 @@ function internalToolDescription(name, _config) {
 function internalWorkspaceContext(config) {
   const root = config.WORKSPACE_ROOTS[0]
   if (!root) return null
-  return { rootPath: root, cwd: root }
+  const nodePath = require('path')
+  const imageRoots = [
+    ...config.WORKSPACE_ROOTS,
+    ...config.WORKSPACE_ROOTS.map((value) => nodePath.dirname(value)),
+  ].filter((value, index, all) => all.indexOf(value) === index)
+  return { rootPath: root, cwd: root, imageRoots }
 }
 
 /**

@@ -43,6 +43,8 @@ MODULES
  core/mhi/commands.js — allowlisted programs; write/network gated by capability flags
  core/mhi/parser.js — block parser for internal executors; throws MhiParseError {code,message}
  core/mhi/path-policy.js — workspace confinement: realpath, UNC/ADS/reserved-name refusal
+ core/mhi/view-image.js — falls back to context.imageRoots when the path is outside the first workspace root; other file tools stay confined to the first root
+ core/mhi/loop.js imageRoots — every ZEROKEY_WORKSPACE_ROOTS entry (default process.cwd()) plus its direct parent dir (one level max, never higher); built in internalWorkspaceContext
  engine/pipeline.js — StreamPipeline: per-request SSE lifecycle, scan() FSM, deferFinish for tool loops
  engine/compiler.js — ToolCompiler singleton per ide×provider; parse/emit generic→native tool mapping
  engine/tool-bridge.js — grammar injection + block parsing for providers with no native tool channel
