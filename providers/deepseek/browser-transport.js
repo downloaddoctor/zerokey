@@ -45,6 +45,7 @@ const path = require('path')
 const { PassThrough } = require('stream')
 const { chromium } = require('playwright')
 const { humanDelay } = require('../../utils/human-delay')
+const instructions = require('../../engine/instructions')
 
 const { CONFIG } = require('../../config/constants')
 
@@ -102,11 +103,10 @@ class DeepSeekBrowserTransport {
 
     this._context = await chromium.launchPersistentContext(this._profileDir, {
       headless: this._headless,
-      viewport: { width: 1280, height: 800 },
-      // NOTE: no permissions array — Input.insertText is a CDP input event,
-      // it never touches the clipboard. Requesting clipboard perms made
-      // launch negotiate them and stalled navigation by 30s+.
+      viewport: null,
+      // No clipboard permissions: Input.insertText is a CDP event, not the clipboard.
       args: [
+        '--start-maximized',
         '--disable-blink-features=AutomationControlled',
         '--no-first-run',
         '--no-default-browser-check',
@@ -119,8 +119,7 @@ class DeepSeekBrowserTransport {
       ],
     })
 
-    // Register the page-side tee BEFORE any navigation — addInitScript only
-    // applies to future navigations, so this must run before goto.
+    // addInitScript only applies to future navigations — install before goto.
     this._streamHookReady = this._installStreamHook()
 
     this._page = this._context.pages()[0] || (await this._context.newPage())
@@ -362,22 +361,12 @@ class DeepSeekBrowserTransport {
 
   async warmupSession(_chatSessionId) {}
 
-  // Warmup prompt: a trivial arithmetic question whose *shape* also varies
-  // so repeated calls do not look identical to anti-abuse heuristics. The
-  // answer is never inspected — this only opens the chat session.
+  // New-chat opener: the instruction block, then a wait-for-user line.
   _warmupPrompt() {
-    const a = Math.floor(Math.random() * 900) + 100
-    const b = Math.floor(Math.random() * 900) + 100
-    const [lo, hi] = a >= b ? [b, a] : [a, b]
-    const forms = [
-      `What is ${a} + ${b}?`,
-      `What is ${hi} - ${lo}?`,
-      `What is ${a} × ${b}?`,
-      `What is ${a * b} ÷ ${b}?`,
-      `What is ${a} plus ${b}?`,
-      `Compute ${a} + ${b}.`,
-    ]
-    return forms[Math.floor(Math.random() * forms.length)]
+    return (
+      instructions.getFull().content +
+      '\n\n---\n\nDo not act yet. Acknowledge briefly and wait for my first message.'
+    )
   }
 
   // ── Chat ─────────────────────────────────────────────────────────────────

@@ -13,16 +13,14 @@ class BaseAPI {
     this._log = options.log !== false
     this._cookies = new CookieJar()
     this._headers = {}
-    // One agent per provider host for the whole server lifetime: sockets stay open
-    // between turns, so DNS + TCP + TLS are paid once. 'lifo' reuses the freshest
-    // socket, which the server is least likely to have closed while idle.
+    // Pool of 1 (sequentialQueue allows one in-flight request). 60s idle cap
+    // fires before any upstream cull — no zombie sockets, one handshake per gap.
     this._httpAgent = new https.Agent({
       keepAlive: true,
-      keepAliveMsecs: 30000,
-      scheduling: 'lifo',
-      maxSockets: 50,
-      maxFreeSockets: 10,
-      timeout: 300000,
+      keepAliveMsecs: 15000,
+      maxSockets: 1,
+      maxFreeSockets: 1,
+      timeout: 60000,
     })
   }
 
