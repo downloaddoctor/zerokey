@@ -51,9 +51,6 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
       return
     }
 
-    // Browser warmup already delivered the instructions; don't prepend again.
-    if (TRANSPORT !== 'api') pipeline.haveInstructionsAPI = true
-
     const activeSession = pipeline.session
     if (!activeSession.id) {
       try {

@@ -45,7 +45,6 @@ const path = require('path')
 const { PassThrough } = require('stream')
 const { chromium } = require('playwright')
 const { humanDelay } = require('../../utils/human-delay')
-const instructions = require('../../engine/instructions')
 
 const { CONFIG } = require('../../config/constants')
 
@@ -361,12 +360,22 @@ class DeepSeekBrowserTransport {
 
   async warmupSession(_chatSessionId) {}
 
-  // New-chat opener: the instruction block, then a wait-for-user line.
+  // Warmup prompt: a trivial arithmetic question whose *shape* also varies
+  // so repeated calls do not look identical to anti-abuse heuristics. The
+  // answer is never inspected — this only opens the chat session.
   _warmupPrompt() {
-    return (
-      instructions.getFull().content +
-      '\n\n---\n\nDo not act yet. Acknowledge briefly and wait for my first message.'
-    )
+    const a = Math.floor(Math.random() * 900) + 100
+    const b = Math.floor(Math.random() * 900) + 100
+    const [lo, hi] = a >= b ? [b, a] : [a, b]
+    const forms = [
+      `What is ${a} + ${b}?`,
+      `What is ${hi} - ${lo}?`,
+      `What is ${a} × ${b}?`,
+      `What is ${a * b} ÷ ${b}?`,
+      `What is ${a} plus ${b}?`,
+      `Compute ${a} + ${b}.`,
+    ]
+    return forms[Math.floor(Math.random() * forms.length)]
   }
 
   // ── Chat ─────────────────────────────────────────────────────────────────

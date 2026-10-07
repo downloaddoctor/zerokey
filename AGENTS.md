@@ -85,7 +85,7 @@ ARCHITECTURE
  Persistence: users.parsedFetch + sessions.id/parentId written through Proxy set traps, flushed on res finish/close
  Compaction: incoming x-zerokey-compaction-generation > row.generation → id/parentId cleared, old id appended to metadata.pendingPreviousConversationIds
  Fail-closed schema: db.open refuses a DB whose meta.schema_version exceeds SCHEMA_VERSION (3)
- DeepSeek uses a real Chromium profile (providers/deepseek/browser-transport.js) — not a lightweight HTTP path; new chat opens with the instruction block as warmup (_warmupPrompt), router sets haveInstructionsAPI so buildPrompt does not prepend it again; viewport null + --start-maximized (real window)
+ DeepSeek uses a real Chromium profile (providers/deepseek/browser-transport.js) — not a lightweight HTTP path; new chat opens with a random arithmetic warmup (_warmupPrompt); instructions ride in the first buildPrompt; viewport null + --start-maximized (real window)
 
 SCHEMA
  users(id PK, provider, username, parsed_fetch, instructions_hash, instructions_applied_at, wait_until, wait_reason, state_json, created_at, updated_at, UNIQUE(provider, username))
