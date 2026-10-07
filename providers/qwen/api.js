@@ -33,20 +33,7 @@ class QwenAPI extends BaseAPI {
     this._body = {}
   }
 
-  // Completion callers parse the timeout as a structured upstream error.
-  _timeoutError(timeoutMs) {
-    const error = new Error(
-      JSON.stringify({
-        error: {
-          type: 'request_timeout',
-          message: `Request timed out after ${timeoutMs / 1000}s`,
-        },
-      }),
-    )
-    error.status = 504
-    error.statusCode = 504
-    return error
-  }
+  static JSON_TIMEOUT = true
 
   async initializeFromJSON({ headers, body }) {
     await super.initializeFromJSON({ headers })

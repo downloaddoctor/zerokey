@@ -55,7 +55,7 @@ MODULES
  providers/<name>/index.js — {name, displayName, models, promptLimit, setupSteps, validateFetch, validateCredentials, buildRouter}
  providers/<name>/router.js — express router; runToolLoop wraps one upstream turn per round; userData is a Proxy row, mutate fields directly (persistence is automatic)
  providers/<name>/stream-handler.js — provider SSE → OpenAI chunk deltas
- providers/base/BaseAPI.js — shared base for all four *API classes: https agent, cookie jar, initializeFromJSON cookie seeding, _captureResponseHeaders (cookie header), _fetch with timeout; _timeoutError(ms) overridable (ChatGPT/Qwen wrap it as JSON request_timeout); subclasses add only provider-specific headers/endpoints
+ providers/base/BaseAPI.js — shared base for all four *API classes: https agent, cookie jar, initializeFromJSON cookie seeding, _captureResponseHeaders (cookie header), _fetch with timeout; _seedCookies(); _timeoutError(ms) returns a plain message unless the subclass sets static JSON_TIMEOUT = true (ChatGPT/Qwen: JSON request_timeout body); subclasses add only provider-specific headers/endpoints
  surfaces/registry.js — auto-discovers surfaces/<name>/index.js; resolveSurface(messages) by realSessionPrefix; resolveUtility(messages) by utilityPrefixes
  surfaces/base.js — IDEToolSurface: tool()/format() registrar + resolve(); realSessionPrefix (real IDE fingerprint) + utilityPrefixes (IDE-internal utility calls)
  surfaces/specs.js — generic tool specs (grammar, keys, repeatable) merged by IDEToolSurface#tool()

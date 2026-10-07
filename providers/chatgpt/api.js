@@ -3,6 +3,8 @@ const nodeFetch = require('node-fetch')
 const { ChatGPTProofOfWork } = require('./pow')
 const { humanDelay } = require('../../utils/human-delay')
 const { uuid } = require('../../utils/uuid')
+const { BaseAPI } = require('../base/BaseAPI')
+const { assertOk } = require('../../utils/http-error')
 
 /**
  * ChatGPT API Client
@@ -14,10 +16,9 @@ const { uuid } = require('../../utils/uuid')
  * We extract the real UA from the proof token config[4] and add it to every request.
  * Without User-Agent, Cloudflare returns 403.
  */
-const { BaseAPI } = require('../base/BaseAPI')
-const { assertOk } = require('../../utils/http-error')
-
 class ChatGPTAPI extends BaseAPI {
+  static JSON_TIMEOUT = true
+
   constructor(options = {}) {
     super(options)
     this.BASE_URL = 'https://chatgpt.com'
@@ -28,31 +29,11 @@ class ChatGPTAPI extends BaseAPI {
     this._pageLoadedAt = Date.now()
   }
 
-  // Completion callers parse the timeout as a structured upstream error.
-  _timeoutError(timeoutMs) {
-    const error = new Error(
-      JSON.stringify({
-        error: {
-          type: 'request_timeout',
-          message: `Request timed out after ${timeoutMs / 1000}s`,
-        },
-      }),
-    )
-    error.status = 504
-    error.statusCode = 504
-    return error
-  }
-
   async initializeFromJSON(data) {
     this._headers = data.headers
     this._bodyTemplate = data.body
 
-    // Seed cookie jar from initial headers
-    const initialCookie = this._headers.cookie || this._headers.Cookie || ''
-    if (initialCookie) {
-      const count = this._cookies.seedFromHeader(initialCookie)
-      if (this._log) console.debug(`[ChatGPT] Seeded cookie jar with ${count} initial cookies`)
-    }
+    this._seedCookies()
 
     const existingProof = this._headers['openai-sentinel-proof-token']
     if (!existingProof) {

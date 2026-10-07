@@ -13,8 +13,13 @@ class BaseAPI {
     this._log = options.log !== false
     this._cookies = new CookieJar()
     this._headers = {}
+    // One agent per provider host for the whole server lifetime: sockets stay open
+    // between turns, so DNS + TCP + TLS are paid once. 'lifo' reuses the freshest
+    // socket, which the server is least likely to have closed while idle.
     this._httpAgent = new https.Agent({
       keepAlive: true,
+      keepAliveMsecs: 30000,
+      scheduling: 'lifo',
       maxSockets: 50,
       maxFreeSockets: 10,
       timeout: 300000,
@@ -27,13 +32,16 @@ class BaseAPI {
    */
   async initializeFromJSON(parsedFetch) {
     this._headers = { ...parsedFetch.headers }
+    this._seedCookies()
+  }
 
+  /** Seed the cookie jar from the captured cookie header. */
+  _seedCookies() {
     const initialCookie = this._headers.cookie || this._headers.Cookie || ''
-    if (initialCookie) {
-      const count = this._cookies.seedFromHeader(initialCookie)
-      if (count > 0 && this._log) {
-        console.debug(`[${this.constructor.name}] Seeded ${count} cookies`)
-      }
+    if (!initialCookie) return
+    const count = this._cookies.seedFromHeader(initialCookie)
+    if (count > 0 && this._log) {
+      console.debug(`[${this.constructor.name}] Seeded ${count} cookies`)
     }
   }
 
@@ -52,9 +60,18 @@ class BaseAPI {
     return h
   }
 
-  /** Error thrown when a request exceeds its timeout; subclasses may reshape it. */
+  /**
+   * Error thrown when a request exceeds its timeout. Subclasses that set
+   * `static JSON_TIMEOUT = true` get a structured `request_timeout` body in the
+   * message, which their completion callers parse as an upstream error.
+   */
   _timeoutError(timeoutMs) {
-    const error = new Error(`Request timed out after ${timeoutMs / 1000}s`)
+    const message = `Request timed out after ${timeoutMs / 1000}s`
+    const error = new Error(
+      this.constructor.JSON_TIMEOUT
+        ? JSON.stringify({ error: { type: 'request_timeout', message } })
+        : message,
+    )
     error.status = 504
     error.statusCode = 504
     return error
