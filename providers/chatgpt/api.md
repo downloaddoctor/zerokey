@@ -8,20 +8,20 @@ Manages HTTP requests to `chatgpt.com/backend-api` using browser-identical heade
 
 ## Internal API Endpoints Used
 
-| Endpoint                                          | Method | Purpose                                      |
-| ------------------------------------------------- | ------ | -------------------------------------------- |
-| `/backend-api/sentinel/chat-requirements/prepare` | POST   | Refresh sentinel proof-of-work token         |
-| `/backend-api/f/conversation/prepare`             | POST   | Prepare conversation, get conduit token      |
-| `/backend-api/f/conversation`                     | POST   | Send chat completion (SSE stream)            |
-| `/backend-api/conversation/{id}`                  | PATCH  | Soft-delete conversation (is_visible=false)  |
-| `/backend-api/user_system_messages`               | PATCH  | Set custom instructions (currently disabled) |
+| Endpoint                                          | Method | Purpose                                                  |
+| ------------------------------------------------- | ------ | -------------------------------------------------------- |
+| `/backend-api/sentinel/chat-requirements/prepare` | POST   | Refresh sentinel proof-of-work token                     |
+| `/backend-api/f/conversation/prepare`             | POST   | Prepare conversation, get conduit token                  |
+| `/backend-api/f/conversation`                     | POST   | Send chat completion (SSE stream)                        |
+| `/backend-api/conversation/{id}`                  | PATCH  | Soft-delete conversation (is_visible=false)              |
+| `/backend-api/user_system_messages`               | PATCH  | Set custom instructions (hash-cached, new sessions only) |
 
 ## Dependencies
 
 - **`ChatGPTProofOfWork`** (`providers/chatgpt/pow.js`): Sentinel POW solver — decodes proof token config, generates sentinel proof, solves POW challenges
 - **`CookieJar`** (`utils/cookie-jar.js`): Cookie persistence across requests
 - **`readSSE`** (`utils/sse-reader.js`): SSE stream parser
-- **`setChatGPTInstructions`** (`providers/chatgpt/set-instructions.js`): PATCH user_system_messages (hash-cached; currently disabled in favor of prepending to prompt)
+- **`setChatGPTInstructions`** (`providers/chatgpt/set-instructions.js`): PATCH user_system_messages (hash-cached; uses engine/extra/instructions-1500.md — fits the 1500-char field)
 - **`Instructions`** (`engine/instructions.js`): System prompt singleton
 - **`acquireSlot`** (`utils/rate-limiter.js`): 5 req / 15s sliding window rate limiter
 

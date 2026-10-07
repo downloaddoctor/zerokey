@@ -10,7 +10,7 @@ module.exports = {
   promptLimit,
   setupSteps,
   defaultVision: true,
-  reinjectEvery: 4,
+  reinjectEvery: 10,
   createAPI: (options) => new ChatGPTAPI(options),
   validateCredentials: async (parsedFetch) => {
     const api = new ChatGPTAPI()

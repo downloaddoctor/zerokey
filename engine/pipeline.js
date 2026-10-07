@@ -357,8 +357,8 @@ class StreamPipeline {
     let at = messages.length
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       const role = messages[i] && messages[i].role
-      if (role === 'user' || role === 'mhi') {
-        at = i
+      if (role === 'assistant') {
+        at = i + 1
         break
       }
     }

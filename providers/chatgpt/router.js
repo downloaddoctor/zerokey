@@ -8,13 +8,14 @@ const { chatgptStreamHandler } = require('./stream-handler')
 const { acquireSlot } = require('../../utils/rate-limiter')
 const retry = require('../../utils/retry')
 const recovery = require('./recovery')
+const { setChatGPTInstructions } = require('./set-instructions')
 const { runToolLoop } = require('../../core/mhi/loop')
 const { CONFIG } = require('../../config/constants')
 
 const chatgptApi = new ChatGPTAPI()
 chatgptApi._providerKey = 'chatgpt'
 
-async function buildChatGPTRouter(parsedFetch, session) {
+async function buildChatGPTRouter(parsedFetch, session, userData = null) {
   console.debug('[ChatGPT] Initializing from parsed capture JSON')
   await chatgptApi.initializeFromJSON(parsedFetch)
 
@@ -37,6 +38,11 @@ async function buildChatGPTRouter(parsedFetch, session) {
 
     const activeSession = pipeline.session
     const model = activeSession.model || 'auto'
+
+    if (pipeline.isNewSession && !pipeline.rawMode) {
+      await setChatGPTInstructions(chatgptApi, userData, pipeline.toolCalling)
+      pipeline.haveInstructionsAPI = true
+    }
 
     // Defer the SSE [DONE] until the tool loop resolves.
     pipeline.deferFinish = true
