@@ -3,13 +3,14 @@
 /**
  * Users: identity, credentials, and the rate-limit/instructions fields.
  *
- * Rows are materialized as plain objects and wrapped in a Proxy. Assigning
- * to any field persists the change (debounced 50 ms) without the caller
- * ever seeing SQL. Nested writes to parsedFetch.headers are not intercepted:
- * assign user.parsedFetch = nextCapture to persist a fresh capture.
+ * Persistence and the recursive Proxy live in core/state/store.js; this module
+ * supplies the table config and the user-specific domain functions. Assigning
+ * to any field (nested plain objects and arrays included, e.g.
+ * `user.parsedFetch.headers.cookie = x`) schedules a debounced 250 ms flush.
  */
 
 const { randomUUID } = require('crypto')
+const { createStore, parseBlob } = require('./store')
 
 const COLUMN_MAP = {
   id: 'id',
@@ -25,23 +26,19 @@ const COLUMN_MAP = {
 }
 
 const BLOB_KEYS = new Set(['parsedFetch'])
-const FLUSH_MS = 50
 const SELECT_COLUMNS =
   'id, provider, username, parsed_fetch, instructions_hash, ' +
   'instructions_applied_at, wait_until, wait_reason, state_json, created_at, updated_at'
 
-const pending = new Map()
-
-function parseBlob(value, fallback) {
-  if (typeof value !== 'string' || value === '') return fallback
-  try {
-    const parsed = JSON.parse(value)
-    return parsed && typeof parsed === 'object' ? parsed : fallback
-  } catch (caughtErr) {
-    console.error('JSON.parse() failed:', caughtErr)
-    return fallback
-  }
-}
+const store = createStore({
+  table: 'users',
+  columnMap: COLUMN_MAP,
+  blobKeys: BLOB_KEYS,
+  conflict: ['id'],
+  keyOf: (user) => user.id,
+  flushMs: 250,
+  label: 'users',
+})
 
 function rowToUser(row) {
   if (!row) return null
@@ -64,108 +61,25 @@ function rowToUser(row) {
   return user
 }
 
-function columnProjection(user) {
-  const columns = {}
-  const state = {}
-  for (const [key, value] of Object.entries(user)) {
-    const column = COLUMN_MAP[key]
-    if (!column) {
-      state[key] = value
-      continue
-    }
-    if (BLOB_KEYS.has(key)) {
-      columns[column] = value === null || value === undefined ? null : JSON.stringify(value)
-    } else if (typeof value === 'boolean') {
-      columns[column] = value ? 1 : 0
-    } else if (value === undefined) {
-      columns[column] = null
-    } else {
-      columns[column] = value
-    }
-  }
-  return {
-    columns,
-    state: Object.keys(state).length === 0 ? null : JSON.stringify(state),
-  }
-}
-
-function flush(db, user) {
-  const { columns, state } = columnProjection(user)
-  columns.state_json = state
-  columns.updated_at = Date.now()
-  user.updatedAt = columns.updated_at
-
-  const names = Object.keys(columns)
-  const placeholders = names.map(() => '?').join(', ')
-  const updates = names.map((n) => n + ' = excluded.' + n).join(', ')
-  db.prepare(
-    'INSERT INTO users (' +
-      names.join(', ') +
-      ') VALUES (' +
-      placeholders +
-      ') ON CONFLICT(id) DO UPDATE SET ' +
-      updates,
-  ).run(...names.map((n) => columns[n]))
-}
-
-function schedule(db, user) {
-  const id = user.id
-  if (pending.has(id)) return
-  pending.set(
-    id,
-    setTimeout(() => {
-      pending.delete(id)
-      try {
-        flush(db, user)
-      } catch (error) {
-        console.error('flush() failed:', error)
-        const message = error && error.message ? error.message : String(error)
-        if (!/database is not open/i.test(message)) {
-          console.error('users flush failed: ' + message)
-        }
-      }
-    }, FLUSH_MS),
-  )
-}
-
-function wrap(db, user) {
-  return new Proxy(user, {
-    set(target, key, value) {
-      if (typeof key !== 'string' || key === 'updatedAt' || key === 'createdAt') {
-        target[key] = value
-        return true
-      }
-      target[key] = value
-      schedule(db, target)
-      return true
-    },
-    deleteProperty(target, key) {
-      delete target[key]
-      schedule(db, target)
-      return true
-    },
-  })
-}
-
 function get(db, provider, username) {
   const row = db
     .prepare('SELECT ' + SELECT_COLUMNS + ' FROM users WHERE provider = ? AND username = ?')
     .get(String(provider).toLowerCase(), String(username))
   if (!row) return null
-  return wrap(db, rowToUser(row))
+  return store.wrap(db, rowToUser(row))
 }
 
 function getById(db, id) {
   const row = db.prepare('SELECT ' + SELECT_COLUMNS + ' FROM users WHERE id = ?').get(id)
   if (!row) return null
-  return wrap(db, rowToUser(row))
+  return store.wrap(db, rowToUser(row))
 }
 
 function list(db) {
   return db
     .prepare('SELECT ' + SELECT_COLUMNS + ' FROM users ORDER BY provider, username')
     .all()
-    .map(rowToUser)
+    .map((row) => store.wrap(db, rowToUser(row)))
 }
 
 function create(db, provider, username, fields = {}) {
@@ -182,8 +96,8 @@ function create(db, provider, username, fields = {}) {
     createdAt: fields.createdAt ?? now,
     updatedAt: now,
   }
-  flush(db, user)
-  return wrap(db, user)
+  store.flush(db, user)
+  return store.wrap(db, user)
 }
 
 function upsert(db, provider, username, fields = {}) {
@@ -196,27 +110,17 @@ function upsert(db, provider, username, fields = {}) {
 }
 
 function remove(db, id) {
-  if (pending.has(id)) {
-    clearTimeout(pending.get(id))
-    pending.delete(id)
-  }
+  store.cancel(id)
   return db.prepare('DELETE FROM users WHERE id = ?').run(id).changes
-}
-
-function flushNow(db, user) {
-  if (pending.has(user.id)) {
-    clearTimeout(pending.get(user.id))
-    pending.delete(user.id)
-  }
-  flush(db, user)
 }
 
 module.exports = {
   BLOB_KEYS,
   COLUMN_MAP,
   create,
-  flush,
-  flushNow,
+  flush: store.flush,
+  flushAll: store.flushAll,
+  flushNow: store.flushNow,
   get,
   getById,
   list,

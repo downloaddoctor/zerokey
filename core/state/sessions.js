@@ -3,14 +3,17 @@
 /**
  * Sessions: one row per (user, session name).
  *
- * Column names are snake_case; the JS object is camelCase. The proxy in this
- * module is the boundary. Writes are debounced 50 ms; nested writes are not
- * intercepted, so reassign a field to persist a change.
+ * Column names are snake_case; the JS object is camelCase. Persistence and the
+ * recursive Proxy live in core/state/store.js; this module supplies the table
+ * config and the session-specific domain functions. Writes (nested plain
+ * objects/arrays included) are debounced 250 ms.
  *
  * Compaction: when a caller reports a higher generation than the row holds,
  * id and parentId are cleared and the old id is appended to
  * metadata.pendingPreviousConversationIds.
  */
+
+const { createStore, parseBlob } = require('./store')
 
 const COLUMN_MAP = {
   userId: 'user_id',
@@ -35,25 +38,23 @@ const COLUMN_MAP = {
 }
 
 const BLOB_KEYS = new Set(['todos', 'metadata', 'mcpInjected', 'usageTotals'])
-const FLUSH_MS = 50
 const MAX_GENERATION = Number.MAX_SAFE_INTEGER
 const SELECT_COLUMNS =
   'user_id, name, id, parent_id, generation, tool_calling, vision, model, ' +
   'todos_json, turn_count, dynamic_tools_hash, mcp_injected_json, state, metadata_json, ' +
   'last_token_usage, usage_totals_json, last_used, created_at, state_json, updated_at'
 
-const pending = new Map()
+const keyFor = (userId, name) => userId + '\u0000' + name
 
-function parseBlob(value, fallback) {
-  if (typeof value !== 'string' || value === '') return fallback
-  try {
-    const parsed = JSON.parse(value)
-    return parsed && typeof parsed === 'object' ? parsed : fallback
-  } catch (caughtErr) {
-    console.error('JSON.parse() failed:', caughtErr)
-    return fallback
-  }
-}
+const store = createStore({
+  table: 'sessions',
+  columnMap: COLUMN_MAP,
+  blobKeys: BLOB_KEYS,
+  conflict: ['user_id', 'name'],
+  keyOf: (session) => keyFor(session.userId, session.name),
+  flushMs: 250,
+  label: 'sessions',
+})
 
 function normalizeGeneration(value) {
   return Number.isSafeInteger(value) && value >= 0 && value <= MAX_GENERATION ? value : 0
@@ -90,101 +91,12 @@ function rowToSession(row) {
   return session
 }
 
-function columnProjection(session) {
-  const columns = {}
-  const state = {}
-  for (const [key, value] of Object.entries(session)) {
-    const column = COLUMN_MAP[key]
-    if (!column) {
-      state[key] = value
-      continue
-    }
-    if (BLOB_KEYS.has(key)) {
-      columns[column] = value === null || value === undefined ? null : JSON.stringify(value)
-    } else if (typeof value === 'boolean') {
-      columns[column] = value ? 1 : 0
-    } else if (value === undefined) {
-      columns[column] = null
-    } else {
-      columns[column] = value
-    }
-  }
-  return {
-    columns,
-    state: Object.keys(state).length === 0 ? null : JSON.stringify(state),
-  }
-}
-
-function flush(db, session) {
-  const { columns, state } = columnProjection(session)
-  columns.state_json = state
-  columns.updated_at = Date.now()
-  session.updatedAt = columns.updated_at
-
-  const names = Object.keys(columns)
-  const placeholders = names.map(() => '?').join(', ')
-  const updates = names
-    .filter((n) => n !== 'user_id' && n !== 'name')
-    .map((n) => n + ' = excluded.' + n)
-    .join(', ')
-  db.prepare(
-    'INSERT INTO sessions (' +
-      names.join(', ') +
-      ') VALUES (' +
-      placeholders +
-      ') ON CONFLICT(user_id, name) DO UPDATE SET ' +
-      updates,
-  ).run(...names.map((n) => columns[n]))
-}
-
-function schedule(db, session) {
-  const key = session.userId + '\u0000' + session.name
-  if (pending.has(key)) return
-  pending.set(
-    key,
-    setTimeout(() => {
-      pending.delete(key)
-      try {
-        flush(db, session)
-      } catch (error) {
-        // A flush scheduled just before the caller closed the database is
-        // expected in short-lived processes (tests, shutdown). Stay silent
-        // for that case; report anything else once.
-        const message = error && error.message ? error.message : String(error)
-        if (!/database is not open/i.test(message)) {
-          console.error('flush() failed:', error)
-          console.error('sessions flush failed: ' + message)
-        }
-      }
-    }, FLUSH_MS),
-  )
-}
-
-function wrap(db, session) {
-  return new Proxy(session, {
-    set(target, key, value) {
-      if (typeof key !== 'string' || key === 'updatedAt' || key === 'createdAt') {
-        target[key] = value
-        return true
-      }
-      target[key] = value
-      schedule(db, target)
-      return true
-    },
-    deleteProperty(target, key) {
-      delete target[key]
-      schedule(db, target)
-      return true
-    },
-  })
-}
-
 function get(db, userId, name) {
   const row = db
     .prepare('SELECT ' + SELECT_COLUMNS + ' FROM sessions WHERE user_id = ? AND name = ?')
     .get(userId, name)
   if (!row) return null
-  return wrap(db, rowToSession(row))
+  return store.wrap(db, rowToSession(row))
 }
 
 function listForUser(db, userId) {
@@ -195,7 +107,7 @@ function listForUser(db, userId) {
         ' FROM sessions WHERE user_id = ? ORDER BY last_used DESC NULLS LAST, name DESC',
     )
     .all(userId)
-    .map((row) => wrap(db, rowToSession(row)))
+    .map((row) => store.wrap(db, rowToSession(row)))
 }
 
 function list(db, limit = 500) {
@@ -203,7 +115,7 @@ function list(db, limit = 500) {
   return db
     .prepare('SELECT ' + SELECT_COLUMNS + ' FROM sessions ORDER BY updated_at DESC LIMIT ?')
     .all(bounded)
-    .map(rowToSession)
+    .map((row) => store.wrap(db, rowToSession(row)))
 }
 
 function create(db, userId, fields = {}) {
@@ -229,8 +141,29 @@ function create(db, userId, fields = {}) {
     createdAt: fields.createdAt ?? now,
     updatedAt: now,
   }
-  flush(db, session)
-  return wrap(db, session)
+  store.flush(db, session)
+  return store.wrap(db, session)
+}
+
+// Rebase a session onto a newer compaction generation: forget the upstream
+// chat pointer, stash the old id, and record the new generation. Shared by
+// sessions.resolve and the per-request rebase in core/chat-router.js.
+function rebase(session, generation) {
+  const previousId = session.id || null
+  const pendingIds = Array.isArray(session.metadata?.pendingPreviousConversationIds)
+    ? session.metadata.pendingPreviousConversationIds.filter(
+        (value) => typeof value === 'string' && value !== '',
+      )
+    : []
+  if (previousId) pendingIds.push(previousId)
+  session.generation = generation
+  session.id = null
+  session.parentId = null
+  session.state = 'rebased'
+  session.metadata = {
+    ...(session.metadata || {}),
+    pendingPreviousConversationIds: [...new Set(pendingIds)],
+  }
 }
 
 function resolve(db, userId, name, options = {}) {
@@ -256,60 +189,28 @@ function resolve(db, userId, name, options = {}) {
   }
   session.persistent = true
 
-  if (incoming > session.generation) {
-    const previousId = session.id || null
-    const pendingIds = Array.isArray(session.metadata.pendingPreviousConversationIds)
-      ? session.metadata.pendingPreviousConversationIds.filter(
-          (value) => typeof value === 'string' && value !== '',
-        )
-      : []
-    if (previousId) pendingIds.push(previousId)
-    session.generation = incoming
-    session.id = null
-    session.parentId = null
-    session.state = 'rebased'
-    session.metadata = {
-      ...(session.metadata || {}),
-      pendingPreviousConversationIds: [...new Set(pendingIds)],
-    }
-  }
+  if (incoming > session.generation) rebase(session, incoming)
   return session
 }
 
 function remove(db, userId, name) {
-  const key = userId + '\u0000' + name
-  if (pending.has(key)) {
-    clearTimeout(pending.get(key))
-    pending.delete(key)
-  }
+  store.cancel(keyFor(userId, name))
   return db.prepare('DELETE FROM sessions WHERE user_id = ? AND name = ?').run(userId, name).changes
 }
 
 function removeAllForUser(db, userId) {
-  for (const key of [...pending.keys()]) {
-    if (key.startsWith(userId + '\u0000')) {
-      clearTimeout(pending.get(key))
-      pending.delete(key)
-    }
-  }
+  store.cancelWhere((key) => key.startsWith(userId + '\u0000'))
   return db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId).changes
-}
-
-function flushNow(db, session) {
-  const key = session.userId + '\u0000' + session.name
-  if (pending.has(key)) {
-    clearTimeout(pending.get(key))
-    pending.delete(key)
-  }
-  flush(db, session)
 }
 
 module.exports = {
   BLOB_KEYS,
   COLUMN_MAP,
   create,
-  flush,
-  flushNow,
+  rebase,
+  flush: store.flush,
+  flushAll: store.flushAll,
+  flushNow: store.flushNow,
   get,
   list,
   listForUser,

@@ -31,11 +31,12 @@ MODULES
  app.js — express wiring; classifySession per request; mounts health/models/diagnostics/chat router
  server.js — claimFirstFree → postClaim → db.open → SessionSelector → app.start → signal shutdown
  config/constants.js — CONFIG: PORT, PORT_RANGE, EXACT_PORT, DATA_DIR, DB_FILE, LOG_*, MHI_* capability flags
- core/chat-router.js — provider seam: seedSession, persistAfterTurn, per-request generation rebase
+ core/chat-router.js — provider seam: adoptSession annotates the selector's Proxy row (no re-resolve, no copy); sessions.rebase runs on the per-request generation header; persistAfterTurn runs sessions.flushNow at res finish/close; server.js cleanup drains users/sessions.flushAll before store.close
  core/session-selector.js — interactive prompts: provider → user (create/update auth/delete; fetch capture) → session; headless preselection
  core/state/db.js — node:sqlite DatabaseSync; WAL; fail-closed on newer schema_version; additive columns via ADDED_COLUMNS (idempotent ALTER TABLE ADD COLUMN); one-shot legacy import
- core/state/users.js — Proxy row; assigning any field schedules a 50 ms debounced flush
- core/state/sessions.js — Proxy row; same debounce; compaction via generation bump clears id/parentId
+ core/state/store.js — createStore(cfg): debounced write-through + recursive Proxy (plain objects/arrays only) shared by users/sessions; cfg = table, columnMap, blobKeys, conflict, keyOf, flushMs, label
+ core/state/users.js — store config + user domain fns; Proxy row; top-level and nested (parsedFetch.*, state entries) writes schedule a 250 ms debounced flush; list() also returns wrapped rows so wizard-held references persist; flushAll() drains pending writes at shutdown; deepWrap proxies only arrays and plain objects (Date/Buffer pass through)
+ core/state/sessions.js — Proxy row; 250 ms debounce; nested (metadata.*, todos, usageTotals) writes also persist; flushAll() drains pending writes at shutdown; compaction via generation bump clears id/parentId
  core/mhi/loop.js — runToolLoop: one turn → evaluateAssistant → executeCalls → appendResult (role 'mhi', passed verbatim by compiler._handlers.mhi — no USER: prefix), cap MHI_MAX_ROUNDS
  core/mhi/index.js — executor dispatch; every failure returns {ok:false, code, output} — never throws except on abort
  core/mhi/files.js — read/ls/glob/grep/write/replace; write refuses overwrite; replace requires exactly one match
@@ -52,7 +53,7 @@ MODULES
  engine/mcp/auto.js — build alias maps from mcp_<server>_<tool> names in req.body.tools[]
  providers/registry.js — auto-discovers providers/<name>/index.js
  providers/<name>/index.js — {name, displayName, models, promptLimit, setupSteps, validateFetch, validateCredentials, buildRouter}
- providers/<name>/router.js — express router; runToolLoop wraps one upstream turn per round
+ providers/<name>/router.js — express router; runToolLoop wraps one upstream turn per round; userData is a Proxy row, mutate fields directly (persistence is automatic)
  providers/<name>/stream-handler.js — provider SSE → OpenAI chunk deltas
  providers/base/BaseAPI.js — https agent, cookie jar, _fetch with timeout
  surfaces/registry.js — auto-discovers surfaces/<name>/index.js; resolveSurface(messages) by realSessionPrefix; resolveUtility(messages) by utilityPrefixes
@@ -147,7 +148,7 @@ INVARIANTS
  One log file, no errors.log — the error block sits right after the lifecycle lines that led to it, so the preceding context travels with it
  Internal executors never throw on normal failure — they return {ok:false, code, output}
  Path policy: all MHI file/cmd paths confined to the resolved workspace root (realpath-checked)
- Proxy writes are debounced 50 ms; nested mutation is NOT intercepted — reassign the field
+ Proxy writes are debounced 250 ms; nested plain objects/arrays (parsedFetch.*, metadata.*, todos) ARE intercepted (recursive wrap) — reassignment is not required
  StreamPipeline.emit is the only path to the SSE writer
  engine/syntax.js is the single source of truth for OPEN/CLOSE/SEP/ESC — never restate the literal bytes
  No prose around tool blocks in MHI responses — mixed output triggers a repair round

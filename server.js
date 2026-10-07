@@ -50,6 +50,12 @@ async function run() {
   const cleanup = () => {
     startup.release(port)
     try {
+      require('./core/state/users').flushAll()
+      require('./core/state/sessions').flushAll()
+    } catch {
+      // Best-effort drain of debounced writes; ignore.
+    }
+    try {
       store.close()
     } catch {
       // Best-effort close on shutdown; ignore.
