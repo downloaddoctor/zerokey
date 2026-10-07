@@ -13,7 +13,7 @@ const {
 } = require('./triggers')
 const { ephemeralSession } = require('../utils/ephemeral-session')
 const { buildUsage, accumulate } = require('./usage')
-const { inspectBatch, MAX_BATCH } = require('./loop-guard')
+const { inspectBatch, signature, pushHistory, MAX_BATCH } = require('./loop-guard')
 
 let callCounter = 0
 
@@ -75,6 +75,11 @@ function emitToolCalls(compiler, session, payloads, emit) {
   const delta = buildToolDelta(tool_calls)
   console.debug('[TOOL] EMIT', delta.tool_calls)
   emit(delta)
+}
+
+// Shared loop-break fragment for both drift and cross-turn repetition.
+function _loopBreakText() {
+  return require('./instructions').getExtra('loop-break').content
 }
 
 class StreamPipeline {
@@ -360,11 +365,15 @@ class StreamPipeline {
 
     if (this.session._driftWarning) {
       this.session._driftWarning = false
-      this._injectLive(
-        messages,
-        'Your previous response emitted duplicate or too many tool calls. Those results are already in the conversation. Do not repeat them. Take the single next unfinished step of the task.',
-      )
+      this._injectLive(messages, _loopBreakText())
       console.debug('[LOOP] drift reminder injected')
+    }
+
+    // Cross-turn loop break set by flush() on an all-repeat batch.
+    if (this.session._loopBreak) {
+      this.session._loopBreak = false
+      this._injectLive(messages, _loopBreakText())
+      console.debug('[LOOP] cross-turn loop break injected')
     }
 
     const { prompt, skill } = await this.compiler.uploadAndFormatPrompt(messages, this)
@@ -381,9 +390,7 @@ class StreamPipeline {
     return { prompt: built, handled: false }
   }
 
-  // Insert a live_instructions message BEFORE the latest user/mhi turn so the
-  // reminder precedes the message it applies to, and the last message stays
-  // the user turn (skill triggers read messages[messages.length - 1]).
+  // Insert before the last user/mhi turn; keep the user turn last.
   _injectLive(messages, content) {
     let at = messages.length
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -515,6 +522,19 @@ class StreamPipeline {
     }
     if (drifting) {
       this.session._driftWarning = true
+    }
+
+    // All-repeat batch (AA/ABA/ABAB) = loop.
+    const history = Array.isArray(this.session._toolHistory) ? this.session._toolHistory : []
+    if (history.length > 0 && deduped.length > 0) {
+      const sigs = deduped.map(signature).filter((s) => s !== null)
+      if (sigs.length > 0 && sigs.every((s) => history.includes(s))) {
+        this.session._loopBreak = true
+        console.warn(`[LOOP] all ${sigs.length} call(s) repeat prior reads — breaking loop`)
+      }
+    }
+    if (deduped.length > 0 && !this.session._loopBreak) {
+      this.session._toolHistory = pushHistory(history, deduped)
     }
 
     emitToolCalls(this.compiler, this.session, deduped, this.emit)

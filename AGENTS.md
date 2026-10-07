@@ -45,7 +45,9 @@ MODULES
  core/mhi/path-policy.js — workspace confinement: realpath, UNC/ADS/reserved-name refusal
  core/mhi/view-image.js — falls back to context.imageRoots when the path is outside the first workspace root; other file tools stay confined to the first root
  core/mhi/loop.js imageRoots — every ZEROKEY_WORKSPACE_ROOTS entry (default process.cwd()) plus its direct parent dir (one level max, never higher); built in internalWorkspaceContext
- engine/pipeline.js — StreamPipeline: per-request SSE lifecycle, scan() FSM, deferFinish for tool loops
+ engine/pipeline.js — StreamPipeline: per-request SSE lifecycle, scan() FSM, deferFinish for tool loops; flush() dedupes via loop-guard and records read signatures to session._toolHistory, injecting $loop-break when a whole batch repeats prior reads
+ engine/loop-guard.js — signature/inspectBatch (single-response dedup + drift), pushHistory/detectLoop (cross-turn ABAB/ABA/AA via session._toolHistory)
+ engine/extra/loop-break.md — loop-break reminder text, injected live via pipeline._loopBreakText() on single-response drift or cross-turn repetition (not a $-trigger)
  engine/compiler.js — ToolCompiler singleton per ide×provider; parse/emit generic→native tool mapping
  engine/tool-bridge.js — grammar injection + block parsing for providers with no native tool channel
  engine/triggers.js — $skill registry; auto-registers one passthrough per engine/extra/*.md

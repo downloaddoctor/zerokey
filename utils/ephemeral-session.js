@@ -19,6 +19,11 @@ function ephemeralSession(session) {
     parentId: null,
     usageTotals: copy(session.usageTotals),
     _usageTotals: copy(session._usageTotals),
+    // Loop-guard history is an array; shallow-clone it so pushHistory on the
+    // ephemeral clone never mutates the real session's row.
+    _toolHistory: Array.isArray(session._toolHistory)
+      ? [...session._toolHistory]
+      : session._toolHistory,
   }
 }
 
