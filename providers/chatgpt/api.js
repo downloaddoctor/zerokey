@@ -1,11 +1,8 @@
-const https = require('https')
-const crypto = require('crypto')
-
 const nodeFetch = require('node-fetch')
 
 const { ChatGPTProofOfWork } = require('./pow')
-const { CookieJar } = require('../../utils/cookie-jar')
 const { humanDelay } = require('../../utils/human-delay')
+const { uuid } = require('../../utils/uuid')
 
 /**
  * ChatGPT API Client
@@ -17,24 +14,33 @@ const { humanDelay } = require('../../utils/human-delay')
  * We extract the real UA from the proof token config[4] and add it to every request.
  * Without User-Agent, Cloudflare returns 403.
  */
+const { BaseAPI } = require('../base/BaseAPI')
 const { assertOk } = require('../../utils/http-error')
 
-class ChatGPTAPI {
+class ChatGPTAPI extends BaseAPI {
   constructor(options = {}) {
-    this._log = options.log !== false
+    super(options)
     this.BASE_URL = 'https://chatgpt.com'
     this._headers = null
     this._bodyTemplate = null
     this._config = null
     this._ready = false
     this._pageLoadedAt = Date.now()
-    this._cookies = new CookieJar()
-    this._httpAgent = new https.Agent({
-      keepAlive: true,
-      maxSockets: 50,
-      maxFreeSockets: 10,
-      timeout: 300000,
-    })
+  }
+
+  // Completion callers parse the timeout as a structured upstream error.
+  _timeoutError(timeoutMs) {
+    const error = new Error(
+      JSON.stringify({
+        error: {
+          type: 'request_timeout',
+          message: `Request timed out after ${timeoutMs / 1000}s`,
+        },
+      }),
+    )
+    error.status = 504
+    error.statusCode = 504
+    return error
   }
 
   async initializeFromJSON(data) {
@@ -156,7 +162,7 @@ class ChatGPTAPI {
     await humanDelay()
     if (!this._ready) throw new Error('Not initialized')
 
-    const messageId = crypto.randomUUID()
+    const messageId = uuid()
     const partialQuery = {
       id: messageId,
       author: { role: 'user' },
@@ -448,8 +454,8 @@ class ChatGPTAPI {
   // ─── Response header capture ─────────────────────────────────
 
   _captureResponseHeaders(res) {
-    // Capture all cookies via shared CookieJar
-    this._cookies.captureFromFetchHeaders(res.headers, ' ChatGPT')
+    // Cookies + cookie header via BaseAPI
+    super._captureResponseHeaders(res)
 
     const oaiIsUpdate = res.headers.get('x-oai-is-update')
     if (oaiIsUpdate) {
@@ -462,8 +468,6 @@ class ChatGPTAPI {
       this._headers['x-conduit-token'] = conduitToken
       // console.debug('[ChatGPT] Updated x-conduit-token from response header')
     }
-
-    this._headers['cookie'] = this._cookies.toString()
 
     if (typeof this._onCaptureChanged === 'function') {
       try {
@@ -556,46 +560,6 @@ class ChatGPTAPI {
     delete extra['content-type']
 
     return { ...base, ...extra }
-  }
-
-  async _fetch(url, options = {}, parseJSON = false, timeoutMs = 300_000) {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), timeoutMs)
-
-    let res
-    try {
-      res = await nodeFetch(url, {
-        ...options,
-        redirect: 'follow',
-        signal: controller.signal,
-        agent: this._httpAgent,
-      })
-    } catch (err) {
-      console.error('chatgpt: fetch failed for ' + url + ':', err)
-      clearTimeout(timer)
-      if (err.name === 'AbortError') {
-        const errorObj = {
-          error: {
-            type: 'request_timeout',
-            message: `Request timed out after ${timeoutMs / 1000}s`,
-          },
-        }
-        const te = new Error(JSON.stringify(errorObj))
-        te.status = 504
-        te.statusCode = 504
-        throw te
-      }
-      throw err
-    }
-    clearTimeout(timer)
-
-    if (parseJSON && res.ok) {
-      this._captureResponseHeaders(res)
-      const json = await res.json()
-      return { ok: true, status: res.status, data: json }
-    }
-
-    return res
   }
 }
 

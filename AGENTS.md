@@ -55,7 +55,7 @@ MODULES
  providers/<name>/index.js — {name, displayName, models, promptLimit, setupSteps, validateFetch, validateCredentials, buildRouter}
  providers/<name>/router.js — express router; runToolLoop wraps one upstream turn per round; userData is a Proxy row, mutate fields directly (persistence is automatic)
  providers/<name>/stream-handler.js — provider SSE → OpenAI chunk deltas
- providers/base/BaseAPI.js — https agent, cookie jar, _fetch with timeout; ChatGPT and Qwen keep their own _fetch (do not extend it)
+ providers/base/BaseAPI.js — shared base for all four *API classes: https agent, cookie jar, initializeFromJSON cookie seeding, _captureResponseHeaders (cookie header), _fetch with timeout; _timeoutError(ms) overridable (ChatGPT/Qwen wrap it as JSON request_timeout); subclasses add only provider-specific headers/endpoints
  surfaces/registry.js — auto-discovers surfaces/<name>/index.js; resolveSurface(messages) by realSessionPrefix; resolveUtility(messages) by utilityPrefixes
  surfaces/base.js — IDEToolSurface: tool()/format() registrar + resolve(); realSessionPrefix (real IDE fingerprint) + utilityPrefixes (IDE-internal utility calls)
  surfaces/specs.js — generic tool specs (grammar, keys, repeatable) merged by IDEToolSurface#tool()
@@ -67,6 +67,7 @@ MODULES
  utils/rate-limiter.js — sliding window 15/60s per label; setProviderCooldown on 429
  utils/startup.js — per-port lock file temp/db/.start.<port>.lock; probeHealth/postClaim
  utils/errors.js — classifyError → toOpenAIError (two calling conventions)
+ utils/uuid.js — uuid() v4 via crypto.randomUUID; the only UUID helper for provider clients
  utils/http-error.js — assertOk(res, {allow, prefix}) opt-in non-OK guard (reads body slice, throws Error with .status); not used in sentinel prepare/finalize (they set err.code/statusCode) nor completion calls (bodies parsed for rate-limit/cooldown)
  utils/log.js — one zerokey.log (ts,pid,level,tag,msg,where,error,code,status,context,stack) separated by engine/syntax.js SEP (not a comma), one line per record; pid in the same column for plain and error rows; console.* rewired (colour + auto [FILE] tag + redact + mirror); console.error('msg', err[, ctx]) fills all columns — the ONE entry point; O(1) per call (cached tag, in-memory size, depth-capped causes); formatError renders Error → Name/msg|code|status + frames + caused-by
 

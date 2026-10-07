@@ -39,7 +39,8 @@ class BaseAPI {
 
   _captureResponseHeaders(res) {
     this._cookies.captureFromFetchHeaders(res.headers, ` ${this.constructor.name}`)
-    this._headers['cookie'] = this._cookies.toString()
+    const cookieStr = this._cookies.toString()
+    if (cookieStr) this._headers['cookie'] = cookieStr
   }
 
   _buildHeaders(overrides = {}) {
@@ -49,6 +50,14 @@ class BaseAPI {
     if (cookieStr) h['cookie'] = cookieStr
     Object.assign(h, overrides)
     return h
+  }
+
+  /** Error thrown when a request exceeds its timeout; subclasses may reshape it. */
+  _timeoutError(timeoutMs) {
+    const error = new Error(`Request timed out after ${timeoutMs / 1000}s`)
+    error.status = 504
+    error.statusCode = 504
+    return error
   }
 
   async _fetch(url, options = {}, parseJSON = false, timeoutMs = 300000) {
@@ -64,14 +73,9 @@ class BaseAPI {
         agent: this._httpAgent,
       })
     } catch (err) {
-      console.error('BaseAPI: fetch failed for ' + url + ':', err)
+      console.error(`${this.constructor.name}: fetch failed for ${url}:`, err)
       clearTimeout(timer)
-      if (err.name === 'AbortError') {
-        const error = new Error(`Request timed out after ${timeoutMs / 1000}s`)
-        error.status = 504
-        error.statusCode = 504
-        throw error
-      }
+      if (err.name === 'AbortError') throw this._timeoutError(timeoutMs)
       throw err
     }
     clearTimeout(timer)

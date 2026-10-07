@@ -1,30 +1,13 @@
-const crypto = require('crypto')
-
 const { BaseAPI } = require('../base/BaseAPI')
 const { assertOk } = require('../../utils/http-error')
 const { reasoning } = require('./config')
 const { humanDelay } = require('../../utils/human-delay')
+const { uuid } = require('../../utils/uuid')
 
 // O(1) reasoning_effort → { think, tier } lookup.
 // Keys are the exact labels VS Code advertises (utils/sync-ide-config.js).
 // Anything not mapped disables thinking.
 const REASONING_MAP = reasoning.map
-
-/**
- * Generate a UUID v4.
- */
-function generateUUID() {
-  try {
-    return crypto.randomUUID()
-  } catch (caughtErr) {
-    console.error('crypto.randomUUID() failed:', caughtErr)
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0
-      const v = c === 'x' ? r : (r & 0x3) | 0x8
-      return v.toString(16)
-    })
-  }
-}
 
 /**
  * Claude API Client
@@ -130,11 +113,11 @@ class ClaudeAPI extends BaseAPI {
 
     // Generate conversation UUID for new conversations (client-side pregen)
     if (!chatSessionId) {
-      chatSessionId = generateUUID()
+      chatSessionId = uuid()
     }
 
-    const humanMessageUuid = generateUUID()
-    const assistantMessageUuid = generateUUID()
+    const humanMessageUuid = uuid()
+    const assistantMessageUuid = uuid()
 
     const body = {
       prompt,
@@ -149,7 +132,7 @@ class ClaudeAPI extends BaseAPI {
       attachments: [],
       files: fileIds,
       sync_sources: [],
-      completion_request_id: generateUUID(),
+      completion_request_id: uuid(),
       rendering_mode: 'messages',
     }
 
@@ -261,13 +244,6 @@ class ClaudeAPI extends BaseAPI {
     await assertOk(res, { prefix: 'Failed to get account profile: ' })
 
     return res.data
-  }
-
-  _captureResponseHeaders(res) {
-    // Capture cookies from response
-    this._cookies.captureFromFetchHeaders(res.headers, ' Claude')
-    // Update stored cookie header for future requests
-    this._headers['cookie'] = this._cookies.toString()
   }
 
   // ─── Headers builder ───────────────────────────────────────────

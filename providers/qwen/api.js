@@ -1,10 +1,5 @@
-const https = require('https')
-const crypto = require('crypto')
-
-const nodeFetch = require('node-fetch')
-
-const { CookieJar } = require('../../utils/cookie-jar')
 const { humanDelay } = require('../../utils/human-delay')
+const { uuid } = require('../../utils/uuid')
 const { reasoning } = require('./config')
 
 // O(1) reasoning_effort → feature_config lookup
@@ -27,48 +22,35 @@ function parseWaitMs(num, template) {
   return num * 60 * 1000
 }
 
-function uuid() {
-  try {
-    return crypto.randomUUID()
-  } catch (caughtErr) {
-    console.error('crypto.randomUUID() failed:', caughtErr)
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0
-      const v = c === 'x' ? r : (r & 0x3) | 0x8
-      return v.toString(16)
-    })
-  }
-}
-
+const { BaseAPI } = require('../base/BaseAPI')
 const { assertOk } = require('../../utils/http-error')
 
-class QwenAPI {
+class QwenAPI extends BaseAPI {
   static BASE_URL = QWEN_AI_BASE
 
   constructor(options = {}) {
-    this._log = options.log !== false
-    this._headers = {}
+    super(options)
     this._body = {}
-    this._cookies = new CookieJar()
-    this._httpAgent = new https.Agent({
-      keepAlive: true,
-      maxSockets: 50,
-      maxFreeSockets: 10,
-      timeout: 300000,
-    })
+  }
+
+  // Completion callers parse the timeout as a structured upstream error.
+  _timeoutError(timeoutMs) {
+    const error = new Error(
+      JSON.stringify({
+        error: {
+          type: 'request_timeout',
+          message: `Request timed out after ${timeoutMs / 1000}s`,
+        },
+      }),
+    )
+    error.status = 504
+    error.statusCode = 504
+    return error
   }
 
   async initializeFromJSON({ headers, body }) {
-    this._headers = { ...headers }
+    await super.initializeFromJSON({ headers })
     this._body = { ...(body || {}) }
-
-    const initialCookie = headers.cookie || headers.Cookie || ''
-    if (initialCookie) {
-      const count = this._cookies.seedFromHeader(initialCookie)
-      if (count > 0 && this._log) {
-        console.debug(`[Qwen] Seeded cookie jar with ${count} initial cookies`)
-      }
-    }
 
     if (!this._getBearer()) {
       throw new Error(
@@ -347,12 +329,6 @@ class QwenAPI {
     this._headers.authorization = `Bearer ${jwt}`
   }
 
-  _captureResponseHeaders(res) {
-    this._cookies.captureFromFetchHeaders(res.headers, ' Qwen')
-    const cookieStr = this._cookies.toString()
-    if (cookieStr) this._headers.cookie = cookieStr
-  }
-
   _buildHeaders(overrides = {}) {
     const src = this._headers
     const cookieStr = this._cookies.toString() || src.cookie || ''
@@ -387,46 +363,6 @@ class QwenAPI {
     }
 
     return { ...base, ...overrides }
-  }
-
-  async _fetch(url, options = {}, parseJSON = false, timeoutMs = 300_000) {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), timeoutMs)
-
-    let res
-    try {
-      res = await nodeFetch(url, {
-        ...options,
-        redirect: 'follow',
-        signal: controller.signal,
-        agent: this._httpAgent,
-      })
-    } catch (err) {
-      console.error('qwen: fetch failed for ' + url + ':', err)
-      clearTimeout(timer)
-      if (err.name === 'AbortError') {
-        const errorObj = {
-          error: {
-            type: 'request_timeout',
-            message: `Request timed out after ${timeoutMs / 1000}s`,
-          },
-        }
-        const te = new Error(JSON.stringify(errorObj))
-        te.status = 504
-        te.statusCode = 504
-        throw te
-      }
-      throw err
-    }
-    clearTimeout(timer)
-
-    if (parseJSON && res.ok) {
-      this._captureResponseHeaders(res)
-      const json = await res.json()
-      return { ok: true, status: res.status, data: json }
-    }
-
-    return res
   }
 }
 
