@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ZeroKey API Server",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "description": "OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT & Qwen — no API keys, real browser sessions. Base URL uses the port chosen at startup (default 7250, auto-increments if occupied).",
     "license": {
       "name": "MIT"

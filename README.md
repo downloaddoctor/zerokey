@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="ZeroKey preview" src="https://github.com/user-attachments/assets/eea8d10c-a1e0-4373-9ee7-34a1e9165d94" width="979" height="512">
+  <img alt="ZeroKey preview" src="https://github.com/user-attachments/assets/9d0e2707-46c9-4290-9d37-ffbff5ea9dde" width="979" height="446">
 </p>
 
 <p align="center">

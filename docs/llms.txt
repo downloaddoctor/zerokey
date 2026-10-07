@@ -1,4 +1,4 @@
-# ZeroKey
+# ZeroKey v0.4.0
 
 > Self-hosted, personal-use OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT, and Qwen. Uses your own browser session — no API keys, no shared accounts, no relay servers.
 
