@@ -83,6 +83,7 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
               qwenApi.chatCompletion(activeSession.id, prompt, activeSession.parentId, {
                 model: activeSession.model,
                 reasoningEffort,
+                files: fileIds,
               }),
             pipeline,
           )
@@ -92,6 +93,7 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
             return qwenApi.chatCompletion(activeSession.id, prompt, activeSession.parentId, {
               model: activeSession.model,
               reasoningEffort,
+              files: fileIds,
             })
           }
 

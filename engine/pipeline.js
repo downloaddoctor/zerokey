@@ -148,7 +148,14 @@ class StreamPipeline {
 
     // bindUploader curries the API's uploadFile — must be set per-request.
     this.bindUploader = (api, collector) => {
-      this.upload = (file) => this._uploadFile(api.uploadFile.bind(api), file, collector)
+      this.upload = (file) => {
+        // Providers without an uploadFile (Qwen) must not crash the whole turn.
+        if (typeof api.uploadFile !== 'function') {
+          this.emitText('\n⚠ This provider does not support image upload; image skipped.\n')
+          return Promise.resolve(null)
+        }
+        return this._uploadFile(api.uploadFile.bind(api), file, collector)
+      }
     }
   }
 

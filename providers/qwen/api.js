@@ -1,3 +1,5 @@
+const crypto = require('crypto')
+
 const { humanDelay } = require('../../utils/human-delay')
 const { uuid } = require('../../utils/uuid')
 const { reasoning } = require('./config')
@@ -101,6 +103,135 @@ class QwenAPI extends BaseAPI {
     return id
   }
 
+  /**
+   * Upload a file/image (HAR flow): POST /api/v2/files/getstsToken returns
+   * temporary OSS credentials, the bytes are PUT straight to Alibaba OSS with an
+   * OSS4-HMAC-SHA256 header signature, and the returned descriptor goes into
+   * message.files[] of the completion request.
+   *
+   * @param {{ filename: string, data: Buffer, mimeType?: string }} file
+   */
+  async uploadFile(file) {
+    const { filename, data, mimeType = 'application/octet-stream' } = file
+    const filetype = mimeType.startsWith('image/') ? 'image' : 'file'
+
+    const stsRes = await this._fetch(
+      `${QWEN_AI_BASE}/api/v2/files/getstsToken`,
+      {
+        method: 'POST',
+        headers: this._buildHeaders({
+          accept: 'application/json, text/plain, */*',
+          'content-type': 'application/json',
+        }),
+        body: JSON.stringify({ filename, filesize: String(data.length), filetype }),
+      },
+      true,
+    )
+    await assertOk(stsRes, { prefix: '[Qwen] getstsToken: ' })
+
+    const sts = stsRes.data?.data
+    if (!sts?.access_key_id || !sts?.security_token || !sts?.file_path || !sts?.file_id) {
+      throw new Error(
+        `[Qwen] getstsToken: unexpected response ${JSON.stringify(stsRes.data).slice(0, 300)}`,
+      )
+    }
+
+    // OSS V4 header signing (scope region has no 'oss-' prefix).
+    const region = String(sts.region || 'oss-ap-southeast-1').replace(/^oss-/, '')
+    const host = `${sts.bucketname}.${sts.endpoint}`
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[-:]/g, '')
+      .replace(/\.\d{3}/, '')
+    const day = timestamp.slice(0, 8)
+    const encodedKey = sts.file_path
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/')
+    const signed = {
+      'content-type': mimeType,
+      'x-oss-content-sha256': 'UNSIGNED-PAYLOAD',
+      'x-oss-date': timestamp,
+      'x-oss-security-token': sts.security_token,
+    }
+    const canonicalHeaders = Object.keys(signed)
+      .sort()
+      .map((name) => `${name}:${String(signed[name]).trim()}\n`)
+      .join('')
+    const canonicalRequest = [
+      'PUT',
+      `/${sts.bucketname}/${encodedKey}`,
+      '',
+      canonicalHeaders,
+      '',
+      'UNSIGNED-PAYLOAD',
+    ].join('\n')
+    const scope = `${day}/${region}/oss/aliyun_v4_request`
+    const stringToSign = [
+      'OSS4-HMAC-SHA256',
+      timestamp,
+      scope,
+      crypto.createHash('sha256').update(canonicalRequest).digest('hex'),
+    ].join('\n')
+    const hmac = (key, text) => crypto.createHmac('sha256', key).update(text).digest()
+    const signingKey = hmac(
+      hmac(hmac(hmac(`aliyun_v4${sts.access_key_secret}`, day), region), 'oss'),
+      'aliyun_v4_request',
+    )
+    const signature = crypto.createHmac('sha256', signingKey).update(stringToSign).digest('hex')
+
+    const putRes = await this._fetch(
+      `https://${host}/${encodedKey}`,
+      {
+        method: 'PUT',
+        headers: {
+          ...signed,
+          authorization: `OSS4-HMAC-SHA256 Credential=${sts.access_key_id}/${scope},Signature=${signature}`,
+          origin: QWEN_AI_BASE,
+          referer: `${QWEN_AI_BASE}/`,
+        },
+        body: data,
+      },
+      false,
+    )
+    await assertOk(putRes, { prefix: '[Qwen] OSS upload: ' })
+
+    if (this._log)
+      console.debug(`[Qwen] File uploaded: ${filename} (${data.length} bytes) → ${sts.file_id}`)
+
+    const now = Date.now()
+    return {
+      type: filetype,
+      file: {
+        created_at: now,
+        data: {},
+        filename,
+        hash: null,
+        id: sts.file_id,
+        user_id: sts.file_path.split('/')[0],
+        meta: { name: filename, size: data.length, content_type: mimeType },
+        update_at: now,
+        name: filename,
+        size: data.length,
+        type: mimeType,
+      },
+      id: sts.file_id,
+      url: sts.file_url,
+      name: filename,
+      collection_name: '',
+      progress: 0,
+      status: 'uploaded',
+      greenNet: 'success',
+      size: data.length,
+      error: '',
+      itemId: uuid(),
+      file_type: mimeType,
+      showType: filetype,
+      file_class: filetype === 'image' ? 'vision' : 'document',
+      uploadTaskId: uuid(),
+    }
+  }
+
   async chatCompletion(chatSessionId, prompt, parentMessageId = null, options = {}) {
     await humanDelay()
     const modelId = options.model || 'qwen3.7-plus'
@@ -152,7 +283,7 @@ class QwenAPI extends BaseAPI {
           role: 'user',
           content: prompt,
           user_action: 'chat',
-          files: [],
+          files: options.files || [],
           timestamp: ts,
           models: [modelId],
           model: '',
