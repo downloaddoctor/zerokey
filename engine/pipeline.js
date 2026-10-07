@@ -169,8 +169,32 @@ class StreamPipeline {
    */
   beginTurn() {
     this.assistantText = ''
+    // Keep the last round that actually produced usage so a failed or empty
+    // later round never reports zero.
+    if (Object.keys(this.tokenUsage || {}).length > 0 || this._modelChars > 0) {
+      this._prevUsage = { tokenUsage: this.tokenUsage, modelChars: this._modelChars }
+    }
     this.tokenUsage = {}
     this._modelChars = 0
+  }
+
+  // One place builds the usage frame. A turn that computes zero (ephemeral
+  // utility call, errored round) reports session.lastTokenUsage instead of 0.
+  _turnUsage() {
+    this._restorePrevUsage()
+    const usage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
+    if ((usage.total_tokens || 0) > 0) return usage
+    const kept = this.session.lastTokenUsage || 0
+    if (kept <= 0) return usage
+    return { prompt_tokens: kept, completion_tokens: 0, total_tokens: kept, source: 'retained' }
+  }
+
+  _restorePrevUsage() {
+    const empty = Object.keys(this.tokenUsage || {}).length === 0 && !(this._modelChars > 0)
+    if (empty && this._prevUsage) {
+      this.tokenUsage = this._prevUsage.tokenUsage
+      this._modelChars = this._prevUsage.modelChars
+    }
   }
 
   /**
@@ -192,7 +216,7 @@ class StreamPipeline {
       // Role-only frame — writer.text emits the role implicitly on first text.
     }
     if (finishReason === 'stop' || finishReason === 'length') {
-      const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
+      const turnUsage = this._turnUsage()
       const totals = accumulate(this.session, turnUsage)
       this.session.lastTokenUsage = turnUsage.total_tokens || 0
       this.writer.finish(finishReason, { ...turnUsage, session: totals })
@@ -205,7 +229,7 @@ class StreamPipeline {
   emitAndEnd(text) {
     this.scan(text)
     this.flush()
-    const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
+    const turnUsage = this._turnUsage()
     const totals = accumulate(this.session, turnUsage)
     this.session.lastTokenUsage = turnUsage.total_tokens || 0
     this.writer.finish('stop', { ...turnUsage, session: totals })
@@ -235,7 +259,7 @@ class StreamPipeline {
     this._finished = true
     this.flush()
     // Real provider numbers win; estimate is the fallback. See engine/usage.js.
-    const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
+    const turnUsage = this._turnUsage()
     const totals = accumulate(this.session, turnUsage)
     this.session.lastTokenUsage = turnUsage.total_tokens || 0
     this.writer.finish('stop', { ...turnUsage, session: totals })
@@ -252,7 +276,7 @@ class StreamPipeline {
     this.deferFinish = false
     this._finished = true
     this.flush()
-    const turnUsage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
+    const turnUsage = this._turnUsage()
     const totals = accumulate(this.session, turnUsage)
     this.session.lastTokenUsage = turnUsage.total_tokens || 0
     this.writer.finish('stop', { ...turnUsage, session: totals })

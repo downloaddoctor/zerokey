@@ -60,6 +60,18 @@ test('executeCalls refuses cmd when disabled', async () => {
   assert.equal(results[0].code, 'mhi_cmd_disabled')
 })
 
+test('appendResult adds an image_url user message for view_image attachments', () => {
+  const data = Buffer.from('89504e470d0a1a0a', 'hex')
+  const out = mhi.appendResult({ messages: [] }, 'MHI(view_image): IMAGE', [
+    { filename: 'x.png', mimeType: 'image/png', data },
+  ])
+  assert.equal(out.messages.length, 2)
+  assert.equal(out.messages[0].role, 'mhi')
+  assert.equal(out.messages[1].role, 'user')
+  assert.equal(out.messages[1].content[0].type, 'image_url')
+  assert.ok(out.messages[1].content[0].image_url.url.startsWith('data:image/png;base64,'))
+})
+
 test('executeCalls refuses view_image when disabled', async () => {
   reset()
   const results = await mhi.executeCalls(

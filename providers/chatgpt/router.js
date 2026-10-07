@@ -25,13 +25,6 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
     const pipeline = new StreamPipeline(res, session, 'chatgpt', req.surface, req.isRealSession)
 
     if (pipeline.ephemeralMode) {
-      pipeline.onFinalChunk = () => {
-        if (pipeline.session.id) {
-          chatgptApi.deleteSession(pipeline.session.id).catch((caughtErr) => {
-            console.error('chatgptApi.deleteSession() failed:', caughtErr)
-          })
-        }
-      }
       pipeline.sendFinalChunk()
       return
     }

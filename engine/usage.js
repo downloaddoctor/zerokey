@@ -273,6 +273,16 @@ function emptyTotals() {
  */
 function accumulate(session, usage) {
   const t = (session._usageTotals ||= emptyTotals())
+  // Always remember the last real turn's split (input/output/total). Retained
+  // turns only echo session.lastTokenUsage, so they never overwrite it.
+  if (usage.source !== 'retained') {
+    t.last = {
+      input_tokens: usage.prompt_tokens || 0,
+      output_tokens: usage.completion_tokens || 0,
+      total_tokens: usage.total_tokens || 0,
+      source: usage.source || null,
+    }
+  }
   if (usage.source !== 'estimated') return t
   t.prompt_tokens += usage.prompt_tokens || 0
   t.completion_tokens += usage.completion_tokens || 0

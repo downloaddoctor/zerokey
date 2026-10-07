@@ -1,7 +1,7 @@
 /**
  * Clones a real session into a disposable one for a single request: no
- * chatSessionId/parentMessageId link to the real thread, and any mutation
- * the stream handler makes (chatSessionId, parentMessageId, lastUsed) lands
+ * id/parentId link to the real thread, and any mutation
+ * the stream handler makes (id, parentId, lastUsed) lands
  * on the clone only — it is never written back to user.sessions, so it is
  * naturally discarded once the request completes.
  *
@@ -11,8 +11,8 @@
 function ephemeralSession(session) {
   return {
     ...session,
-    chatSessionId: null,
-    parentMessageId: null,
+    id: null,
+    parentId: null,
   }
 }
 

@@ -4,6 +4,29 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const usage = require('../../engine/usage')
 
+test('accumulate stores the last turn split and ignores retained turns', () => {
+  const session = {}
+  usage.accumulate(session, {
+    prompt_tokens: 8,
+    completion_tokens: 3,
+    total_tokens: 11,
+    source: 'upstream',
+  })
+  usage.accumulate(session, {
+    prompt_tokens: 11,
+    completion_tokens: 0,
+    total_tokens: 11,
+    source: 'retained',
+  })
+  assert.deepEqual(session._usageTotals.last, {
+    input_tokens: 8,
+    output_tokens: 3,
+    total_tokens: 11,
+    source: 'upstream',
+  })
+  assert.equal(session._usageTotals.turns, 0)
+})
+
 test('normalizeUsage collapses all prompt-side spellings', () => {
   for (const key of [
     'prompt_tokens',

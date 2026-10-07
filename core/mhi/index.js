@@ -163,9 +163,21 @@ function evaluateAssistant(text) {
  * Append a MHI result block to the payload's messages as a user turn. The
  * pipeline feeds this back to the provider for the next upstream round.
  */
-function appendResult(payload, resultText) {
+function appendResult(payload, resultText, attachments = []) {
   const messages = Array.isArray(payload.messages) ? payload.messages.map((m) => ({ ...m })) : []
   messages.push({ role: 'mhi', content: resultText })
+  const images = (Array.isArray(attachments) ? attachments : []).filter(
+    (item) => item && Buffer.isBuffer(item.data) && typeof item.mimeType === 'string',
+  )
+  if (images.length > 0) {
+    messages.push({
+      role: 'user',
+      content: images.map((item) => ({
+        type: 'image_url',
+        image_url: { url: 'data:' + item.mimeType + ';base64,' + item.data.toString('base64') },
+      })),
+    })
+  }
   return { ...payload, messages, attachments: [] }
 }
 

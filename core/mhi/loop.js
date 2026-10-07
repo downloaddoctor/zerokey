@@ -239,10 +239,7 @@ async function runToolLoop(options) {
     })
 
     const formatted = mhi.formatResults(results)
-    payload = mhi.appendResult(payload, formatted.text)
-    if (Array.isArray(formatted.attachments) && formatted.attachments.length > 0) {
-      payload.attachments = formatted.attachments
-    }
+    payload = mhi.appendResult(payload, formatted.text, formatted.attachments)
   }
 }
 
