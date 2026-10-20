@@ -450,10 +450,31 @@ function toRecord(level, call) {
   )
 }
 
+// Append-only history: every level (debug included) from every run, never
+// rotated or pruned. Each process start writes a SESSION marker row, so
+// "last N sessions" = the text after the Nth-from-last marker.
+const historySink = new LogSaver({
+  name: 'zerokey-history',
+  dir: CONFIG.LOG_DIR,
+  maxSize: Infinity,
+  header: CSV_HEADER,
+})
+
+historySink.log(
+  [
+    csvField(new Date().toISOString()),
+    PID,
+    'SESSION',
+    'SESSION',
+    csvField('START node=' + process.version + ' cwd=' + process.cwd()),
+  ].join(SEP) + CSV_EMPTY_TAIL,
+)
+
 function record(level, call) {
-  if (LEVELS[level] > THRESHOLD) return
   try {
-    sink.log(toRecord(level, call))
+    const line = toRecord(level, call)
+    if (LEVELS[level] <= THRESHOLD) sink.log(line)
+    historySink.log(line)
   } catch (caughtErr) {
     reportLoggerError(caughtErr)
   }

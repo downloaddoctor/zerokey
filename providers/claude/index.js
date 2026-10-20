@@ -1,4 +1,4 @@
-const { ClaudeAPI } = require('./api')
+const { TRANSPORT, resolveTransport, createAPI } = require('./transport')
 const { buildClaudeRouter } = require('./router')
 const { models, reasoning, promptLimit, setupSteps } = require('./config')
 
@@ -18,9 +18,10 @@ module.exports = {
       `⚠ All Claude users are at their usage limit.\n` +
       `    Soonest reset: "${soonestUser}" at ${resetsAt} (~${mins} min).`,
   },
-  createAPI: (options) => new ClaudeAPI(options),
+  TRANSPORT,
+  createAPI: (options, parsedFetch) => createAPI(options, parsedFetch),
   validateCredentials: async (parsedFetch) => {
-    const api = new ClaudeAPI()
+    const api = createAPI({}, parsedFetch)
     await api.initializeFromJSON(parsedFetch)
     try {
       const profile = await api.getCurrentUser()
@@ -37,14 +38,27 @@ module.exports = {
     const url = parsedFetch.url || ''
     const errors = []
     if (!h['cookie']) errors.push('cookie — required for session auth')
-    if (!h['anthropic-device-id'])
-      errors.push('anthropic-device-id — missing; copy from the /completion request on claude.ai')
-    if (!/\/organizations\/[a-f0-9-]{36}/i.test(url))
-      errors.push(
-        'URL must contain /organizations/<uuid>/chat_conversations — wrong request copied',
+
+    if (resolveTransport(parsedFetch).IS_COMPLETION) {
+      // Legacy REST SSE protocol. Accept either the old /completion capture
+      // (org in the URL path) or a modern claude.ai fetch (org in the
+      // x-organization-uuid header), so users can paste whatever they copied.
+      const orgInUrl = /\/organizations\/[a-f0-9-]{36}/i.test(url)
+      const orgInHeader = !!(
+        h['x-organization-uuid'] || /(?:^|;\s*)lastActiveOrg=[a-f0-9-]{36}/i.test(h['cookie'] || '')
       )
-    if (!url.endsWith('/completion'))
-      errors.push('URL must end in /completion — copy the streaming completion request, not a GET')
+      if (!orgInUrl && !orgInHeader)
+        errors.push(
+          'no organization id — copy a request that has /organizations/<uuid> or x-organization-uuid',
+        )
+      return errors
+    }
+
+    // Opt-in Connect-RPC StreamTimeline. The org id rides in a header, not the URL.
+    if (!h['x-organization-uuid'] && !/\/organizations\/[a-f0-9-]{36}/i.test(url))
+      errors.push(
+        'x-organization-uuid — missing; copy from the StreamTimeline request on claude.ai',
+      )
     return errors
   },
   buildRouter: buildClaudeRouter,

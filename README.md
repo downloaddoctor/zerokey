@@ -146,9 +146,10 @@ through the real web UI — no further captures needed.
 
 1. Open DevTools → Network tab
 2. Visit `claude.ai` and start a conversation
-3. Find a request to `/api/organizations/.../chat_conversations/.../completion`
-4. Right-click → Copy → Copy as fetch (Node.js)
+3. Find the **StreamTimeline** request to `/claudeai-rpc/.../ConversationService/StreamTimeline`
+4. Right-click → Copy → Copy as fetch (Node.js) — it **must include the `cookie` header**
 5. Paste into the startup wizard
+   (legacy REST SSE is still available with `CLAUDE_TRANSPORT=completion`)
 
 ### Qwen
 

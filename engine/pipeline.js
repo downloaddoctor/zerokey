@@ -434,7 +434,11 @@ class StreamPipeline {
 
     this._finished = true
     const err = toOpenAIError(error, this.provider)
-    this.emitAndEnd(`\n\n⚠ ${err.error.message}${err.error.action ? ' ' + err.error.action : ''}\n`)
+    const real = String(error?.message || error).slice(0, 500)
+    const realLine = err.error.message.includes(real) ? '' : `\n  Real error: ${real}`
+    this.emitAndEnd(
+      `\n\n⚠ ${err.error.message}${err.error.action ? ' ' + err.error.action : ''}${realLine}\n`,
+    )
   }
 
   // ── block scanning ───────────────────────────────────────────────────────

@@ -59,6 +59,13 @@ MODULES
  providers/<name>/index.js — {name, displayName, models, promptLimit, setupSteps, validateFetch, validateCredentials, buildRouter}
  providers/<name>/router.js — express router; runToolLoop wraps one upstream turn per round; userData is a Proxy row, mutate fields directly (persistence is automatic)
  providers/<name>/stream-handler.js — provider SSE → OpenAI chunk deltas
+ providers/claude/connect-rpc.js — CURRENT claude.ai Connect-RPC transport (gRPC framing + schema-less protobuf); ClaudeConnectRpc extends BaseAPI (StreamTimeline/PerformAction/GetNewConversationDefaults); org id from x-organization-uuid
+  makeReplyCollector — stateful StreamTimeline decoder: assistant-role filter, per-block dedup, session id/seq/cursor, done on usage frame
+  buildPromptlessAction — byte-exact vs HAR; buildPromptAction — full layout, f15 = PerformAction.header.deviceSigning (32-byte device signature over a server deviceSignatureAsk, produced by a key the web bundle doesn't hold; client resends the action after signing) → actionSignature() THROWS unless ZEROKEY_CLAUDE_F15_PROBE=zero|random; RPC sending stays opt-in (CLAUDE_TRANSPORT=rpc) until a signer exists
+  sendMessage — GetNewConversationDefaults → promptless PerformAction → StreamTimeline → wait session id → prompt PerformAction; streams deltas via onText/onReasoning
+ providers/claude/rpc-stream-handler.js — createRpcEmitter(pipeline): incremental text/reasoning → pipeline.scan/emit, finish() → sendFinalChunk
+ providers/claude/transport.js — TRANSPORT {name, IS_RPC, IS_COMPLETION} from CONFIG.CLAUDE_TRANSPORT ('completion' default, 'rpc' opt-in); resolveTransport(parsedFetch) forces completion for legacy captures (org id in URL path); createAPI(options, parsedFetch) picks the client (avoids the index↔router cycle)
+ providers/claude/api.js — LEGACY REST SSE transport (/organizations/.../completion); kept as fallback for stale captures
  providers/base/BaseAPI.js — shared base for all four *API classes: https agent, cookie jar, initializeFromJSON cookie seeding, _captureResponseHeaders (cookie header), _fetch with timeout; _seedCookies(); _timeoutError(ms) returns a plain message unless the subclass sets static JSON_TIMEOUT = true (ChatGPT/Qwen: JSON request_timeout body); subclasses add only provider-specific headers/endpoints
  surfaces/registry.js — auto-discovers surfaces/<name>/index.js; resolveSurface(messages) by realSessionPrefix; resolveUtility(messages) by utilityPrefixes
  surfaces/base.js — IDEToolSurface: tool()/format() registrar + resolve(); realSessionPrefix (real IDE fingerprint) + utilityPrefixes (IDE-internal utility calls)
@@ -73,7 +80,8 @@ MODULES
  utils/errors.js — classifyError → toOpenAIError (two calling conventions)
  utils/uuid.js — uuid() v4 via crypto.randomUUID; the only UUID helper for provider clients
  utils/http-error.js — assertOk(res, {allow, prefix, limit}) opt-in non-OK guard (reads body slice, throws Error with .status/.statusCode); used by sentinel prepare/finalize, DeepSeek and Claude completion calls; not used where the body is parsed for structure (ChatGPT completion 429 cooldown, Qwen _buildQwenError → code/num/waitMs for RateLimited)
- utils/log.js — one zerokey.log (ts,pid,level,tag,msg,where,error,code,status,context,stack) separated by engine/syntax.js SEP (not a comma), one line per record; pid in the same column for plain and error rows; console.* rewired (colour + auto [FILE] tag + redact + mirror); console.error('msg', err[, ctx]) fills all columns — the ONE entry point; O(1) per call (cached tag, in-memory size, depth-capped causes); formatError renders Error → Name/msg|code|status + frames + caused-by
+ utils/har-to-capture.js — dev-only HAR → LLM-digest CLI (not a runtime dep); `node utils/har-to-capture.js <file.har>` (all defaults: mask on, body size auto, out=temp/captures/ for temp/*.har); flags: --list|--filter=|--ignore=|--method=|--status=|--hosts=|--max-body=N|auto|--no-mask|--no-redact|--no-headers|--full|--mode=digest|captures|both|--out=|--json; filters noise endpoints, masks secrets, decodes Connect/gRPC proto bodies into readable fields; writes <base>.digest.txt + .digest.json; masking preserves structure — Cookie/Set-Cookie → {count, cookies:{name: fingerprint}} (names + length kept), Authorization keeps its scheme (Bearer <masked:N>), other secrets → first6…<masked:N>; legacy harToCapture()/convertEntry() still exported for core/session-selector.js
+ utils/log.js — zerokey.log (rotating, LOG_LEVEL-gated) + zerokey-history.log (never rotated, all levels incl. debug, SESSION marker row per process start; last N sessions = text after the Nth-from-last marker); both use columns (ts,pid,level,tag,msg,where,error,code,status,context,stack) separated by engine/syntax.js SEP (not a comma), one line per record; pid in the same column for plain and error rows; console.* rewired (colour + auto [FILE] tag + redact + mirror); console.error('msg', err[, ctx]) fills all columns — the ONE entry point; O(1) per call (cached tag, in-memory size, depth-capped causes); formatError renders Error → Name/msg|code|status + frames + caused-by
 
 ARCHITECTURE
  Request flow: app.js middleware → sequentialQueue → prepareChatRequest → buildRouter(preSelected)
@@ -105,6 +113,8 @@ ENV
  ZEROKEY_MHI_CMD_PROGRAMS (default node,git), ZEROKEY_MHI_CMD_PROJECT_PROGRAMS
  ZEROKEY_MHI_CMD_ALLOW_WRITE, ZEROKEY_MHI_CMD_ALLOW_NETWORK, ZEROKEY_MHI_CMD_TIMEOUT_MS, ZEROKEY_MHI_MAX_ROUNDS
  DEEPSEEK_TRANSPORT — 'browser' (default) or 'api'
+ CLAUDE_TRANSPORT — 'completion' (default; REST SSE, works with old and new captures) or 'rpc' (opt-in; claude.ai Connect/proto, blocked on f15 signer)
+ ZEROKEY_CLAUDE_F15_PROBE — 'zero'|'random': debug only, sends that 32-byte f15 to test whether the server validates it; unset → actionSignature() throws
 
 DEPENDENCIES
  express@^5, node-fetch@^2 (node-fetch@2, not global fetch, for cookie/agent control)
@@ -139,6 +149,7 @@ BUILD
  pnpm test uses --test-reporter=dot — dots plus failure details; run `node --test` directly for the full per-test list
 
 TESTING
+ HAR in temp/ workflow: when the user references a HAR in temp/ (or asks to inspect a capture), run `node utils/har-to-capture.js temp/<file>.har --out=temp/captures` (add `--filter=`/`--method=`/`--status=` to narrow), read the generated `.digest.txt`, then read the digest before implementing
  Framework: node:test with assert
  test/invariants.test.js — repo-wide invariants (naming, forbidden patterns)
  test/modules.test.js — module boundary rules; runs scripts/check-modules.js
@@ -152,7 +163,7 @@ INVARIANTS
  One server process = one preSelected session; restart to switch session/user
  No API keys, cookies, or credential values in logs or commit messages
  Errors go through console.error('msg', err[, context]) — log.js turns that into one CSV row in zerokey.log; never stringify an Error by hand, never instantiate a LogSaver for errors
- One log file, no errors.log — the error block sits right after the lifecycle lines that led to it, so the preceding context travels with it
+ No errors.log — errors share zerokey.log; zerokey-history.log is the only other file (never rotated) — the error block sits right after the lifecycle lines that led to it, so the preceding context travels with it
  Internal executors never throw on normal failure — they return {ok:false, code, output}
  Path policy: all MHI file/cmd paths confined to the resolved workspace root (realpath-checked)
  Proxy writes are debounced 250 ms; nested plain objects/arrays (parsedFetch.*, metadata.*, todos) ARE intercepted (recursive wrap) — reassignment is not required
@@ -162,6 +173,7 @@ INVARIANTS
 
 EXTENSIONS
  New provider → providers/<name>/index.js exporting {name, displayName, models, promptLimit, setupSteps, validateFetch, validateCredentials, buildRouter}; registry auto-discovers
+ Claude capture shape → transport.js#resolveTransport; legacy captures have /organizations/<uuid>/.../completion (org id from URL path); RPC captures carry x-organization-uuid (no org path in URL) and content-type application/connect+proto; completion transport (api.js) org id order: URL path → x-organization-uuid → lastActiveOrg cookie; device id falls back to anthropic-device-id cookie
  New IDE surface → surfaces/<name>/index.js exporting (t) => {...}; set ideName + realSessionPrefix (+ realSessionPrefixAliases for older prompts) + utilityPrefixes; registry auto-discovers; test/surfaces/prefixes.test.js is append-only — never delete a shipped prefix
   Plain-OpenAI clients → surfaces/openai/index.js identity mapping; classifySession routes tools[]-bearing requests here when no IDE fingerprint matches
  New MHI executor → core/mhi/<name>.js + wire into core/mhi/index.js + test/core/mhi/<name>.test.js

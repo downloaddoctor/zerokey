@@ -71,11 +71,13 @@ const promptLimit = 64_000
 
 const setupSteps = {
   url: 'https://claude.ai',
-  requestFilter: '/api/organizations',
+  requestFilter: '/completion  or  /claudeai-rpc/.../StreamTimeline',
   instructions:
     'Open DevTools → Network tab. Visit claude.ai and start a conversation. ' +
-    'Find a request to /api/organizations/.../chat_conversations/.../completion. ' +
-    'Right-click → Copy → Copy as fetch (Node.js).',
+    'Copy either the /completion request or the /claudeai-rpc/.../ConversationService/StreamTimeline request. ' +
+    'Either one works. ' +
+    'Right-click → Copy → Copy as fetch (Node.js). ' +
+    'The copy MUST include the cookie header — a cookieless capture 403s at Cloudflare.',
 }
 
 module.exports = { models, reasoning, promptLimit, setupSteps }

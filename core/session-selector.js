@@ -696,7 +696,14 @@ class SessionSelector {
         body = {}
       }
     }
-    return { headers, body, url: urlMatch[2] }
+    // Binary protobuf bodies arrive as a JS string of code points 0-255 (latin1).
+    // Keep the exact bytes as base64 so they survive JSON storage in SQLite.
+    let bodyBase64 = null
+    if (typeof opts.body === 'string' && opts.body.length > 0) {
+      const wide = [...opts.body].some((ch) => ch.charCodeAt(0) > 255)
+      bodyBase64 = Buffer.from(opts.body, wide ? 'utf8' : 'latin1').toString('base64')
+    }
+    return { headers, body, url: urlMatch[2], method: opts.method || 'GET', bodyBase64 }
   }
 
   _formatResetTime(ts) {

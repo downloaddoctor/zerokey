@@ -2,7 +2,62 @@
 
 > Public contract (models, reasoning labels, prompt limit): see [`openapi.json`](../../openapi.json) and `GET /docs`.
 
-## Object: `ClaudeAPI` (`providers/claude/api.js`)
+## Transports
+
+| Transport                          | Status                        | Endpoint                                                                                                                      | Codec                               |
+| ---------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| **Connect-RPC** (`connect-rpc.js`) | **current** (2026 web client) | `POST /claudeai-rpc/anthropic.bard.api.v1alpha.ConversationService/{StreamTimeline,PerformAction,GetNewConversationDefaults}` | gRPC framing + schema-less protobuf |
+| REST SSE (`api.js`)                | legacy fallback               | `POST /api/organizations/{org}/chat_conversations/{uuid}/completion`                                                          | JSON over `text/event-stream`       |
+
+`transport.js#TRANSPORT` is resolved once from `CONFIG.CLAUDE_TRANSPORT` (`completion` default, `rpc` opt-in). `resolveTransport(parsedFetch)` forces `completion` for legacy captures (org id in URL path); old and new captures both work with `completion`. `createAPI(options, parsedFetch)` picks the client. `index.js#validateFetch` validates each shape separately.
+
+## Connect-RPC transport (`providers/claude/connect-rpc.js`)
+
+Body is base64/raw of one or more Connect frames: `[1 byte flags][4 byte BE length][protobuf]`.
+
+### StreamTimeline request field map (recovered from HAR, round-trip exact)
+
+| Field | Wire   | Value                                     |
+| ----- | ------ | ----------------------------------------- |
+| 1     | len    | conversation UUID                         |
+| 3     | varint | 1 (request kind)                          |
+| 4     | len    | settings message `{ field 6 varint = 1 }` |
+| 5     | len    | locale, e.g. `en-US`                      |
+| 6     | varint | 1 (flags)                                 |
+| 8     | len    | timezone, e.g. `America/Chicago`          |
+
+`buildStreamTimeline({conversationId, locale, timezone})` builds the request frame. Response frames decode via `walkProto` (varint + length-delimited; valid UTF-8 → string, JSON → object, else recurse). HAR binary bodies are latin1/base64, never UTF-8.
+
+Required headers: `content-type: application/connect+proto`, `connect-protocol-version: 1`, `connect-accept-encoding: gzip`, `anthropic-client-build`, `anthropic-client-platform: web_claude_ai`, `x-organization-uuid` (org id — RPC captures carry no org path in the URL), plus `cookie`.
+
+### Stream lifecycle
+
+`StreamTimeline` is a **long-lived subscription**, not a one-shot request. The HAR shows ONE stream held open across three user messages (619 s), with `PerformAction` POSTs interleaved; it reopens after idle. So:
+
+- `openTimeline()` starts the stream and returns `{next(), close(), conversationId}`; `next()` reads frames incrementally as they arrive (split-frame safe via `makeFrameReader`).
+- `timeline(conversationId)` returns the client's **persistent** handle, opening once and reusing it across turns; it reopens if the prior stream closed.
+- `sendMessage()` runs: GetNewConversationDefaults → promptless PerformAction → StreamTimeline → wait for session id (`/1/1/20/1/1`) → prompt PerformAction (seq counter) → read until the usage frame (`done`). Deltas stream via `onText`/`onReasoning`.
+- `f15` is `PerformAction.header.deviceSigning` (proto field 15), a **device-bound signature**, not a message-level blob. In the bundle the flow is: send PerformAction with an empty `deviceSigning` → server returns `deviceSignatureAsk` in the response → the client calls `sign(deviceSignatureAsk, actionCase)` on a registered signer → resend the same action with `deviceSigning` set. The signature is produced by a device key the browser holds (TPM / IndexedDB / native bridge — not the main bundle; `crypto.subtle` in the bundle only does SHA-256). The gating check `EJ(e,t)` bails early with `{kind:'skip',reason:'not_desktop_app'}` when `t.isDesktopApp` is false, so plain web clients do not sign.
+- BLOCKED (workaround): without the signer, `actionSignature()` throws unless `ZEROKEY_CLAUDE_F15_PROBE=zero` (empty 32 bytes) or `=random` is set. Set `=zero` and try a live send: the server may accept an empty signature for web-style requests; if it asks (`deviceSignatureAsk`), RPC is unusable without the key and `CLAUDE_TRANSPORT=completion` remains the only way to send.
+
+Only `StreamTimeline` is Connect-framed (`application/connect+proto`). `PerformAction` and `GetNewConversationDefaults` are bare protobuf (`application/proto`).
+
+### Response decoding
+
+Connect frames carry a flags byte: **bit 0 = gzip**. A flags=1 frame's payload gunzips to the StreamTimeline timeline. Recovered block model:
+
+| Object        | Prefix  | Fields                                                                          |
+| ------------- | ------- | ------------------------------------------------------------------------------- |
+| Message group | `dgrp_` | f1 id, f2 conversation, f4 role (1=human, 2=assistant), f5 label                |
+| Content block | `cblk_` | f2 parent group, f4 type, **f9 = text**, f12 = reasoning, f5 = "Thought for Ns" |
+
+`collectContent(decoded)` returns `{text:[], reasoning:[]}` in order. `rpc-stream-handler.js` forwards these through `pipeline.scan` (text) and the reasoning channel, mirroring the legacy SSE handler. `sendMessage({conversationId, prompt})` runs PerformAction then StreamTimeline and returns decoded blocks.
+
+### Router wiring
+
+Only the **streaming reply** differs by transport. `router.js` branches on `transport === 'rpc'` for the turn: it calls `claudeApi.sendMessage` and `rpcStreamHandler` streams the reply. Everything else is shared and unchanged — instructions (`setClaudeInstructions`, REST `PUT /api/account_profile`), the tool loop, loop-guard, and SSE framing run identically for both transports.
+
+## Legacy transport: `ClaudeAPI` (`providers/claude/api.js`)
 
 Manages HTTP requests to `claude.ai/api` using browser-identical headers in **exact HAR order**. Cloudflare fingerprints header order — all requests must match real browser capture precisely.
 
@@ -24,7 +79,7 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
 ## Flow
 
 ```
-1. initializeFromJSON(parsedFetch) → extract headers, orgId, seed CookieJar
+1. initializeFromJSON(parsedFetch) → extract headers, orgId (URL path → x-organization-uuid header → lastActiveOrg cookie), seed CookieJar
 2. chatCompletion(prompt, chatSessionId, parentMessageId, model, tools):
    a. Generate UUIDs for conversation + messages if new
    b. Build body with timezone, locale, model, personalized_styles

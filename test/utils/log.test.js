@@ -25,19 +25,23 @@ const HEADER = [
 
 // Runs the logger in a child process with an isolated data dir and returns
 // the lines it wrote, so only the public console.* surface is exercised.
-function runLogger(statements) {
+function runLogger(statements, level = 'log') {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zerokey-log-'))
   try {
     const script = ['require(' + JSON.stringify(LOG_MODULE) + ')', ...statements].join(';')
     const res = spawnSync(process.execPath, ['-e', script], {
-      env: { ...process.env, ZEROKEY_DATA_DIR: dir, ZEROKEY_LOG_LEVEL: 'log' },
+      env: { ...process.env, ZEROKEY_DATA_DIR: dir, ZEROKEY_LOG_LEVEL: level },
       encoding: 'utf8',
     })
     const file = path.join(dir, 'logs', 'zerokey.log')
     const lines = fs.existsSync(file)
       ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean)
       : []
-    return { status: res.status, lines, stderr: res.stderr }
+    const hfile = path.join(dir, 'logs', 'zerokey-history.log')
+    const history = fs.existsSync(hfile)
+      ? fs.readFileSync(hfile, 'utf8').split('\n').filter(Boolean)
+      : []
+    return { status: res.status, lines, history, stderr: res.stderr }
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
@@ -86,6 +90,13 @@ test('plain and error rows both carry the pid in the same column', () => {
     assert.strictEqual(fields.length, columns.length, row)
     assert.match(fields[1], /^\d+$/, row)
   }
+})
+
+test('history log keeps every level and marks each session start', () => {
+  const { lines, history } = runLogger(['console.debug("[T] fine detail")'], 'info')
+  assert.ok(!lines.some((l) => l.includes('fine detail')))
+  assert.ok(history.some((l) => l.includes('fine detail')))
+  assert.ok(history.some((l) => l.includes(SEP + 'SESSION' + SEP + 'SESSION' + SEP)))
 })
 
 test('a circular cause does not crash the logger', () => {

@@ -39,14 +39,28 @@ class ClaudeAPI extends BaseAPI {
       console.warn('[Claude] WARNING: No cookies in headers! Cloudflare will block.')
     }
 
-    // Extract organization ID from the captured URL
+    // Organization ID: prefer the URL path (legacy /api/organizations/<uuid>),
+    // else the x-organization-uuid header (present on the RPC StreamTimeline
+    // capture). A modern fetch copied from claude.ai has neither path nor
+    // device-id, so this keeps the legacy client usable with new captures.
     const url = parsedFetch.url || parsedFetch?.request?.url || ''
-    const orgMatch = url.match(/\/organizations\/([a-f0-9-]+)/i)
+    const orgMatch = url.match(/\/organizations\/([a-f0-9-]{36})/i)
     if (orgMatch) {
       this._orgId = orgMatch[1]
       if (this._log) console.debug(`[Claude] Extracted org ID from URL: ${this._orgId}`)
-    } else if (this._log) {
-      console.warn('[Claude] WARNING: No org ID found in URL. Will need discovery.')
+    } else {
+      const headerOrg =
+        this._headers['x-organization-uuid'] ||
+        Object.entries(this._headers).find(
+          ([k]) => k.toLowerCase() === 'x-organization-uuid',
+        )?.[1] ||
+        initialCookie.match(/(?:^|;\s*)lastActiveOrg=([a-f0-9-]{36})/i)?.[1]
+      if (headerOrg) {
+        this._orgId = headerOrg
+        if (this._log) console.debug(`[Claude] Extracted org ID from header: ${this._orgId}`)
+      } else if (this._log) {
+        console.warn('[Claude] WARNING: No org ID found in URL or x-organization-uuid header.')
+      }
     }
 
     if (this._log) console.debug('[Claude] Initialized from capture JSON')
@@ -121,8 +135,8 @@ class ClaudeAPI extends BaseAPI {
 
     const body = {
       prompt,
-      timezone: this._body.timezone,
-      locale: this._body.locale,
+      timezone: this._body.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      locale: this._body.locale || 'en-US',
       model: isEphemeral ? 'claude-haiku-4-5-20251001' : model,
       tools,
       turn_message_uuids: {
@@ -249,6 +263,9 @@ class ClaudeAPI extends BaseAPI {
   _buildHeaders(overrides = {}, _targetPath = '/') {
     const src = this._headers
     const cookieStr = this._cookies.toString()
+    const deviceId =
+      src['anthropic-device-id'] ||
+      String(cookieStr || src.cookie || '').match(/(?:^|;\s*)anthropic-device-id=([^;]+)/)?.[1]
 
     const base = {
       accept: overrides.accept || '*/*',
@@ -262,7 +279,7 @@ class ClaudeAPI extends BaseAPI {
       ...(src['anthropic-client-version'] && {
         'anthropic-client-version': src['anthropic-client-version'],
       }),
-      ...(src['anthropic-device-id'] && { 'anthropic-device-id': src['anthropic-device-id'] }),
+      ...(deviceId && { 'anthropic-device-id': deviceId }),
       'content-type': overrides['content-type'] || 'application/json',
       ...(cookieStr && { cookie: cookieStr }),
       ...(overrides.accept === 'text/event-stream' && { origin: 'https://claude.ai' }),

@@ -3,7 +3,7 @@
   "version": "0.4.0",
   "description": "OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT & Qwen — no API keys, real browser sessions",
   "main": "server.js",
-  "packageManager": "pnpm@10.13.1",
+  "packageManager": "pnpm@12.14.0",
   "engines": {
     "node": ">=22.0.0"
   },

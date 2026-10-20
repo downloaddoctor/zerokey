@@ -3,8 +3,9 @@
 const express = require('express')
 
 const { StreamPipeline } = require('../../engine/pipeline')
-const { ClaudeAPI } = require('./api')
+const { resolveTransport, createAPI } = require('./transport')
 const { claudeStreamHandler } = require('./stream-handler')
+const { createRpcEmitter } = require('./rpc-stream-handler')
 const { setClaudeInstructions } = require('./set-instructions')
 const { acquireSlot } = require('../../utils/rate-limiter')
 const retry = require('../../utils/retry')
@@ -17,10 +18,12 @@ const { models, reasoning } = require('./config')
 const CLAUDE_MODELS = models.models
 const PROVIDER_REASONING_LABELS = reasoning.labels
 
-const claudeApi = new ClaudeAPI()
-
 async function buildClaudeRouter(parsedFetch, session, userData = null) {
-  console.debug('[Claude] Initializing from parsed capture JSON')
+  console.debug(
+    `[Claude] Initializing from parsed capture JSON (transport: ${resolveTransport(parsedFetch).name})`,
+  )
+  const transport = resolveTransport(parsedFetch)
+  const claudeApi = createAPI({}, parsedFetch)
   await claudeApi.initializeFromJSON(parsedFetch)
 
   const router = express.Router()
@@ -73,6 +76,27 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
           if (handled) return { assistantText: '' }
 
           pipeline.beginTurn()
+
+          if (transport.IS_RPC) {
+            const rpc = createRpcEmitter(pipeline)
+            const result = await withRetry(
+              () =>
+                claudeApi.sendMessage({
+                  conversationId: activeSession.id,
+                  prompt,
+                  model,
+                  signal: req.signal,
+                  onText: rpc.text,
+                  onReasoning: rpc.reasoning,
+                }),
+              pipeline,
+            )
+            if (result.conversationId && !activeSession.id) {
+              activeSession.id = result.conversationId
+            }
+            rpc.finish()
+            return { assistantText: pipeline.assistantText }
+          }
 
           const { stream, chatSessionId } = await withRetry(
             () =>

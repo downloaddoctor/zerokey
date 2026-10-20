@@ -83,4 +83,8 @@ CONFIG.MHI_CMD_ALLOW_NETWORK = envBool('ZEROKEY_MHI_CMD_ALLOW_NETWORK', false)
 CONFIG.MHI_CMD_TIMEOUT_MS = envInt('ZEROKEY_MHI_CMD_TIMEOUT_MS', 30000, 100, 120000)
 CONFIG.MHI_MAX_ROUNDS = envInt('ZEROKEY_MHI_MAX_ROUNDS', 8, 1, 32)
 
+// Claude upstream protocol. 'completion' (REST SSE) is the default for every
+// capture, old or new; 'rpc' opts into the Connect/proto transport (needs f15).
+CONFIG.CLAUDE_TRANSPORT = (process.env.CLAUDE_TRANSPORT || 'completion').toLowerCase()
+
 module.exports = { CONFIG }
