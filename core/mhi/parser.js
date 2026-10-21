@@ -12,7 +12,6 @@
 const SYNTAX = require('../../engine/syntax')
 
 const OPEN = SYNTAX.OPEN
-const CLOSE = SYNTAX.CLOSE
 
 const MAX_BLOCKS = 12
 const MAX_BLOCK_CHARS = 1024 * 1024
@@ -118,6 +117,18 @@ function parseBlock(rawBody) {
   return { tool, params }
 }
 
+/**
+ * A bracket span is a call only if its head is a known tool name (optionally
+ * the echoed MHI(name) form). Anything else that merely uses the brackets, such
+ * as a syntax description or an invented name, is prose and never executed.
+ */
+function isToolCall(body) {
+  let head = String(SYNTAX.splitPayload(body)[0] || '').trim()
+  const echo = head.match(/^MHI\(([A-Za-z0-9_]+)\)$/)
+  if (echo) head = echo[1]
+  return Object.prototype.hasOwnProperty.call(DEFINITIONS, head)
+}
+
 function parseAssistantText(text) {
   const value = typeof text === 'string' ? text : String(text || '')
   if (value.length > MAX_TOTAL_CHARS) {
@@ -134,8 +145,23 @@ function parseAssistantText(text) {
       outside += value.slice(cursor)
       break
     }
+    // Same rule as StreamPipeline.scan: an open bracket right after a backtick
+    // is quoted text, not a call.
+    if (start > 0 && value[start - 1] === '`') {
+      outside += value.slice(cursor, start + 1)
+      cursor = start + 1
+      continue
+    }
     outside += value.slice(cursor, start)
-    const end = value.indexOf(CLOSE, start + 1)
+    const rel = SYNTAX.findClose(value.slice(start + 1))
+    const end = rel === -1 ? -1 : start + 1 + rel
+    const body = end === -1 ? value.slice(start + 1) : value.slice(start + 1, end)
+    if (!isToolCall(body)) {
+      const stop = end === -1 ? value.length : end + 1
+      outside += value.slice(start, stop)
+      cursor = stop
+      continue
+    }
     if (end === -1) {
       throw new MhiParseError('mhi_incomplete_block', 'An incomplete block was not executed.')
     }

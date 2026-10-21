@@ -3,7 +3,7 @@
 PROJECT
  ZeroKey — self-hosted, personal-use OpenAI-compatible proxy for DeepSeek, Claude, ChatGPT, Qwen
  Turns a browser session (captured fetch()) into http://localhost:<port>/v1
- Node >=22 required; pnpm@10.13.1; CommonJS; 'use strict' at top of every module
+ Node >=22 required; pnpm@12.14.0; CommonJS; 'use strict' at top of every module
  No telemetry, no hosted service, no shared accounts
 
 DIRECTORY
@@ -37,11 +37,11 @@ MODULES
  core/state/store.js — createStore(cfg): debounced write-through + recursive Proxy (plain objects/arrays only) shared by users/sessions; cfg = table, columnMap, blobKeys, conflict, keyOf, flushMs, label
  core/state/users.js — store config + user domain fns; Proxy row; top-level and nested (parsedFetch.*, state entries) writes schedule a 250 ms debounced flush; list() also returns wrapped rows so wizard-held references persist; flushAll() drains pending writes at shutdown; deepWrap proxies only arrays and plain objects (Date/Buffer pass through)
  core/state/sessions.js — Proxy row; 250 ms debounce; nested (metadata.*, todos, usageTotals) writes also persist; flushAll() drains pending writes at shutdown; compaction via generation bump clears id/parentId
- core/mhi/loop.js — runToolLoop: one turn → evaluateAssistant → executeCalls → appendResult (role 'mhi', passed verbatim by compiler._handlers.mhi — no USER: prefix), cap MHI_MAX_ROUNDS
- core/mhi/index.js — executor dispatch; every failure returns {ok:false, code, output} — never throws except on abort
+ core/mhi/loop.js — runToolLoop: one turn → evaluateAssistant → executeCalls → appendResult (role 'mhi', passed verbatim by compiler._handlers.mhi — no USER: prefix), cap MHI_MAX_ROUNDS; withAssistantTurn records the assistant turn before each mhi result so repair/tool-result rounds send only the new MHI message upstream (uploadAndGetMessages slices after the last assistant message)
+ core/mhi/index.js — executor dispatch; every failure returns {ok:false, code, output} — never throws except on abort; evaluateAssistant returns a repair round (mhi_foreign_markup) when the model emits DSML/XML tool tags
  core/mhi/files.js — read/ls/glob/grep/write/replace; write refuses overwrite; replace requires exactly one match
  core/mhi/commands.js — allowlisted programs; write/network gated by capability flags
- core/mhi/parser.js — block parser for internal executors; throws MhiParseError {code,message}
+ core/mhi/parser.js — block parser for internal executors; throws MhiParseError {code,message}; mirrors StreamPipeline.scan: isToolCall counts a block only when its name is in parser.DEFINITIONS, an open bracket right after a backtick is plain text, close found via SYNTAX.findClose
  core/mhi/path-policy.js — workspace confinement: realpath, UNC/ADS/reserved-name refusal
  core/mhi/view-image.js — falls back to context.imageRoots when the path is outside the first workspace root; other file tools stay confined to the first root
  core/mhi/loop.js imageRoots — every ZEROKEY_WORKSPACE_ROOTS entry (default process.cwd()) plus its direct parent dir (one level max, never higher); built in internalWorkspaceContext
@@ -55,7 +55,7 @@ MODULES
  engine/syntax.js — OPEN/CLOSE/SEP/ESC constants and findClose/splitPayload
  engine/mcp/inject.js — inject MCP alias map into compiler.tools
  engine/mcp/auto.js — build alias maps from mcp_<server>_<tool> names in req.body.tools[]
- providers/registry.js — auto-discovers providers/<name>/index.js
+ providers/registry.js — auto-discovers providers/<name>/index.js; getModels() passes the paid flag (set in providers/claude/config.js) through to /v1/models so the selector groups free and paid
  providers/<name>/index.js — {name, displayName, models, promptLimit, setupSteps, validateFetch, validateCredentials, buildRouter}
  providers/<name>/router.js — express router; runToolLoop wraps one upstream turn per round; userData is a Proxy row, mutate fields directly (persistence is automatic)
  providers/<name>/stream-handler.js — provider SSE → OpenAI chunk deltas
