@@ -139,6 +139,19 @@ function internalToolDescription(name, _config) {
   }
 }
 
+/**
+ * Record the assistant turn that was just produced. Without it, the next
+ * round's prompt slice (everything after the last `assistant` message, see
+ * ToolCompiler.uploadAndGetMessages) starts at the client's old history, so
+ * the previous tool results and user turn are sent upstream again next to
+ * the repair or tool result. With it, only the new `mhi` result goes out.
+ */
+function withAssistantTurn(payload, assistantText) {
+  const messages = Array.isArray(payload.messages) ? payload.messages.slice() : []
+  messages.push({ role: 'assistant', content: assistantText || '' })
+  return { ...payload, messages }
+}
+
 function internalWorkspaceContext(config) {
   const root = config.WORKSPACE_ROOTS[0]
   if (!root) return null
@@ -221,7 +234,7 @@ async function runToolLoop(options) {
       return { assistantText, rounds }
     }
     if (decision.kind === 'continue') {
-      payload = mhi.appendResult(payload, decision.prompt)
+      payload = mhi.appendResult(withAssistantTurn(payload, assistantText), decision.prompt)
       continue
     }
 
@@ -239,7 +252,11 @@ async function runToolLoop(options) {
     })
 
     const formatted = mhi.formatResults(results)
-    payload = mhi.appendResult(payload, formatted.text, formatted.attachments)
+    payload = mhi.appendResult(
+      withAssistantTurn(payload, assistantText),
+      formatted.text,
+      formatted.attachments,
+    )
   }
 }
 
