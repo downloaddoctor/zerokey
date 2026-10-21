@@ -274,6 +274,11 @@ class SessionSelector {
     if (!rawUsername) return null
     const username = String(rawUsername).trim().toLowerCase()
 
+    const providerDef = registry.get(this.provider)
+    if (providerDef && providerDef.requiresCapture === false) {
+      return usersState.create(this._db, this.provider, username, {})
+    }
+
     const parsedFetch = await this._captureFetch(username)
     if (!parsedFetch) return null
 
@@ -300,6 +305,11 @@ class SessionSelector {
     if (!user) return this._stepUserLogin()
 
     console.info('\n  -- Update User: ' + target + ' --\n', 1)
+
+    if (registry.get(this.provider)?.requiresCapture === false) {
+      console.info('  ' + text.green('√') + ' No auth required for "' + target + '".\n')
+      return user
+    }
 
     const parsedFetch = await this._captureFetch(target)
     if (!parsedFetch) return this._stepUserLogin()

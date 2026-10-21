@@ -1,7 +1,7 @@
 # AGENTS.md
 
 PROJECT
- ZeroKey — self-hosted, personal-use OpenAI-compatible proxy for DeepSeek, Claude, ChatGPT, Qwen
+ ZeroKey — self-hosted, personal-use OpenAI-compatible proxy for DeepSeek, Claude, ChatGPT, Qwen, Inception (Mercury)
  Turns a browser session (captured fetch()) into http://localhost:<port>/v1
  Node >=22 required; pnpm@12.14.0; CommonJS; 'use strict' at top of every module
  No telemetry, no hosted service, no shared accounts
@@ -58,7 +58,7 @@ MODULES
  providers/registry.js — auto-discovers providers/<name>/index.js; getModels() passes the paid flag (set in providers/claude/config.js) through to /v1/models so the selector groups free and paid
  providers/<name>/index.js — {name, displayName, models, promptLimit, setupSteps, validateFetch, validateCredentials, buildRouter}
  providers/<name>/router.js — express router; runToolLoop wraps one upstream turn per round; userData is a Proxy row, mutate fields directly (persistence is automatic)
- providers/<name>/stream-handler.js — provider SSE → OpenAI chunk deltas
+ providers/<name>/stream-handler.js — provider SSE → OpenAI chunk deltas; providers/inception/ = chat.inceptionlabs.ai (authless: index.js requiresCapture:false → core/session-selector.js creates/updates the user without a fetch paste; browser-transport.js is the ONLY transport: Playwright persistent profile at temp/profiles/inception/<user>, drives the real UI like DeepSeek: CDP Input.insertText into the composer + Enter, web search forced off and thinking mode picked from the listbox, the 'Enjoying Mercury 3?' signup-nudge modal (Continue Chatting) and the cookie banner are closed before New Chat, settings and send, an init-script fetch tee copies the app's own POST /api/chat SSE to Node; the UI keeps the thread and resends its own history so only the new prompt is typed; New Chat on first turn, ephemeral requests and after any failure; one request at a time (gate); closing the stream early clicks Stop generating; relaunch if the browser dies; INCEPTION_HEADLESS=1 runs headless), stateless (no server chat id): router keeps the message history in memory per process (trimHistory caps it, first exchange kept), stream = AI-SDK UI frames (reasoning-delta, text-delta, error, [DONE]), plain HTTP is unsupported (Vercel Security Checkpoint 429), one model 'mercury', reasoning Instant|Low|Medium|High sent lowercase as reasoningEffort (default Medium)
  providers/claude/connect-rpc.js — CURRENT claude.ai Connect-RPC transport (gRPC framing + schema-less protobuf); ClaudeConnectRpc extends BaseAPI (StreamTimeline/PerformAction/GetNewConversationDefaults); org id from x-organization-uuid
   makeReplyCollector — stateful StreamTimeline decoder: assistant-role filter, per-block dedup, session id/seq/cursor, done on usage frame
   buildPromptlessAction — byte-exact vs HAR; buildPromptAction — full layout, f15 = PerformAction.header.deviceSigning (32-byte device signature over a server deviceSignatureAsk, produced by a key the web bundle doesn't hold; client resends the action after signing) → actionSignature() THROWS unless ZEROKEY_CLAUDE_F15_PROBE=zero|random; RPC sending stays opt-in (CLAUDE_TRANSPORT=rpc) until a signer exists
@@ -113,12 +113,13 @@ ENV
  ZEROKEY_MHI_CMD_PROGRAMS (default node,git), ZEROKEY_MHI_CMD_PROJECT_PROGRAMS
  ZEROKEY_MHI_CMD_ALLOW_WRITE, ZEROKEY_MHI_CMD_ALLOW_NETWORK, ZEROKEY_MHI_CMD_TIMEOUT_MS, ZEROKEY_MHI_MAX_ROUNDS
  DEEPSEEK_TRANSPORT — 'browser' (default) or 'api'
+ INCEPTION_HEADLESS — 1|true runs the Inception browser headless (default: visible window)
  CLAUDE_TRANSPORT — 'completion' (default; REST SSE, works with old and new captures) or 'rpc' (opt-in; claude.ai Connect/proto, blocked on f15 signer)
  ZEROKEY_CLAUDE_F15_PROBE — 'zero'|'random': debug only, sends that 32-byte f15 to test whether the server validates it; unset → actionSignature() throws
 
 DEPENDENCIES
  express@^5, node-fetch@^2 (node-fetch@2, not global fetch, for cookie/agent control)
- playwright@^1 — DeepSeek browser transport only
+ playwright@^1 — DeepSeek + Inception browser transports
  prompts@^2 — startup wizard
  Runtime: node:sqlite (built-in), node:test, node:crypto
  Dev: eslint@^10, prettier@^3; .githooks/pre-commit runs `pnpm precommit`
@@ -155,7 +156,7 @@ TESTING
  test/modules.test.js — module boundary rules; runs scripts/check-modules.js
  test/surfaces/prefixes.test.js + prefixes.snapshot.json — append-only ledger: every shipped real/utility prefix must stay declared
  test/core/mhi/* — parser, files, path-policy, view-image
- test/providers/chatgpt-recovery.test.js, test/surfaces/*, test/engine/*
+ test/providers/chatgpt-recovery.test.js, test/providers/inception.test.js, test/providers/inception-transport.test.js, test/surfaces/*, test/engine/*
  New executors must add a matching test/core/mhi/*.test.js
  Adding a surface prefix → declare in surfaces/<name>/index.js AND append to test/surfaces/prefixes.snapshot.json (same commit); never remove a shipped prefix
 
@@ -172,7 +173,7 @@ INVARIANTS
  No prose around tool blocks in MHI responses — mixed output triggers a repair round
 
 EXTENSIONS
- New provider → providers/<name>/index.js exporting {name, displayName, models, promptLimit, setupSteps, validateFetch, validateCredentials, buildRouter}; registry auto-discovers
+ New provider → providers/<name>/index.js exporting {name, displayName, models, promptLimit, setupSteps, validateFetch, validateCredentials, buildRouter, requiresCapture?}; registry auto-discovers; requiresCapture=false (e.g. inception) skips fetch capture and validateCredentials always passes
  Claude capture shape → transport.js#resolveTransport; legacy captures have /organizations/<uuid>/.../completion (org id from URL path); RPC captures carry x-organization-uuid (no org path in URL) and content-type application/connect+proto; completion transport (api.js) org id order: URL path → x-organization-uuid → lastActiveOrg cookie; device id falls back to anthropic-device-id cookie
  New IDE surface → surfaces/<name>/index.js exporting (t) => {...}; set ideName + realSessionPrefix (+ realSessionPrefixAliases for older prompts) + utilityPrefixes; registry auto-discovers; test/surfaces/prefixes.test.js is append-only — never delete a shipped prefix
   Plain-OpenAI clients → surfaces/openai/index.js identity mapping; classifySession routes tools[]-bearing requests here when no IDE fingerprint matches
