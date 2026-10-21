@@ -21,7 +21,7 @@
 
 # ZeroKey
 
-OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, **ChatGPT**, and **Qwen** — use your own browser sessions and your own credentials to connect your own accounts with VS Code (Chat), Terax, or OpenCode. Personal use only. Just paste a fetch() call from DevTools. ZeroKey does not provide shared accounts, API access, or commercial access to third-party services.
+OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, **ChatGPT**, **Qwen**, and **Inception (Mercury)** — use your own browser sessions and your own credentials to connect your own accounts with VS Code (Chat), Terax, or OpenCode. Personal use only. Just paste a fetch() call from DevTools. ZeroKey does not provide shared accounts, API access, or commercial access to third-party services.
 
 > **Why DeepSeek uses a real browser.** DeepSeek's direct HTTP API is aggressively
 > flagged during their ban waves. In testing, **7 different accounts** were tried
@@ -68,7 +68,7 @@ OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, **ChatGPT**, and 
 ## Features
 
 - **OpenAI-compatible** — drop-in replacement for `/v1/models` and `/v1/chat/completions`
-- **Four providers** — DeepSeek, Claude, ChatGPT, and Qwen — switch at startup
+- **Five providers** — DeepSeek, Claude, ChatGPT, Qwen, and Inception (Mercury) — switch at startup
 - **Streaming** — SSE response streaming for all providers
 - **Multi-IDE** — VS Code, Terax, OpenCode; the tool surface is auto-detected per request from the IDE's system prompt (no auth/API key required)
 - **Session persistence** — in-memory session tracking; flushed to disk on graceful shutdown
@@ -107,8 +107,8 @@ On Windows, `zerokey.bat` and on Linux/macOS `zerokey.sh` handle clone + toolcha
 
 On startup, the interactive wizard guides you through:
 
-1. **Provider** — DeepSeek, Claude, ChatGPT, or Qwen
-2. **User** — paste a `fetch()` call from browser DevTools (captures headers + browser fingerprint)
+1. **Provider** — DeepSeek, Claude, ChatGPT, Qwen, or Inception
+2. **User** — paste a `fetch()` call from browser DevTools (captures headers + browser fingerprint); Inception needs no paste, just a username
 3. **Session** — pick or create a chat session
 
 The server auto-finds an available port starting from `7250` and prints the endpoint URLs.
@@ -159,6 +159,13 @@ through the real web UI — no further captures needed.
 4. Right-click → Copy → Copy as fetch (Node.js)
 5. Paste into the startup wizard
 
+### Inception (Mercury)
+
+No capture needed — the site is authless. ZeroKey drives a real Chromium window (profile in `temp/profiles/inception/<username>/`) on `chat.inceptionlabs.ai`, like DeepSeek, so plain HTTP is not used. Set `INCEPTION_HEADLESS=1` to run it headless.
+
+- Model: `mercury`; reasoning `Instant`, `Low`, `Medium`, `High`, plus `<Effort> Search` variants that turn the site's Web search on.
+- Long chats: every 95th real prompt, ZeroKey asks Mercury for a session summary and continues in a new chat seeded with the base prompt plus that summary. The client gets a short notice when this happens.
+
 ## IDE Integration
 
 VS Code (actively tested), Terax, and OpenCode are all tested and working. There is no auth — the tool surface (VS Code, Terax, OpenCode) is detected per request from the system prompt, so just point any OpenAI-compatible client at the server. Where a client requires an "API key" field, any non-empty placeholder works.
@@ -208,11 +215,11 @@ ZeroKey's tool layer is extensible past the built-in MHI tools.
   are entries in `engine/triggers.js` — each is a trigger word plus a MHI template. Add a new
   entry to teach the agent a new skill.
 - **Per-IDE tool grammar** — the same tool set compiles differently per IDE (VS Code, Terax,
-  OpenCode) from one shared definition in `engine/tool-defs.js`.
+  OpenCode) from one shared definition in `surfaces/specs.js`.
 
 ## Session Storage
 
-Sessions and credentials are stored in `temp/users.json` (gitignored). Each user entry contains the captured browser headers and a list of named sessions with conversation IDs. Sessions are tracked in-memory during runtime and flushed to disk on graceful shutdown (`SIGINT`/`SIGTERM`). No per-request disk writes.
+Sessions and credentials are stored in a SQLite database at `temp/db/zerokey.db` (gitignored; `ZEROKEY_DATA_DIR` relocates `temp/`). Each user row contains the captured browser headers and a list of named sessions with conversation IDs. Writes go through a 250 ms debounced write-through and are drained on graceful shutdown (`SIGINT`/`SIGTERM`). Lifecycle data only — never prompt or response content.
 
 Full schema details: **[API.md](API.md)**
 

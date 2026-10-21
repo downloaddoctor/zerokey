@@ -19,12 +19,12 @@ Only the latest commit on `main` is supported. No backports for prior releases.
 
 ## Security Design
 
-ZeroKey stores browser session credentials (cookies, headers, tokens) in `temp/users.json`. This file is gitignored and should never be committed. Treat it as sensitive — anyone with access to this file can impersonate your browser sessions.
+ZeroKey stores browser session credentials (cookies, headers, tokens) in `temp/db/zerokey.db` (SQLite). This file is gitignored and should never be committed. Treat it as sensitive — anyone with access to this file can impersonate your browser sessions.
 
 ### Best Practices
 
 - Run ZeroKey on `localhost` only — do not expose it to public networks
-- Keep `temp/users.json` private and never commit it
+- Keep `temp/db/zerokey.db` private and never commit it
 - Use a firewall to block external access to the ZeroKey port
 - Regularly refresh your browser sessions by re-capturing a fresh `fetch()` call
 - If you suspect a session is compromised, delete the session from the startup wizard

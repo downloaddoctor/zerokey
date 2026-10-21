@@ -2,13 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ZeroKey — Self-Hosted AI Proxy for DeepSeek, Claude, ChatGPT &amp; Qwen</title>
+    <meta name="viewport" content="width=1280" />
+    <title>
+      ZeroKey — Self-Hosted AI Proxy for DeepSeek, Claude, ChatGPT, Qwen &amp; Inception
+    </title>
     <meta
       name="description"
-      content="ZeroKey is a self-hosted AI proxy for personal use. Connect your own browser sessions and credentials from DeepSeek, Claude, ChatGPT, or Qwen to your IDE. No shared accounts or hosted access."
+      content="ZeroKey is a self-hosted AI proxy for personal use. Connect your own browser sessions and credentials from DeepSeek, Claude, ChatGPT, Qwen, or Inception to your IDE. No shared accounts or hosted access."
     />
-    <meta name="theme-color" content="#0a0a0d" />
+    <meta name="theme-color" content="#050507" />
     <link rel="canonical" href="https://downloaddoctor.github.io/zerokey/" />
     <link rel="llms" href="/zerokey/llms.txt" />
 
@@ -17,18 +19,14 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "ZeroKey",
-        "description": "Self-hosted, personal-use OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT, and Qwen using your own browser sessions. No API keys, no shared accounts, no telemetry.",
+        "description": "Self-hosted, personal-use OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT, Qwen, and Inception using your own browser sessions. No API keys, no shared accounts, no telemetry.",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Windows, macOS, Linux",
         "url": "https://downloaddoctor.github.io/zerokey/",
         "downloadUrl": "https://github.com/downloaddoctor/zerokey/releases/latest",
         "codeRepository": "https://github.com/downloaddoctor/zerokey",
         "license": "https://github.com/downloaddoctor/zerokey/blob/main/LICENSE",
-        "offers": {
-          "@type": "Offer",
-          "price": "0",
-          "priceCurrency": "USD"
-        }
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
       }
     </script>
     <script type="application/ld+json">
@@ -41,7 +39,7 @@
             "name": "Does ZeroKey cost anything?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "No. ZeroKey itself is free and open source. You still need your own DeepSeek, Claude, ChatGPT, or Qwen account, but you don't pay for a separate API on top of it."
+              "text": "No. ZeroKey itself is free and open source. You still need your own DeepSeek, Claude, ChatGPT, Qwen, or Inception account, but you don't pay for a separate API on top of it."
             }
           },
           {
@@ -65,7 +63,7 @@
             "name": "What happens if my session expires?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Re-paste a fresh fetch() in the setup wizard, which takes about 30 seconds. Sessions otherwise persist across server restarts."
+              "text": "Re-paste a fresh fetch() in the setup wizard. Sessions otherwise persist across server restarts."
             }
           },
           {
@@ -87,12 +85,11 @@
         ]
       }
     </script>
-    <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="ZeroKey" />
     <meta
       property="og:title"
-      content="ZeroKey — Self-Hosted AI Proxy for DeepSeek, Claude, ChatGPT &amp; Qwen Using Your Own Accounts."
+      content="ZeroKey — Self-Hosted AI Proxy for DeepSeek, Claude, ChatGPT, Qwen &amp; Inception."
     />
     <meta
       property="og:description"
@@ -104,52 +101,46 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="ZeroKey — paste a fetch, no API keys, real browser sessions for DeepSeek, Claude, ChatGPT & Qwen."
+      content="ZeroKey — paste a fetch, no API keys, real browser sessions."
     />
-
-    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="ZeroKey — Self-Hosted AI Proxy for DeepSeek, Claude, ChatGPT &amp; Qwen Using Your Own Accounts."
+      content="ZeroKey — Self-Hosted AI Proxy for DeepSeek, Claude, ChatGPT, Qwen &amp; Inception."
     />
     <meta
       name="twitter:description"
-      content="Connect your own browser sessions to your IDE. ZeroKey is a personal-use self-hosted proxy — use your own credentials, your own accounts. No API keys. Just paste one fetch()."
+      content="Connect your own browser sessions to your IDE. No API keys. Just paste one fetch()."
     />
     <meta name="twitter:image" content="https://downloaddoctor.github.io/zerokey/og.png" />
-    <link
-      rel="icon"
-      href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230a0a0d'/%3E%3Cpath d='M7 16 L13 22 L25 10' stroke='%238b7bff' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
-    />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
 
     <style>
       :root {
-        --bg: #0a0a0d;
-        --surface: #131318;
-        --surface-raised: #1a1a21;
-        --ink: #f5f5f7;
-        --ink-dim: #a3a3ad;
-        --ink-muted: #6b6b76;
-        --line: rgba(245, 245, 247, 0.1);
-        --line-strong: rgba(245, 245, 247, 0.18);
-        --accent: #8b7bff;
-        --accent-soft: rgba(139, 123, 255, 0.14);
-        --accent-ink: #0a0a0d;
+        --bg: #050507;
+        --bg-2: #0a0a0e;
+        --panel: #0d0d12;
+        --panel-2: #111118;
+        --ink: #f4f4f6;
+        --ink-dim: #9a9aa6;
+        --ink-muted: #5e5e6b;
+        --line: rgba(244, 244, 246, 0.08);
+        --line-strong: rgba(244, 244, 246, 0.16);
+        --accent: #a78bfa;
+        --accent-2: #8b5cf6;
+        --accent-soft: rgba(167, 139, 250, 0.1);
+        --accent-glow: rgba(139, 92, 246, 0.35);
+        --accent-dim: #7c6cf0;
+        --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
         --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
-        --font-sans: 'Inter', system-ui, sans-serif;
-        --max-w: 1180px;
-        --radius: 14px;
-        --radius-sm: 8px;
-        --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.35);
-        --shadow-glow: 0 0 0 1px var(--line), 0 24px 60px -18px rgba(139, 123, 255, 0.35);
+        --max-w: 1140px;
       }
 
       *,
@@ -161,1581 +152,1866 @@
       }
 
       html {
-        scroll-behavior: smooth;
         background: var(--bg);
         color: var(--ink);
         font-family: var(--font-sans);
         -webkit-font-smoothing: antialiased;
+        scroll-behavior: smooth;
+        font-size: 15px;
       }
 
       body {
         line-height: 1.6;
         overflow-x: hidden;
+        position: relative;
       }
 
-      p,
-      li,
-      .section-lead,
-      .hero-subtitle {
-        text-wrap: pretty;
-      }
-
+      /* graph-paper dot grid, like the hub */
       body::before {
         content: '';
         position: fixed;
         inset: 0;
         pointer-events: none;
-        z-index: 9998;
-        opacity: 0.03;
-        mix-blend-mode: multiply;
+        z-index: 0;
+        background-image: radial-gradient(circle, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+        background-size: 32px 32px;
+        mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, #000 40%, transparent 100%);
+        -webkit-mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, #000 40%, transparent 100%);
+      }
+
+      body::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        opacity: 0.05;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
       }
 
-      #preloader {
+      /* ---------- Side nav pills ---------- */
+      .side-nav {
         position: fixed;
-        inset: 0;
-        z-index: 100000;
-        background: var(--bg);
+        right: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 600;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+      }
+      .side-list {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 20px;
+        padding: 6px 0;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(13, 13, 18, 0.8);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+      }
+      .side-rail {
+        position: absolute;
+        left: 50%;
+        top: 20px;
+        bottom: 20px;
+        width: 2px;
+        margin-left: -1px;
+        background: var(--line-strong);
+        border-radius: 999px;
+        pointer-events: none;
+      }
+      .side-rail .fill {
+        display: block;
+        width: 100%;
+        background: linear-gradient(180deg, var(--accent), var(--accent-2));
+        box-shadow: 0 0 14px 1px var(--accent-glow);
+        height: 0;
+        border-radius: 999px;
+        transition: height 0.08s linear;
+      }
+      .side-jump {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        background: rgba(13, 13, 18, 0.9);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        color: var(--ink-dim);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        line-height: 1;
+        text-decoration: none;
+        transition:
+          color 0.2s,
+          border-color 0.2s;
+      }
+      .side-jump:hover {
+        color: var(--accent);
+        border-color: var(--accent-dim);
+      }
+      .side-jump {
+        display: flex;
+        width: 18px;
+        height: 18px;
+        font-size: 10px;
+        overflow: hidden;
+        opacity: 1;
+        transform: scale(1);
+        transition:
+          opacity 0.3s ease,
+          transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+          height 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+          margin 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+          border-width 0.35s ease,
+          visibility 0s linear 0s,
+          color 0.2s,
+          border-color 0.2s;
+      }
+      .side-jump.is-hidden {
+        height: 0;
+        border-width: 0;
+        opacity: 0;
+        transform: scale(0.4);
+        visibility: hidden;
+        pointer-events: none;
+        transition:
+          opacity 0.25s ease,
+          transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+          height 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+          margin 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+          border-width 0.35s ease,
+          visibility 0s linear 0.35s,
+          color 0.2s,
+          border-color 0.2s;
+      }
+      .side-nav .side-jump {
+        margin-top: 8px;
+      }
+      .side-nav .side-jump.is-hidden {
+        margin-top: 0;
+      }
+      .side-nav .side-list {
+        margin-top: 8px;
+        max-height: 400px;
+        transition:
+          max-height 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+          margin 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+          padding 0.4s ease,
+          border-width 0.4s ease,
+          opacity 0.3s ease,
+          transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .side-nav .side-progress {
+        max-height: 40px;
+        transition:
+          max-height 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+          padding 0.4s ease,
+          border-width 0.4s ease,
+          opacity 0.3s ease,
+          transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .side-nav.edge .side-list,
+      .side-nav.edge .side-progress {
+        max-height: 0;
+        margin-top: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        border-width: 0;
+        opacity: 0;
+        transform: scale(0.85);
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .side-pill {
+        position: relative;
         display: flex;
         align-items: center;
         justify-content: center;
+        width: 100%;
+        height: 28px;
+        text-decoration: none;
+      }
+      .side-pill .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #17171f;
+        border: 1.5px solid var(--ink-muted);
+        flex-shrink: 0;
+        z-index: 1;
+        transition:
+          background 0.2s,
+          border-color 0.2s,
+          box-shadow 0.2s,
+          transform 0.2s;
+      }
+      .side-pill .lbl {
+        position: absolute;
+        right: calc(100% + 8px);
+        top: 50%;
+        transform: translateY(-50%);
+        max-width: 0;
+        opacity: 0;
+        overflow: hidden;
+        white-space: nowrap;
         font-family: var(--font-mono);
-        color: var(--ink);
+        font-size: 10.5px;
+        letter-spacing: 0.04em;
+        color: var(--accent);
+        padding: 3px 0;
+        border: 1px solid transparent;
+        border-radius: 999px;
+        transition:
+          max-width 0.24s ease,
+          opacity 0.2s ease,
+          padding 0.24s ease;
+      }
+      .side-pill:hover .dot {
+        border-color: var(--accent);
+      }
+      .side-nav {
+        pointer-events: none;
+      }
+      .side-list,
+      .side-pill,
+      .side-jump {
+        pointer-events: auto;
+      }
+      .side-pill.done .dot {
+        background: var(--accent-dim);
+        border-color: var(--accent-dim);
+      }
+      .side-pill.done .lbl {
+        color: var(--ink-muted);
+      }
+      .side-pill.upcoming .dot {
+        opacity: 0.7;
+      }
+      .side-pill:hover .lbl,
+      .side-pill:focus-visible .lbl,
+      .side-pill.show .lbl {
+        max-width: 120px;
+        opacity: 1;
+        padding: 3px 10px;
+        border-color: var(--accent-dim);
+        background: rgba(17, 17, 24, 0.95);
+      }
+      .side-pill.active .lbl {
+        max-width: 120px;
+        opacity: 1;
+        padding: 3px 10px;
+        border-color: var(--accent);
+        background: linear-gradient(180deg, rgba(167, 139, 250, 0.18), rgba(139, 92, 246, 0.06));
+        box-shadow: 0 0 20px -6px var(--accent-glow);
+      }
+      .side-pill.active .dot {
+        background: var(--accent);
+        border-color: var(--accent);
+        transform: scale(1.3);
+        box-shadow: 0 0 10px 2px var(--accent-glow);
+      }
+      .side-progress {
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 4px;
+        min-width: 60px;
+        padding: 4px 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(13, 13, 18, 0.8);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        font-variant-numeric: tabular-nums;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        color: var(--ink-muted);
+        white-space: nowrap;
+        transition: opacity 0.2s ease;
+      }
+      .side-progress .cur {
+        color: var(--accent);
         font-size: 12px;
-        letter-spacing: 0.25em;
-        text-transform: uppercase;
+      }
+      .side-progress .sep {
+        opacity: 0.5;
+      }
+      .side-nav.between:not(.edge) .side-progress {
+        opacity: 0.5;
+      }
+      @media (max-width: 1100px) {
+        .side-nav {
+          display: none;
+        }
       }
 
-      nav.nav-hidden {
-        transform: translateY(-100%);
+      /* ---------- Scrollbar ---------- */
+      html {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      ::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+        display: none;
       }
 
+      a {
+        color: inherit;
+      }
+      .wrap {
+        position: relative;
+        z-index: 1;
+      }
       .container {
         max-width: var(--max-w);
         margin: 0 auto;
-        padding: 0 40px;
+        padding: 0 32px;
+      }
+      .mono {
+        font-family: var(--font-mono);
       }
 
+      /* ---------- Nav (framed floating bar) ---------- */
       nav {
         position: sticky;
-        top: 0;
+        top: 12px;
         z-index: 500;
-        background: rgba(10, 10, 13, 0.72);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+        padding: 0 20px;
+      }
+      .nav-shell {
+        position: relative;
+        max-width: calc(var(--max-w) - 24px);
+        margin: 0 auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        background: rgba(9, 9, 13, 0.88);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        box-shadow: 0 16px 44px -28px #000;
+      }
+      .nav-inner {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 18px 0;
-        gap: 20px;
-        border-bottom: 1px solid var(--line);
-        transition: transform 0.3s ease;
+        gap: 24px;
+        padding: 9px 18px;
+        white-space: nowrap;
       }
-
       .brand {
         display: inline-flex;
         align-items: center;
         gap: 10px;
-        font-family: var(--font-mono);
-        font-weight: 700;
-        font-size: 17px;
-        color: var(--ink);
         text-decoration: none;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14.5px;
+        color: var(--ink);
         letter-spacing: -0.01em;
       }
-
       .brand-mark {
-        width: 30px;
-        height: 30px;
-        background: var(--accent);
-        display: grid;
-        place-items: center;
-        border-radius: var(--radius-sm);
-      }
-
-      .brand-mark svg {
-        width: 16px;
-        height: 16px;
+        width: 26px;
+        height: 26px;
         display: block;
+        border-radius: 8px;
       }
-
       .nav-links {
         display: flex;
         align-items: center;
         gap: 2px;
       }
-
       .nav-links a {
+        font-family: var(--font-sans);
+        font-size: 13px;
         color: var(--ink-dim);
         text-decoration: none;
-        font-family: var(--font-sans);
-        font-size: 12.5px;
-        font-weight: 500;
-        padding: 7px 11px;
-        border: 1px solid transparent;
-        border-radius: var(--radius-sm);
-        letter-spacing: 0;
+        padding: 7px 12px;
+        border-radius: 6px;
         white-space: nowrap;
-        transition: all 0.15s;
+        transition:
+          color 0.15s,
+          background 0.15s;
       }
-
       .nav-links a:hover {
-        border-color: var(--line);
-        background: var(--surface-raised);
+        color: var(--ink);
+        background: var(--panel);
+      }
+      .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+      .nav-contact {
+        font-size: 13px;
+        color: var(--ink-dim);
+        text-decoration: none;
+        transition: color 0.15s;
+      }
+      .nav-contact:hover {
         color: var(--ink);
       }
-
-      .hero {
-        position: relative;
-        padding: 90px 0 70px;
-      }
-
-      .hero-grid {
-        display: flex;
-        flex-direction: column;
-        gap: 40px;
-      }
-
-      .hero-badge {
+      .nav-cta {
         display: inline-flex;
         align-items: center;
-        gap: 10px;
-        padding: 7px 16px;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--ink-dim);
-        background: var(--surface);
-        width: fit-content;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        padding: 8px 14px;
+        border-radius: 6px;
+        border: 1px solid var(--line-strong);
+        background: transparent;
+        color: var(--ink);
+        text-decoration: none;
+        transition:
+          border-color 0.15s,
+          background 0.15s,
+          color 0.15s;
       }
-
-      .hero-badge-dot {
-        width: 7px;
-        height: 7px;
-        background: var(--accent);
-        border-radius: 50%;
-        box-shadow: 0 0 8px 1px var(--accent);
+      .nav-cta:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: var(--accent-soft);
       }
-
-      h1 {
-        font-family: var(--font-sans);
-        font-size: clamp(40px, 7vw, 82px);
-        font-weight: 700;
-        line-height: 1.04;
-        letter-spacing: -0.03em;
-        max-width: 17ch;
-      }
-
-      h1 .line {
-        display: block;
-      }
-
-      h1 .line-accent {
+      .nav-cta .arw {
         color: var(--accent);
       }
 
-      h1 .cursor {
-        display: inline-block;
-        width: 3px;
-        height: 0.85em;
-        background: var(--accent);
-        margin-left: 4px;
-        vertical-align: text-bottom;
-        animation: blink 1s step-end infinite;
+      /* ---------- Page frame (content borders + corner squares) ---------- */
+      .page-frame {
+        position: relative;
+        max-width: none;
+        margin: 0 24px;
+        border-left: 1px solid var(--line);
+        border-right: 1px solid var(--line);
+      }
+      .pf-tl,
+      .pf-tr {
+        top: 0;
+      }
+      .pf-tl,
+      .pf-tr {
+        position: absolute;
+        top: -4px;
+        width: 7px;
+        height: 7px;
+        background: var(--ink-dim);
+        z-index: 3;
+      }
+      .pf-tl {
+        left: -4px;
+      }
+      .pf-tr {
+        right: -4px;
       }
 
-      @keyframes blink {
-        50% {
-          opacity: 0;
-        }
+      /* ---------- Hero ---------- */
+      .hero {
+        padding: 96px 0 110px;
+        text-align: center;
+        border-bottom: 1px solid var(--line);
+        position: relative;
+        overflow: hidden;
       }
-
-      .hero-lower {
-        display: grid;
-        grid-template-columns: 1.1fr 0.9fr;
-        gap: 60px;
-        align-items: end;
+      .hero::before {
+        content: '';
+        position: absolute;
+        top: -260px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 900px;
+        height: 620px;
+        background: radial-gradient(circle, var(--accent-glow), transparent 62%);
+        filter: blur(60px);
+        opacity: 0.55;
+        pointer-events: none;
+        z-index: 0;
       }
-
-      .hero-subtitle {
-        font-size: 17px;
+      .hero > .container {
+        position: relative;
+        z-index: 1;
+      }
+      .hero-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 14px 6px 8px;
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        background: var(--panel);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
         color: var(--ink-dim);
-        max-width: 48ch;
-        line-height: 1.65;
+        margin-bottom: 40px;
+      }
+      .hero-pill .tag {
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 600;
+      }
+      h1 {
+        font-size: clamp(38px, 6.5vw, 78px);
+        font-weight: 600;
+        line-height: 1.04;
+        letter-spacing: -0.04em;
+        margin-bottom: 26px;
+      }
+      h1 .line {
+        display: block;
+      }
+      h1 .accent-line {
+        color: var(--accent);
       }
 
+      .hero-sub {
+        font-size: 16px;
+        color: var(--ink-dim);
+        line-height: 1.7;
+        max-width: 58ch;
+        margin: 0 auto;
+      }
+      .hero-sub code {
+        font-family: var(--font-mono);
+        font-size: 13.5px;
+        color: var(--accent);
+        background: var(--accent-soft);
+        padding: 1px 6px;
+        border-radius: 4px;
+      }
       .hero-cta {
         display: flex;
         flex-wrap: wrap;
-        gap: 14px;
-        margin-top: 28px;
+        gap: 12px;
+        justify-content: center;
+        margin-top: 40px;
       }
-
       .btn {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        padding: 15px 28px;
         font-family: var(--font-sans);
-        font-size: 14px;
-        font-weight: 600;
-        text-decoration: none;
-        letter-spacing: 0;
-        border: 1px solid transparent;
-        border-radius: var(--radius-sm);
-        cursor: pointer;
-        transition: all 0.18s ease;
-      }
-
-      .btn-primary {
-        background: var(--accent);
-        color: var(--accent-ink);
-        box-shadow: var(--shadow);
-      }
-
-      .btn-primary:hover {
-        transform: translateY(-1px);
-        box-shadow: var(--shadow-glow);
-      }
-
-      .btn-ghost {
-        background: var(--surface);
-        color: var(--ink);
-        border-color: var(--line);
-      }
-
-      .btn-ghost:hover {
-        background: var(--surface-raised);
-        border-color: var(--line-strong);
-      }
-
-      .hero-terminal {
-        background: var(--surface);
-        color: var(--ink);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-        padding: 24px 22px;
-        font-family: var(--font-mono);
-        font-size: 12px;
-        line-height: 1.9;
-      }
-
-      .hero-terminal .t-prompt {
-        color: var(--accent);
-        margin-right: 8px;
-        user-select: none;
-      }
-
-      .hero-terminal .t-dim {
-        opacity: 0.55;
-      }
-
-      .hero-terminal .t-hl {
-        color: var(--accent);
-      }
-
-      section {
-        padding: 90px 0;
-        border-bottom: 1px solid var(--line);
-      }
-
-      .section-eyebrow {
-        font-family: var(--font-mono);
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-        color: var(--accent);
-        margin-bottom: 14px;
-      }
-
-      h2 {
-        font-family: var(--font-sans);
-        font-size: clamp(26px, 3.6vw, 40px);
-        font-weight: 700;
-        letter-spacing: -0.02em;
-        line-height: 1.15;
-        margin-bottom: 20px;
-        max-width: 18ch;
-      }
-
-      .section-lead {
-        color: var(--ink-dim);
-        max-width: 620px;
-        font-size: 16px;
-        line-height: 1.7;
-        margin-bottom: 48px;
-      }
-
-      .bento-grid {
-        display: grid;
-        gap: 16px;
-        grid-template-columns: 1.4fr 1fr;
-        grid-template-rows: auto auto;
-      }
-
-      .bento-grid .card.featured {
-        grid-row: 1 / 3;
-      }
-
-      .card-grid {
-        display: grid;
-        gap: 16px;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      }
-
-      .card {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        padding: 34px 30px;
-        position: relative;
-        transition:
-          background 0.2s,
-          border-color 0.2s,
-          transform 0.2s;
-      }
-
-      .card:hover {
-        background: var(--surface-raised);
-        border-color: var(--line-strong);
-        transform: translateY(-2px);
-      }
-
-      .card-icon {
-        width: 46px;
-        height: 46px;
-        margin-bottom: 20px;
-        background: rgba(255, 255, 255, 0.85);
-        backdrop-filter: blur(6px);
-        -webkit-backdrop-filter: blur(6px);
-        border: 1px solid rgba(255, 255, 255, 0.4);
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-        border-radius: var(--radius-sm);
-        display: grid;
-        place-items: center;
-      }
-
-      .card-icon--deepseek {
-        box-shadow:
-          0 2px 6px rgba(0, 0, 0, 0.25),
-          0 0 18px -3px rgba(77, 107, 254, 0.65);
-      }
-
-      .card-icon--claude {
-        box-shadow:
-          0 2px 6px rgba(0, 0, 0, 0.25),
-          0 0 18px -3px rgba(217, 119, 87, 0.65);
-      }
-
-      .card-icon--chatgpt {
-        box-shadow:
-          0 2px 6px rgba(0, 0, 0, 0.25),
-          0 0 18px -3px rgba(16, 163, 127, 0.65);
-      }
-
-      .card-icon--qwen {
-        box-shadow:
-          0 2px 6px rgba(0, 0, 0, 0.25),
-          0 0 18px -3px rgba(0, 82, 255, 0.7);
-      }
-
-      #providers .card-grid {
-        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-      }
-
-      .ide-icon--vscode {
-        box-shadow:
-          0 2px 6px rgba(0, 0, 0, 0.25),
-          0 0 14px -2px rgba(0, 122, 204, 0.65);
-      }
-
-      .ide-icon--terax {
-        box-shadow:
-          0 2px 6px rgba(0, 0, 0, 0.25),
-          0 0 14px -2px rgba(139, 123, 255, 0.65);
-      }
-
-      .ide-icon--opencode {
-        box-shadow:
-          0 2px 6px rgba(0, 0, 0, 0.25),
-          0 0 14px -2px rgba(255, 255, 255, 0.4);
-      }
-
-      .card-icon img {
-        width: 24px;
-        height: 24px;
-        object-fit: contain;
-      }
-
-      .card h3 {
-        font-family: var(--font-sans);
-        font-size: 19px;
-        font-weight: 700;
-        margin-bottom: 6px;
-        letter-spacing: -0.01em;
-      }
-
-      .card-tagline {
-        font-family: var(--font-mono);
-        font-size: 11px;
-        color: var(--accent);
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        margin-bottom: 14px;
-      }
-
-      .card p {
-        font-size: 14.5px;
-        color: var(--ink-dim);
-        line-height: 1.65;
-      }
-
-      .chip-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 28px;
-      }
-
-      .chip {
-        padding: 7px 16px;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.04em;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        color: var(--ink-dim);
-        background: var(--surface);
-      }
-
-      .step-grid {
-        display: grid;
-        gap: 16px;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      }
-
-      .step {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        padding: 34px 26px;
-        position: relative;
-      }
-
-      .step-num {
-        font-family: var(--font-mono);
-        font-size: 44px;
-        font-weight: 700;
-        color: var(--accent);
-        line-height: 1;
-        margin-bottom: 18px;
-        letter-spacing: -0.03em;
-      }
-
-      .step h3 {
-        font-family: var(--font-sans);
-        font-size: 15px;
-        font-weight: 700;
-        margin-bottom: 10px;
-        letter-spacing: 0;
-      }
-
-      .step p {
         font-size: 13.5px;
-        color: var(--ink-dim);
-        line-height: 1.7;
+        font-weight: 500;
+        text-decoration: none;
+        padding: 13px 22px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.16s ease;
       }
-
-      .ide-grid {
-        display: grid;
-        gap: 16px;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      .btn-primary {
+        background: var(--accent-2);
+        color: #fff;
+        border-color: var(--accent-2);
+        box-shadow: 0 8px 26px -10px var(--accent-glow);
       }
-
-      .ide-card {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        padding: 30px;
+      .btn-primary:hover {
+        filter: brightness(1.1);
+        transform: translateY(-1px);
       }
-
-      .ide-card h3 {
-        font-family: var(--font-sans);
-        font-size: 16px;
-        font-weight: 700;
-        margin-bottom: 18px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
+      .btn-ghost {
+        background: var(--panel);
+        color: var(--ink);
+        border-color: var(--line-strong);
       }
-
-      .ide-icon {
-        width: 28px;
-        height: 28px;
-        border-radius: 7px;
-        background: rgba(255, 255, 255, 0.85);
-        backdrop-filter: blur(6px);
-        -webkit-backdrop-filter: blur(6px);
-        border: 1px solid rgba(255, 255, 255, 0.4);
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-        display: inline-grid;
-        place-items: center;
-        flex-shrink: 0;
-      }
-
-      .ide-card h3 img {
-        width: 17px;
-        height: 17px;
-        object-fit: contain;
-      }
-
-      .ide-card ol {
-        padding-left: 20px;
-        font-size: 13px;
-        color: var(--ink-dim);
-        line-height: 2;
-        font-family: var(--font-mono);
-      }
-
-      .ide-card ol li {
-        margin-bottom: 2px;
-      }
-
-      .ide-card code {
-        background: var(--bg);
-        padding: 1px 6px;
-        border: 1px solid var(--line);
-        border-radius: 4px;
-        font-size: 11px;
+      .btn-ghost:hover {
+        border-color: var(--accent);
         color: var(--accent);
       }
-
-      .terminal {
-        max-width: 800px;
-        margin: 0 auto;
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        background: var(--surface);
-        box-shadow: var(--shadow);
-        overflow: hidden;
+      .hero-note {
+        margin-top: 26px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--ink-muted);
+        letter-spacing: 0.03em;
       }
 
-      .terminal-chrome {
+      /* terminal plate on hero */
+      .hero-term {
+        max-width: 760px;
+        margin: 56px auto 0;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--bg-2);
+        overflow: hidden;
+        text-align: left;
+        box-shadow: 0 40px 90px -50px #000;
+      }
+      .term-chrome {
         display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 14px 18px;
+        gap: 6px;
+        padding: 11px 14px;
         border-bottom: 1px solid var(--line);
+        background: var(--panel);
       }
-
-      .terminal-chrome .dot {
-        width: 10px;
-        height: 10px;
+      .term-chrome .dot {
+        width: 9px;
+        height: 9px;
         border-radius: 50%;
         background: var(--ink);
-        opacity: 0.25;
+        opacity: 0.16;
       }
-
-      .terminal-chrome .filename {
-        margin-left: 14px;
+      .term-chrome .name {
+        margin-left: 10px;
         font-family: var(--font-mono);
-        font-size: 11px;
-        color: var(--ink-dim);
-        letter-spacing: 0.06em;
-      }
-
-      .terminal-body {
-        padding: 28px;
-        font-family: var(--font-mono);
-        font-size: 13px;
-        line-height: 2;
-        overflow-x: auto;
-        margin: 0;
-        color: var(--ink);
-      }
-
-      .terminal-body .c {
-        opacity: 0.5;
-      }
-
-      .terminal-body .prompt {
-        color: var(--accent);
-        user-select: none;
-        margin-right: 12px;
-      }
-
-      .terminal-body .k {
-        font-weight: 700;
-      }
-
-      .terminal-body .s {
-        color: var(--accent);
-      }
-
-      .terminal-body .blank {
-        display: block;
-        height: 0.5em;
-      }
-
-      footer {
-        padding: 40px 0;
-        font-size: 12px;
+        font-size: 10.5px;
         color: var(--ink-muted);
+        letter-spacing: 0.05em;
+      }
+      .term-body {
+        padding: 22px 22px;
         font-family: var(--font-mono);
-        text-align: center;
-        line-height: 2;
+        font-size: 12.5px;
+        line-height: 1.95;
+        color: var(--ink-dim);
       }
-
-      footer a {
+      .term-body .p {
+        color: var(--ink-muted);
+        user-select: none;
+        margin-right: 6px;
+      }
+      .term-body .k {
         color: var(--ink);
-        text-decoration: underline;
-        text-underline-offset: 3px;
+      }
+      .term-body .hl {
+        color: var(--accent);
       }
 
-      .footer-badge {
+      /* ---------- Section scaffolding ---------- */
+      section {
+        padding: 48px 0;
+        position: relative;
+      }
+      .sec-head {
+        margin-bottom: 44px;
+      }
+      .sec-head.center {
+        text-align: center;
+      }
+      .sec-eyebrow {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        margin-top: 18px;
-        padding: 7px 16px;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        background: var(--accent-soft);
-        color: var(--accent);
         font-family: var(--font-mono);
         font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.16em;
         text-transform: uppercase;
-      }
-
-      .footer-badge-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: var(--accent);
-        box-shadow: 0 0 6px 1px var(--accent);
-      }
-
-      @media (max-width: 860px) {
-        .hero-lower {
-          grid-template-columns: 1fr;
-          gap: 32px;
-        }
-
-        .bento-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .bento-grid .card.featured {
-          grid-row: auto;
-        }
-      }
-
-      body {
-        user-select: none;
-      }
-
-      code,
-      pre,
-      .terminal-body,
-      .terminal-body * {
-        user-select: text;
-      }
-
-      .terminal-body .c {
-        user-select: none;
-      }
-
-      @media (max-width: 640px) {
-        .nav-links {
-          display: none;
-        }
-
-        .container {
-          padding: 0 20px;
-        }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        * {
-          animation-duration: 0.01ms !important;
-          transition-duration: 0.01ms !important;
-        }
-      }
-
-      .cursor-particle {
-        position: fixed;
-        z-index: 9999;
-        width: 4px;
-        height: 4px;
-        border-radius: 50%;
-        background: var(--accent);
-        pointer-events: none;
-        animation: particle-fade 0.6s ease-out forwards;
-      }
-
-      @keyframes particle-fade {
-        to {
-          opacity: 0;
-          transform: translate(calc(var(--dx) * 18px), calc(var(--dy) * 18px)) scale(0.4);
-        }
-      }
-
-      .click-ring {
-        position: fixed;
-        z-index: 9999;
-        width: 8px;
-        height: 8px;
-        margin: -4px;
-        border-radius: 50%;
-        border: 1.5px solid var(--accent);
-        pointer-events: none;
-        animation: ring-expand 0.5s ease-out forwards;
-      }
-
-      @keyframes ring-expand {
-        to {
-          width: 46px;
-          height: 46px;
-          margin: -23px;
-          opacity: 0;
-        }
-      }
-
-      .click-spark {
-        position: fixed;
-        z-index: 9999;
-        width: 3px;
-        height: 3px;
-        margin: -1.5px;
-        border-radius: 50%;
-        background: var(--accent);
-        pointer-events: none;
-        animation: spark-burst 0.45s ease-out forwards;
-      }
-
-      @keyframes spark-burst {
-        to {
-          transform: translate(var(--sx), var(--sy));
-          opacity: 0;
-        }
-      }
-
-      .feature-row {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 16px;
-        margin-top: 44px;
-      }
-
-      .feature-item {
-        padding: 26px 24px;
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        background: var(--surface);
-      }
-
-      .feature-item .f-icon {
-        width: 36px;
-        height: 36px;
-        border-radius: 8px;
-        background: var(--accent-soft);
-        display: grid;
-        place-items: center;
-        margin-bottom: 16px;
         color: var(--accent);
+        margin-bottom: 22px;
       }
-
-      .feature-item .f-icon svg {
-        width: 18px;
-        height: 18px;
+      .sec-eyebrow .tick {
+        display: inline-block;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 8px 1px var(--accent-glow);
       }
-
-      .feature-item h3 {
-        font-family: var(--font-sans);
-        font-size: 15px;
-        font-weight: 700;
-        margin-bottom: 8px;
+      .sec-title {
+        font-size: clamp(28px, 3.8vw, 44px);
+        font-weight: 600;
+        line-height: 1.12;
+        letter-spacing: -0.03em;
+        max-width: 22ch;
       }
-
-      .feature-item p {
-        font-size: 13px;
+      .sec-head.center .sec-title {
+        margin: 0 auto;
+      }
+      .sec-lead {
+        margin-top: 18px;
+        font-size: 15.5px;
         color: var(--ink-dim);
-        line-height: 1.65;
+        line-height: 1.72;
+        max-width: 62ch;
+      }
+      .sec-head.center .sec-lead {
+        margin-left: auto;
+        margin-right: auto;
       }
 
+      /* framed section with corner squares */
+      .slab {
+        position: relative;
+        max-width: var(--max-w);
+        margin: 0 auto;
+        padding: 0 32px;
+      }
+      .slab-frame {
+        position: relative;
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        padding: 52px 44px;
+      }
+      .slab-frame::before,
+      .slab-frame::after,
+      .corner-bl,
+      .corner-br {
+        content: '';
+        position: absolute;
+        width: 7px;
+        height: 7px;
+        background: var(--ink-dim);
+        z-index: 2;
+      }
+      .slab-frame::before {
+        top: -4px;
+        left: -4px;
+      }
+      .slab-frame::after {
+        top: -4px;
+        right: -4px;
+      }
+      .corner-bl {
+        bottom: -4px;
+        left: -4px;
+      }
+      .corner-br {
+        bottom: -4px;
+        right: -4px;
+      }
+
+      /* ---------- Stats ---------- */
       .stat-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-        gap: 16px;
+        grid-template-columns: repeat(3, 1fr);
+        border-top: 1px solid var(--line);
+        border-left: 1px solid var(--line);
       }
-
-      .stat-card {
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        background: var(--surface);
-        padding: 26px 22px;
+      .stat {
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        padding: 34px 26px;
+        background: var(--bg-2);
       }
-
       .stat-num {
         font-family: var(--font-mono);
-        font-size: 32px;
-        font-weight: 800;
-        color: var(--accent);
-        letter-spacing: -0.02em;
-        margin-bottom: 6px;
+        font-size: 40px;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        color: var(--ink);
         line-height: 1;
+        margin-bottom: 14px;
       }
-
+      .stat-num .accent {
+        color: var(--accent);
+      }
       .stat-label {
         font-size: 12.5px;
         color: var(--ink-dim);
-        line-height: 1.5;
+        line-height: 1.55;
       }
-
       .stat-note {
-        margin-top: 20px;
+        margin-top: 22px;
         font-family: var(--font-mono);
         font-size: 11px;
         color: var(--ink-muted);
-        letter-spacing: 0.02em;
       }
 
-      .layer-stack {
-        display: flex;
-        flex-direction: column;
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        overflow: hidden;
+      /* ---------- Numbered feature columns ---------- */
+      .num-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-top: 1px solid var(--line);
+        border-left: 1px solid var(--line);
       }
-
-      .layer {
-        padding: 22px 26px;
-        display: flex;
-        align-items: center;
-        gap: 24px;
-        background: var(--surface);
+      .num-card {
+        border-right: 1px solid var(--line);
         border-bottom: 1px solid var(--line);
-        flex-wrap: wrap;
+        padding: 34px 28px;
+        background: var(--bg-2);
+        transition: background 0.2s;
+      }
+      .num-card:hover {
+        background: var(--panel);
+      }
+      .num-card .n {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--accent);
+        letter-spacing: 0.08em;
+        margin-bottom: 16px;
+      }
+      .num-card h3 {
+        font-size: 15.5px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      .num-card p {
+        font-size: 13px;
+        color: var(--ink-dim);
+        line-height: 1.66;
       }
 
+      /* ---------- Layer stack ---------- */
+      .layer-stack {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--bg-2);
+      }
+      .layer {
+        display: grid;
+        grid-template-columns: 170px 1fr 1fr;
+        gap: 24px;
+        align-items: center;
+        padding: 26px 28px;
+        border-bottom: 1px solid var(--line);
+      }
       .layer:last-child {
         border-bottom: none;
       }
-
       .layer.base {
-        background: var(--surface-raised);
+        background: var(--panel);
       }
-
       .layer-label {
         font-family: var(--font-mono);
         font-size: 11px;
         letter-spacing: 0.1em;
         text-transform: uppercase;
         color: var(--accent);
-        font-weight: 700;
-        min-width: 170px;
+        font-weight: 600;
       }
-
       .layer-desc {
         font-size: 13.5px;
         color: var(--ink-dim);
-        flex: 1 1 220px;
         line-height: 1.6;
       }
-
       .layer-mods {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: 6px;
+        justify-content: flex-end;
       }
-
       .layer-mod {
         font-family: var(--font-mono);
-        font-size: 11px;
-        padding: 5px 10px;
+        font-size: 10.5px;
+        padding: 4px 9px;
         border: 1px solid var(--line);
         border-radius: 999px;
         color: var(--ink-dim);
         background: var(--bg);
       }
 
-      footer.big-footer {
-        text-align: left;
-        padding: 70px 0 40px;
-      }
-
-      .footer-top {
+      /* ---------- Cards ---------- */
+      .card-grid {
         display: grid;
-        grid-template-columns: 1.5fr repeat(4, 1fr);
-        gap: 30px;
-        padding-bottom: 36px;
-        border-bottom: 1px solid var(--line);
-        margin-bottom: 24px;
+        gap: 1px;
+        background: var(--line);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
       }
-
-      .footer-brand p {
+      .card-grid.c3 {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .card-grid.c2 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .card-grid.c5 {
+        grid-template-columns: repeat(5, 1fr);
+      }
+      .card {
+        background: var(--bg-2);
+        padding: 30px 26px;
+        transition: background 0.2s;
+        position: relative;
+      }
+      .card:hover {
+        background: var(--panel);
+      }
+      .card h3 {
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        margin-bottom: 6px;
+      }
+      .card .tag {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 14px;
+      }
+      .card p {
         font-size: 13px;
         color: var(--ink-dim);
-        max-width: 32ch;
+        line-height: 1.66;
+      }
+      .card code {
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+        color: var(--accent);
+        background: var(--accent-soft);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      .card-icon {
+        width: 42px;
+        height: 42px;
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        background: rgba(255, 255, 255, 0.04);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        margin-bottom: 18px;
+        overflow: hidden;
+      }
+      .card-icon img {
+        width: 24px;
+        height: 24px;
+        object-fit: contain;
+        display: block;
+      }
+      .card-icon img.invert,
+      .ide-icon img.invert {
+        filter: invert(1) brightness(1.15);
+      }
+      .card-icon span {
+        font-family: var(--font-mono);
+        font-weight: 700;
+        color: var(--accent-2);
+        font-size: 15px;
+      }
+
+      /* ---------- Chips ---------- */
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 30px;
+        justify-content: center;
+      }
+      .chip {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        letter-spacing: 0.03em;
+        padding: 5px 11px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--ink-dim);
+        background: var(--bg-2);
+      }
+
+      /* ---------- Steps ---------- */
+      .step-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        background: var(--line);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .step {
+        background: var(--bg-2);
+        padding: 30px 26px;
+      }
+      .step-num {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--accent);
+        letter-spacing: 0.1em;
+        margin-bottom: 16px;
+      }
+      .step h3 {
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 10px;
+      }
+      .step p {
+        font-size: 13px;
+        color: var(--ink-dim);
+        line-height: 1.66;
+      }
+      .step code {
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+        color: var(--accent);
+        background: var(--accent-soft);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      .step-dl {
+        display: inline-block;
+        margin-top: 12px;
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+        color: var(--accent);
+        text-decoration: none;
+        border-bottom: 1px solid transparent;
+        transition: border-color 0.15s;
+      }
+      .step-dl:hover {
+        border-bottom-color: var(--accent);
+      }
+
+      /* ---------- IDE cards ---------- */
+      .ide-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        background: var(--line);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .ide-card {
+        background: var(--bg-2);
+        padding: 28px 26px;
+      }
+      .ide-card h3 {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 18px;
+      }
+      .ide-icon {
+        width: 26px;
+        height: 26px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        display: grid;
+        place-items: center;
+        background: rgba(255, 255, 255, 0.04);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+      .ide-icon img {
+        width: 16px;
+        height: 16px;
+        object-fit: contain;
+        display: block;
+      }
+      .ide-card ol {
+        padding-left: 18px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--ink-dim);
+        line-height: 1.95;
+      }
+      .ide-card code {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 11px;
+        color: var(--accent);
+      }
+
+      /* ---------- Terminal block ---------- */
+      .terminal {
+        max-width: 820px;
+        margin: 0 auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--bg-2);
+        overflow: hidden;
+      }
+      .terminal-body {
+        margin: 0;
+        padding: 26px 24px;
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+        line-height: 2;
+        color: var(--ink);
+        overflow-x: auto;
+      }
+      .terminal-body .c {
+        color: var(--ink-muted);
+      }
+      .terminal-body .prompt {
+        color: var(--accent);
+        user-select: none;
+        margin-right: 10px;
+      }
+      .terminal-body .k {
+        color: var(--accent);
+      }
+      .terminal-body .s {
+        color: #9fd9ff;
+      }
+
+      /* ---------- CTA ---------- */
+      .cta {
+        text-align: center;
+        padding: 120px 0;
+        border-bottom: 1px solid var(--line);
+        position: relative;
+        overflow: hidden;
+      }
+      .cta::before {
+        content: '';
+        position: absolute;
+        bottom: -300px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 900px;
+        height: 600px;
+        background: radial-gradient(circle, var(--accent-glow), transparent 62%);
+        filter: blur(70px);
+        opacity: 0.4;
+        pointer-events: none;
+      }
+      .cta > .container {
+        position: relative;
+        z-index: 1;
+      }
+      .cta .sec-title {
+        margin: 0 auto;
+        max-width: 22ch;
+      }
+      .cta .sec-lead {
+        margin: 18px auto 0;
+      }
+      .cta .hero-cta {
+        justify-content: center;
+      }
+      .cta-terminal {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 36px;
+        padding: 13px 18px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: var(--bg-2);
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+        color: var(--ink-dim);
+      }
+      .cta-terminal .p {
+        color: var(--accent);
+      }
+      .cta-terminal .copy {
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 2px 8px;
+        font-size: 10px;
+        color: var(--ink-muted);
+        cursor: pointer;
+        background: var(--panel);
+      }
+
+      /* ---------- Footer ---------- */
+      footer {
+        padding: 70px 0 40px;
+      }
+      .footer-top {
+        display: grid;
+        grid-template-columns: 1.6fr repeat(4, 1fr);
+        gap: 30px;
+        padding-bottom: 40px;
+        border-bottom: 1px solid var(--line);
+      }
+      .footer-brand p {
+        font-size: 12.5px;
+        color: var(--ink-dim);
+        max-width: 34ch;
         margin-top: 14px;
         line-height: 1.7;
       }
-
+      .footer-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 18px;
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .footer-badge .dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 6px 1px var(--accent);
+      }
       .footer-col h4 {
         font-family: var(--font-mono);
-        font-size: 11px;
+        font-size: 10.5px;
         text-transform: uppercase;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.1em;
         color: var(--ink-muted);
-        margin-bottom: 14px;
+        margin-bottom: 16px;
       }
-
       .footer-col a {
         display: block;
-        font-size: 13px;
+        font-size: 12.5px;
         color: var(--ink-dim);
         text-decoration: none;
-        margin-bottom: 10px;
+        margin-bottom: 9px;
+        transition: color 0.15s;
       }
-
       .footer-col a:hover {
         color: var(--ink);
       }
-
       .footer-bottom {
         display: flex;
         justify-content: space-between;
         flex-wrap: wrap;
         gap: 12px;
-        font-size: 12px;
-        color: var(--ink-muted);
+        padding-top: 26px;
         font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--ink-muted);
+      }
+      .footer-bottom a {
+        color: var(--ink-dim);
+        text-decoration: underline;
+        text-underline-offset: 3px;
       }
 
-      @media (max-width: 860px) {
-        .feature-row {
-          grid-template-columns: 1fr;
-        }
+      /* ---------- Responsive ---------- */
 
-        .footer-top {
-          grid-template-columns: repeat(2, 1fr);
-        }
-      }
-
-      @media (max-width: 640px) {
-        .footer-top {
-          grid-template-columns: 1fr;
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0.01ms !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto;
         }
       }
     </style>
   </head>
-
   <body>
-    <div id="preloader">INITIALIZING SESSION…</div>
-    <div class="container">
+    <div class="wrap">
       <nav>
-        <a class="brand" href="#"
-          ><span class="brand-mark"
-            ><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path
-                d="M7 16 L13 22 L25 10"
-                stroke="var(--bg)"
-                stroke-width="3"
-                fill="none"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              /></svg></span
-          ><span>ZeroKey</span></a
-        >
-        <div class="nav-links">
-          <a href="#why">/why</a>
-          <a href="#architecture">/architecture</a>
-          <a href="#extend">/extensibility</a>
-          <a href="#providers">/providers</a>
-          <a href="#ides">/ide-setup</a>
-          <a href="#start">/quickstart</a>
-          <a href="https://github.com/downloaddoctor/zerokey" target="_blank" rel="noopener"
-            >/github</a
-          >
+        <div class="nav-shell">
+          <div class="container nav-inner">
+            <a class="brand" href="#">
+              <img class="brand-mark" src="favicon.svg" alt="" width="26" height="26" />
+              <span>ZeroKey</span>
+            </a>
+            <div class="nav-links">
+              <a href="#why">Why</a>
+              <a href="#architecture">Architecture</a>
+              <a href="#extend">Extensibility</a>
+              <a href="#providers">Providers</a>
+              <a href="#ides">IDE setup</a>
+              <a href="#start">Quickstart</a>
+            </div>
+            <div class="nav-right">
+              <a
+                class="nav-contact"
+                href="https://github.com/downloaddoctor/zerokey"
+                target="_blank"
+                rel="noopener"
+                >GitHub</a
+              >
+              <a
+                class="nav-cta"
+                href="https://github.com/downloaddoctor/zerokey/releases/latest/download/zerokey.bat"
+                rel="noopener"
+                download
+                >Get started <span class="arw">→</span></a
+              >
+              <!-- progress moved into side-nav -->
+            </div>
+          </div>
         </div>
       </nav>
-      <header class="hero">
-        <div class="hero-grid">
-          <div class="hero-badge">
-            <span class="hero-badge-dot"></span>paste one fetch() → skip the API bill
+
+      <nav class="side-nav edge" aria-label="Section navigation">
+        <div class="side-progress">
+          <span class="cur js-side-cur">01</span><span class="sep">/</span
+          ><span class="js-side-total">07</span>
+        </div>
+        <a
+          class="side-jump js-jump-up is-hidden"
+          href="#"
+          aria-label="Previous section"
+          aria-hidden="true"
+          tabindex="-1"
+          >↑</a
+        >
+        <div class="side-list">
+          <div class="side-rail"><span class="fill"></span></div>
+          <a class="side-pill" href="#why" data-sec="why"
+            ><span class="dot"></span><span class="lbl">why</span></a
+          >
+          <a class="side-pill" href="#architecture" data-sec="architecture"
+            ><span class="dot"></span><span class="lbl">architecture</span></a
+          >
+          <a class="side-pill" href="#extend" data-sec="extend"
+            ><span class="dot"></span><span class="lbl">extensibility</span></a
+          >
+          <a class="side-pill" href="#providers" data-sec="providers"
+            ><span class="dot"></span><span class="lbl">providers</span></a
+          >
+          <a class="side-pill" href="#ides" data-sec="ides"
+            ><span class="dot"></span><span class="lbl">ide setup</span></a
+          >
+          <a class="side-pill" href="#start" data-sec="start"
+            ><span class="dot"></span><span class="lbl">quickstart</span></a
+          >
+          <a class="side-pill" href="#faq" data-sec="faq"
+            ><span class="dot"></span><span class="lbl">faq</span></a
+          >
+        </div>
+        <a class="side-jump js-jump-down" href="#" aria-label="Next section">↓</a>
+      </nav>
+
+      <div class="page-frame">
+        <span class="pf-tl"></span><span class="pf-tr"></span>
+        <header class="hero">
+          <div class="container">
+            <div class="hero-pill">
+              <span class="tag">ONE FETCH()</span>5 providers · 3 IDEs · one endpoint
+            </div>
+            <h1>
+              <span class="line">Stop paying twice</span>
+              <span class="line">for the AI you're</span>
+              <span class="line accent-line">already logged into.</span>
+            </h1>
+            <p class="hero-sub">
+              You already have a DeepSeek, Claude, ChatGPT, Qwen, or Inception tab open. ZeroKey
+              turns that browser session into a local OpenAI-compatible endpoint your IDE can call —
+              no API keys, no separate bill. Paste one <code>fetch()</code>, point your IDE at
+              <code>localhost:7250</code>, and you're coding.
+            </p>
+            <div class="hero-cta">
+              <a
+                class="btn btn-primary js-get-zerokey"
+                href="https://github.com/downloaddoctor/zerokey/releases/latest/download/zerokey.bat"
+                rel="noopener"
+                download
+                >Get ZeroKey free →</a
+              >
+              <a class="btn btn-ghost" href="#start">See the 3-step setup</a>
+            </div>
+            <p class="hero-note">
+              MIT-licensed · open source · zero telemetry · runs on your machine
+            </p>
           </div>
-          <h1>
-            <span class="line">Stop paying twice</span><span class="line">for the AI</span
-            ><span class="line line-accent">you're already</span
-            ><span class="line line-accent">logged into.<span class="cursor"></span></span>
-          </h1>
-          <div class="hero-lower">
-            <div>
-              <p class="hero-subtitle">
-                You already have a DeepSeek, Claude, ChatGPT, or Qwen tab open. ZeroKey turns that
-                browser session into a local OpenAI-compatible endpoint your IDE can call — no API
-                keys, no separate bill. Paste one
-                <code style="font-family: var(--font-mono); font-size: 15px; color: var(--accent)"
-                  >fetch()</code
-                >, point your IDE at
-                <code style="font-family: var(--font-mono); font-size: 15px; color: var(--accent)"
-                  >localhost:7250</code
-                >, and you're coding in under 2 minutes.
-              </p>
-              <div class="hero-cta">
-                <a
-                  class="btn btn-primary js-get-zerokey"
-                  href="https://github.com/downloaddoctor/zerokey/releases/latest/download/zerokey.bat"
-                  rel="noopener"
-                  download
-                  >Get ZeroKey free →</a
-                >
-                <a class="btn btn-ghost" href="#start">See the 3-step setup</a>
+        </header>
+
+        <section id="why">
+          <div class="slab">
+            <div class="slab-frame">
+              <span class="corner-bl"></span><span class="corner-br"></span>
+              <div class="sec-head">
+                <div class="sec-eyebrow">// why zerokey</div>
+                <h2 class="sec-title">The proxy, not the platform.</h2>
+                <p class="sec-lead">
+                  ZeroKey doesn't resell inference, host accounts, or sit between you and the
+                  provider. It's a local translator: your browser session on one side, an
+                  OpenAI-compatible endpoint on the other.
+                </p>
               </div>
-              <p
-                style="
-                  margin-top: 20px;
-                  font-family: var(--font-mono);
-                  font-size: 11px;
-                  color: var(--ink-muted);
-                  letter-spacing: 0.04em;
-                "
-              >
-                MIT-licensed · open source on GitHub · zero telemetry · runs entirely on your
-                machine
-              </p>
-            </div>
-            <div class="hero-terminal">
-              <span class="t-dim">$ </span><span class="t-hl">zerokey start</span><br />
-              <span class="t-dim">→ provider: </span><span class="t-prompt">deepseek</span><br />
-              <span class="t-dim">→ user: </span><span class="t-prompt">default</span><br />
-              <span class="t-dim">→ session: </span><span class="t-hl">active</span><br />
-              <span class="t-dim">→ mode: </span><span class="t-prompt">tools enabled</span><br />
-              <span class="t-dim">→ model: </span><span class="t-prompt">deepseek-chat</span><br />
-              <span class="t-dim">→ endpoint: </span>localhost:7250/v1<br />
-              <span class="t-dim">→ status: </span><span class="t-hl">ready ■</span>
-            </div>
-          </div>
-          <div class="feature-row">
-            <div class="feature-item">
-              <div class="f-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="11" width="18" height="10" rx="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
+              <div class="stat-grid">
+                <div class="stat">
+                  <div class="stat-num">5</div>
+                  <div class="stat-label">
+                    providers — DeepSeek, Claude, ChatGPT, Qwen, Inception
+                  </div>
+                </div>
+                <div class="stat">
+                  <div class="stat-num">3</div>
+                  <div class="stat-label">IDEs wired in — VS Code, Terax, OpenCode</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-num">0</div>
+                  <div class="stat-label">API keys, telemetry pings, or hosted servers</div>
+                </div>
               </div>
-              <h3>No API Keys</h3>
-              <p>Your browser session is the credential. Nothing to generate, rotate, or leak.</p>
+              <p class="stat-note">// self-hosted · single process · SQLite state on disk</p>
             </div>
-            <div class="feature-item">
-              <div class="f-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M12 2 2 7l10 5 10-5-10-5Z" />
-                  <path d="m2 17 10 5 10-5" />
-                  <path d="m2 12 10 5 10-5" />
-                </svg>
+          </div>
+        </section>
+
+        <section id="architecture">
+          <div class="slab">
+            <div class="slab-frame">
+              <span class="corner-bl"></span><span class="corner-br"></span>
+              <div class="sec-head">
+                <div class="sec-eyebrow">// architecture</div>
+                <h2 class="sec-title">One process, four layers.</h2>
+                <p class="sec-lead">
+                  Your IDE calls localhost. ZeroKey routes, streams, and translates. Your own
+                  session is the credential at the bottom.
+                </p>
               </div>
-              <h3>Self-Hosted</h3>
-              <p>
-                Runs entirely on your machine. No relay servers, no telemetry, no third party in
-                between.
-              </p>
-            </div>
-            <div class="feature-item">
-              <div class="f-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-                  <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
-                  <path d="M3 16v3a2 2 0 0 0 2 2h3" />
-                  <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
-                </svg>
+              <div class="layer-stack">
+                <div class="layer">
+                  <div class="layer-label">IDE Layer</div>
+                  <div class="layer-desc">
+                    Any OpenAI-compatible client calling localhost:7250/v1.
+                  </div>
+                  <div class="layer-mods">
+                    <span class="layer-mod">VS Code</span><span class="layer-mod">Terax</span
+                    ><span class="layer-mod">OpenCode</span>
+                  </div>
+                </div>
+                <div class="layer">
+                  <div class="layer-label">ZeroKey Core</div>
+                  <div class="layer-desc">Routes, streams, and manages sessions per provider.</div>
+                  <div class="layer-mods">
+                    <span class="layer-mod">Chat Router</span
+                    ><span class="layer-mod">Tool Compiler</span
+                    ><span class="layer-mod">Rate Limiter</span
+                    ><span class="layer-mod">SSE Handler</span>
+                  </div>
+                </div>
+                <div class="layer">
+                  <div class="layer-label">Provider Layer</div>
+                  <div class="layer-desc">
+                    Protocol-specific clients — PoW, sentinel tokens, org-id.
+                  </div>
+                  <div class="layer-mods">
+                    <span class="layer-mod">DeepSeek API</span
+                    ><span class="layer-mod">Claude API</span
+                    ><span class="layer-mod">ChatGPT API</span
+                    ><span class="layer-mod">Qwen API</span>
+                  </div>
+                </div>
+                <div class="layer base">
+                  <div class="layer-label">Your Session</div>
+                  <div class="layer-desc">
+                    The credential is your own browser session — cookie jar, nothing else.
+                  </div>
+                  <div class="layer-mods">
+                    <span class="layer-mod">Cookie Jar</span
+                    ><span class="layer-mod">Your Account</span>
+                  </div>
+                </div>
               </div>
-              <h3>OpenAI-Compatible</h3>
-              <p>
-                Standard
-                <code style="font-family: var(--font-mono); color: var(--accent); font-size: 12px"
-                  >/v1/chat/completions</code
-                >
-                — any IDE that speaks OpenAI, speaks ZeroKey.
-              </p>
             </div>
           </div>
-        </div>
-      </header>
-    </div>
-    <div class="container">
-      <section id="why">
-        <div class="section-eyebrow">/why-zerokey</div>
-        <h2>The proxy, not the platform.</h2>
-        <p class="section-lead">
-          ZeroKey doesn't sell access — it forwards your own session to your own IDE. Every number
-          below is a fact about the project, not a growth metric.
-        </p>
-        <div class="stat-grid">
-          <div class="stat-card">
-            <div class="stat-num">4</div>
-            <div class="stat-label">Providers supported — DeepSeek, Claude, ChatGPT, Qwen</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-num">3</div>
-            <div class="stat-label">IDEs wired in — VS Code, Terax, OpenCode</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-num">0</div>
-            <div class="stat-label">API keys, telemetry pings, or hosted servers</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-num">1</div>
-            <div class="stat-label">
-              Command to install and start —
-              <code style="font-family: var(--font-mono); color: var(--accent); font-size: 12px"
-                >pnpm start</code
-              >
+        </section>
+
+        <section id="extend">
+          <div class="slab">
+            <div class="slab-frame">
+              <span class="corner-bl"></span><span class="corner-br"></span>
+              <div class="sec-head">
+                <div class="sec-eyebrow">// extensibility</div>
+                <h2 class="sec-title">Built to grow with your workflow.</h2>
+                <p class="sec-lead">
+                  ZeroKey isn't a fixed pipeline — the tool layer is designed to be extended. MCP
+                  servers, custom skills, and per-IDE tool grammar all plug into the same engine.
+                </p>
+              </div>
+              <div class="num-grid">
+                <div class="num-card">
+                  <div class="n">01</div>
+                  <h3>MCP Integration</h3>
+                  <p>
+                    Tools named
+                    <code
+                      style="color: var(--accent); font-family: var(--font-mono); font-size: 11.5px"
+                      >mcp_&lt;server&gt;_&lt;tool&gt;</code
+                    >
+                    auto-register as a
+                    <code
+                      style="color: var(--accent); font-family: var(--font-mono); font-size: 11.5px"
+                      >$&lt;server&gt;</code
+                    >
+                    skill tag. A built-in Playwright alias map ships out of the box.
+                  </p>
+                </div>
+                <div class="num-card">
+                  <div class="n">02</div>
+                  <h3>Custom Skills &amp; Triggers</h3>
+                  <p>
+                    Built-in skills like
+                    <code
+                      style="color: var(--accent); font-family: var(--font-mono); font-size: 11.5px"
+                      >$save</code
+                    >,
+                    <code
+                      style="color: var(--accent); font-family: var(--font-mono); font-size: 11.5px"
+                      >$test</code
+                    >, and
+                    <code
+                      style="color: var(--accent); font-family: var(--font-mono); font-size: 11.5px"
+                      >$browser</code
+                    >
+                    are just entries in a triggers array — add a word and a template.
+                  </p>
+                </div>
+                <div class="num-card">
+                  <div class="n">03</div>
+                  <h3>Session &amp; Tool Management</h3>
+                  <p>
+                    Dynamic tools are hashed per session for cheap change detection. The same tool
+                    set compiles differently per IDE from one shared definition.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-        <p class="stat-note">
-          Every number above is a fact about this codebase — nothing modeled or estimated.
-        </p>
-      </section>
-    </div>
-    <div class="container">
-      <section id="architecture">
-        <div class="section-eyebrow">/architecture</div>
-        <h2>Between your IDE and your session.</h2>
-        <p class="section-lead">
-          ZeroKey sits in one place: a local process translating OpenAI-shaped requests into the
-          exact calls your browser would make — then streaming the answer straight back.
-        </p>
-        <div class="layer-stack">
-          <div class="layer">
-            <div class="layer-label">IDE Layer</div>
-            <div class="layer-desc">Any OpenAI-compatible client calling localhost:7250/v1.</div>
-            <div class="layer-mods">
-              <span class="layer-mod">VS Code</span><span class="layer-mod">Terax</span
-              ><span class="layer-mod">OpenCode</span>
+        </section>
+
+        <section id="providers">
+          <div class="slab">
+            <div class="slab-frame">
+              <span class="corner-bl"></span><span class="corner-br"></span>
+              <div class="sec-head">
+                <div class="sec-eyebrow">// supported providers</div>
+                <h2 class="sec-title">Five providers. Same accounts you already use.</h2>
+                <p class="sec-lead">
+                  Pick a provider at startup. ZeroKey routes through the account you're already
+                  signed into — it never creates access, shares credentials, or stores your
+                  password. Switch providers anytime without touching your IDE config.
+                </p>
+              </div>
+              <div class="card-grid c5">
+                <div class="card">
+                  <div class="card-icon"><img src="logos/deepseek.svg" alt="" /></div>
+                  <h3>DeepSeek</h3>
+                  <div class="tag">V4 · Unified</div>
+                  <p>No separate DeepSeek API bill — your session persists across restarts.</p>
+                </div>
+                <div class="card">
+                  <div class="card-icon"><img src="logos/claude.svg" alt="" /></div>
+                  <h3>Claude</h3>
+                  <div class="tag">Sonnet 4</div>
+                  <p>Use the Claude you already pay for — cookies and org-scoped limits handled.</p>
+                </div>
+                <div class="card">
+                  <div class="card-icon"><img src="logos/chatgpt.svg" alt="" class="invert" /></div>
+                  <h3>ChatGPT</h3>
+                  <div class="tag">GPT-4o</div>
+                  <p>Your ChatGPT plan, wired into your editor — sentinel tokens refreshed.</p>
+                </div>
+                <div class="card">
+                  <div class="card-icon"><img src="logos/qwen.png" alt="" /></div>
+                  <h3>Qwen</h3>
+                  <div class="tag">Qwen3.7-Plus</div>
+                  <p>Cookie-based auth with live model sync from chat.qwen.ai, no separate bill.</p>
+                </div>
+                <div class="card">
+                  <div class="card-icon">
+                    <img src="logos/inception.svg" alt="" class="invert" />
+                  </div>
+                  <h3>Inception</h3>
+                  <div class="tag">Mercury</div>
+                  <p>
+                    No paste, no API key — a real Chromium profile with automatic summary rotation.
+                  </p>
+                </div>
+              </div>
+              <div class="chip-row">
+                <span class="chip">SSE streaming</span><span class="chip">Tool calling</span
+                ><span class="chip">Session persistence</span><span class="chip">Multi-IDE</span
+                ><span class="chip">Cookie management</span
+                ><span class="chip">Auto port select</span
+                ><span class="chip">OpenAI-compatible</span>
+              </div>
             </div>
           </div>
-          <div class="layer">
-            <div class="layer-label">ZeroKey Core</div>
-            <div class="layer-desc">Routes, streams, and manages sessions per provider.</div>
-            <div class="layer-mods">
-              <span class="layer-mod">Chat Router</span><span class="layer-mod">Tool Compiler</span
-              ><span class="layer-mod">Rate Limiter</span><span class="layer-mod">SSE Handler</span>
+        </section>
+
+        <section id="ides">
+          <div class="slab">
+            <div class="slab-frame">
+              <span class="corner-bl"></span><span class="corner-br"></span>
+              <div class="sec-head">
+                <div class="sec-eyebrow">// ide integrations</div>
+                <h2 class="sec-title">Works where you code.</h2>
+                <p class="sec-lead">
+                  Drop it into VS Code, Terax, or OpenCode in under two minutes. No plugins to pay
+                  for. You bring your own accounts.
+                </p>
+              </div>
+              <div class="ide-grid">
+                <div class="ide-card">
+                  <h3>
+                    <span class="ide-icon"><img src="logos/vscode.svg" alt="" /></span>VS Code —
+                    Built-in
+                  </h3>
+                  <ol>
+                    <li>Server prints the model name in the console.</li>
+                    <li>Open VS Code Chat → pick the model from dropdown.</li>
+                    <li>Appears under <strong>ZeroKey</strong> provider.</li>
+                  </ol>
+                </div>
+                <div class="ide-card">
+                  <h3>
+                    <span class="ide-icon"><img src="logos/terax.png" alt="" /></span>Terax
+                  </h3>
+                  <ol>
+                    <li>Settings → Models → Add Provider → OpenAI Compatible</li>
+                    <li>Base URL: <code>http://localhost:7250/v1</code></li>
+                    <li>API key: <code>terax</code></li>
+                    <li>Click Test — worked? Done.</li>
+                  </ol>
+                </div>
+                <div class="ide-card">
+                  <h3>
+                    <span class="ide-icon"
+                      ><img src="logos/opencode.svg" alt="" class="invert" /></span
+                    >OpenCode
+                  </h3>
+                  <ol>
+                    <li>Manage Models → Add Provider → Custom OpenAI-compatible</li>
+                    <li>Base URL: <code>http://localhost:7250/v1</code></li>
+                    <li>API key: <code>opencode</code></li>
+                    <li>Submit — worked? Done.</li>
+                  </ol>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="layer">
-            <div class="layer-label">Provider Layer</div>
-            <div class="layer-desc">Protocol-specific clients — PoW, sentinel tokens, org-id.</div>
-            <div class="layer-mods">
-              <span class="layer-mod">DeepSeek API</span><span class="layer-mod">Claude API</span
-              ><span class="layer-mod">ChatGPT API</span>
-            </div>
-          </div>
-          <div class="layer base">
-            <div class="layer-label">Your Session</div>
-            <div class="layer-desc">
-              The browser cookies you already have — pasted once, never uploaded anywhere.
-            </div>
-            <div class="layer-mods">
-              <span class="layer-mod">Cookie Jar</span><span class="layer-mod">Your Account</span>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-    <div class="container">
-      <section id="extend">
-        <div class="section-eyebrow">/extensibility</div>
-        <h2>Built to grow with your workflow.</h2>
-        <p class="section-lead">
-          ZeroKey isn't a fixed pipeline — the tool layer is designed to be extended. MCP servers,
-          custom skills, and per-IDE tool grammar all plug into the same engine.
-        </p>
-        <div class="card-grid">
-          <div class="card">
-            <h3>MCP Integration</h3>
-            <div class="card-tagline">Auto-registration · Alias Maps</div>
-            <p>
-              Tools named
-              <code style="font-family: var(--font-mono); color: var(--accent); font-size: 12px"
-                >mcp_&lt;server&gt;_&lt;tool&gt;</code
-              >
-              auto-register as a
-              <code style="font-family: var(--font-mono); color: var(--accent); font-size: 12px"
-                >$&lt;server&gt;</code
-              >
-              skill tag — no manual wiring. A built-in Playwright MCP alias map ships out of the
-              box, and server connections survive restarts via session-level restore. Ask the agent
-              <code style="font-family: var(--font-mono); color: var(--accent); font-size: 12px"
-                >$mcp</code
-              >
-              to list registered tags, or
-              <code style="font-family: var(--font-mono); color: var(--accent); font-size: 12px"
-                >$mcp-dump</code
-              >
-              to see the full tool map for the session.
-            </p>
-          </div>
-          <div class="card">
-            <h3>Custom Skills & Triggers</h3>
-            <div class="card-tagline">Trigger Words · MHI Templates</div>
-            <p>
-              Built-in skills like
-              <code style="font-family: var(--font-mono); color: var(--accent); font-size: 12px"
-                >$save</code
-              >,
-              <code style="font-family: var(--font-mono); color: var(--accent); font-size: 12px"
-                >$test</code
-              >, and
-              <code style="font-family: var(--font-mono); color: var(--accent); font-size: 12px"
-                >$browser</code
-              >
-              are just entries in a triggers array — add a trigger word and a MHI template to teach
-              the agent a new skill.
-            </p>
-          </div>
-          <div class="card">
-            <h3>Session & Tool Management</h3>
-            <div class="card-tagline">Per-Session Hashing · Multi-IDE</div>
-            <p>
-              Dynamic tools passed per-request are hashed per session for cheap change detection.
-              The same tool set is compiled differently per IDE — VS Code, Terax, and OpenCode each
-              get their own grammar from one shared definition.
-            </p>
-          </div>
-        </div>
-      </section>
-    </div>
-    <div class="container">
-      <section id="providers">
-        <div class="section-eyebrow">/supported-providers</div>
-        <h2>Four providers. Same accounts you already use.</h2>
-        <p class="section-lead">
-          Pick a provider at startup. ZeroKey routes through the account you're already signed into
-          — it never creates access, shares credentials, or stores your password. Switch providers
-          anytime without touching your IDE config.
-        </p>
-        <div class="card-grid">
-          <div class="card">
-            <div class="card-icon card-icon--deepseek"><img src="logos/deepseek.svg" alt="" /></div>
-            <h3>DeepSeek</h3>
-            <div class="card-tagline">DeepSeek V4 · Unified</div>
-            <p>
-              <strong>No separate DeepSeek API bill</strong> — your session persists across
-              restarts, so you reconnect once and keep coding.
-            </p>
-          </div>
-          <div class="card">
-            <div class="card-icon card-icon--claude"><img src="logos/claude.svg" alt="" /></div>
-            <h3>Claude</h3>
-            <div class="card-tagline">Claude Sonnet 4</div>
-            <p>
-              <strong>Use the Claude you already pay for</strong> in your IDE — cookies and
-              org-scoped rate limits are handled for you.
-            </p>
-          </div>
-          <div class="card">
-            <div class="card-icon card-icon--chatgpt"><img src="logos/chatgpt.svg" alt="" /></div>
-            <h3>ChatGPT</h3>
-            <div class="card-tagline">GPT-4o</div>
-            <p>
-              <strong>Your ChatGPT plan, wired into your editor</strong> — sentinel tokens and
-              conversation state are refreshed automatically.
-            </p>
-          </div>
-          <div class="card">
-            <div class="card-icon card-icon--qwen"><img src="logos/qwen.png" alt="" /></div>
-            <h3>Qwen</h3>
-            <div class="card-tagline">Qwen3.7-Plus</div>
-            <p>
-              <strong>Your Qwen account, wired into your editor</strong> — cookie-based auth with
-              live model sync from chat.qwen.ai, no separate bill.
-            </p>
-          </div>
-        </div>
-        <div class="chip-row">
-          <span class="chip">SSE streaming</span><span class="chip">Tool calling</span
-          ><span class="chip">Session persistence</span><span class="chip">Multi-IDE</span
-          ><span class="chip">Cookie management</span><span class="chip">Auto port select</span
-          ><span class="chip">OpenAI-compatible</span>
-        </div>
-      </section>
-    </div>
-    <div class="container">
-      <section id="ides">
-        <div class="section-eyebrow">/ide-integrations</div>
-        <h2>Works Where You Code.</h2>
-        <p class="section-lead">
-          Drop it into VS Code, Terax, or OpenCode in under two minutes. No plugins to pay for. You
-          bring your own accounts.
-        </p>
-        <div class="ide-grid">
-          <div class="ide-card">
-            <h3>
-              <span class="ide-icon ide-icon--vscode"><img src="logos/vscode.svg" alt="" /></span>VS
-              Code — Built-in
-            </h3>
-            <ol>
-              <li>Server prints the model name in the console.</li>
-              <li>Open VS Code Chat → pick the model from dropdown.</li>
-              <li>Appears under <strong>ZeroKey</strong> provider.</li>
-            </ol>
-          </div>
-          <div class="ide-card">
-            <h3>
-              <span class="ide-icon ide-icon--terax"><img src="logos/terax.png" alt="" /></span
-              >Terax
-            </h3>
-            <ol>
-              <li>Settings → Models → Add Provider → OpenAI Compatible</li>
-              <li>Base URL: <code>http://localhost:7250/v1</code></li>
-              <li>API key: <code>terax</code></li>
-              <li>Click Test — worked? Done.</li>
-            </ol>
-          </div>
-          <div class="ide-card">
-            <h3>
-              <span class="ide-icon ide-icon--opencode"
-                ><img src="logos/opencode.svg" alt="" /></span
-              >OpenCode
-            </h3>
-            <ol>
-              <li>Manage Models → Add Provider → Custom OpenAI-compatible</li>
-              <li>Base URL: <code>http://localhost:7250/v1</code></li>
-              <li>API key: <code>opencode</code></li>
-              <li>Submit — worked? Done.</li>
-            </ol>
-          </div>
-        </div>
-      </section>
-    </div>
-    <div class="container">
-      <section id="start">
-        <div class="section-eyebrow">/quickstart</div>
-        <h2>Three steps. Under 2 minutes.</h2>
-        <p class="section-lead">
-          ZeroKey is a self-hosted personal-use tool. You use your own accounts and credentials, and
-          you're responsible for complying with each provider's Terms of Service.
-        </p>
-        <div class="step-grid" style="margin-bottom: 40px">
-          <div class="step">
-            <div class="step-num">01</div>
-            <h3>Install (10 sec)</h3>
-            <p>
-              No build step, no config files — one command:
-              <code style="font-family: var(--font-mono); font-size: 12px; color: var(--accent)"
-                >pnpm install &amp;&amp; pnpm start</code
-              >.
-            </p>
-          </div>
-          <div class="step">
-            <div class="step-num">02</div>
-            <h3>Run the wizard (30 sec)</h3>
-            <p>
-              Pick a
-              <strong>Provider</strong> (DeepSeek, Claude, ChatGPT, or Qwen), paste a
-              <code style="font-family: var(--font-mono); font-size: 12px; color: var(--accent)"
-                >fetch()</code
-              >
-              copied from DevTools → Network tab as your <strong>User</strong>, then pick or create
-              a <strong>Session</strong>.
-            </p>
-          </div>
-          <div class="step">
-            <div class="step-num">03</div>
-            <h3>Point your IDE (30 sec)</h3>
-            <p>
-              Set your IDE's base URL to
-              <code style="font-family: var(--font-mono); font-size: 12px; color: var(--accent)"
-                >http://localhost:7250/v1</code
-              >
-              — full AI in your editor, no second bill.
-            </p>
-          </div>
-        </div>
-        <div class="terminal">
-          <div class="terminal-chrome">
-            <span class="dot"></span><span class="dot"></span><span class="dot"></span
-            ><span class="filename">~/zerokey · terminal</span>
-          </div>
-          <pre class="terminal-body"><span class="c"># 1. clone, install, start</span>
+        </section>
+
+        <section id="start">
+          <div class="slab">
+            <div class="slab-frame">
+              <span class="corner-bl"></span><span class="corner-br"></span>
+              <div class="sec-head">
+                <div class="sec-eyebrow">// quickstart</div>
+                <h2 class="sec-title">Three steps to a running proxy.</h2>
+                <p class="sec-lead">
+                  ZeroKey is a self-hosted personal-use tool. You use your own accounts and
+                  credentials, and you're responsible for complying with each provider's Terms of
+                  Service.
+                </p>
+              </div>
+              <div class="step-grid" style="margin-bottom: 40px">
+                <div class="step">
+                  <div class="step-num">01</div>
+                  <h3>Install</h3>
+                  <p>
+                    <strong>Automatic:</strong> run <code>zerokey.bat</code> (Windows) or
+                    <code>zerokey.sh</code> — clones, installs, updates and starts.
+                  </p>
+                  <p style="margin-top: 10px">
+                    <strong>Manual:</strong> <code>pnpm install &amp;&amp; pnpm start</code> in a
+                    cloned repo. Needs Git and pnpm.
+                  </p>
+                  <a
+                    class="step-dl js-get-zerokey"
+                    href="https://github.com/downloaddoctor/zerokey/releases/latest/download/zerokey.bat"
+                    rel="noopener"
+                    download
+                    >Download launcher ↓</a
+                  >
+                </div>
+                <div class="step">
+                  <div class="step-num">02</div>
+                  <h3>Run the wizard</h3>
+                  <p>
+                    Pick a <strong>Provider</strong>, then a <strong>User</strong> — paste a
+                    <code>fetch()</code> from DevTools → Network (Inception just needs a username),
+                    then pick a <strong>Session</strong>.
+                  </p>
+                </div>
+                <div class="step">
+                  <div class="step-num">03</div>
+                  <h3>Point your IDE</h3>
+                  <p>
+                    Set your IDE's base URL to <code>http://localhost:7250/v1</code> — full AI in
+                    your editor, no second bill.
+                  </p>
+                </div>
+              </div>
+
+              <div class="terminal">
+                <div class="term-chrome">
+                  <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                  <span class="name">~/zerokey · terminal</span>
+                </div>
+                <pre
+                  class="terminal-body"
+                ><span class="c"># 1a. automatic — one launcher, handles clone + install + updates + run</span>
+<span class="prompt">&gt;</span>zerokey.bat          <span class="c"># Windows</span>
+<span class="prompt">&gt;</span>./zerokey.sh         <span class="c"># macOS / Linux</span>
+
+<span class="c"># 1b. manual — clone, install, start</span>
 <span class="prompt">&gt;</span><span class="k">git</span> clone https://github.com/downloaddoctor/zerokey.git
 <span class="prompt">&gt;</span><span class="k">cd</span> zerokey
 <span class="prompt">&gt;</span>pnpm install <span class="k">&amp;&amp;</span> pnpm start
-<span class="blank"></span>
-<span class="c"># 2. interactive wizard — pick provider, paste fetch, choose session</span>
-<span class="blank"></span>
-<span class="c"># 3. call it like OpenAI</span>
+
+<span class="c"># 2. interactive wizard — provider, user (paste fetch), session</span>
+
+<span class="c"># 3. point your IDE at the endpoint — this is the intended path</span>
+<span class="c">#    base_url: http://localhost:7250/v1   ·   api key: any placeholder</span>
+<span class="c">#    the IDE's system prompt identifies the tool surface (VS Code / Terax / OpenCode)</span>
+
+<span class="c"># note: a bare curl/OpenAI SDK call also works, but is treated as the</span>
+<span class="c"># generic 'openai' surface — no IDE instructions, skills or MCP injected</span>
 <span class="prompt">&gt;</span><span class="k">curl</span> http://localhost:7250/v1/chat/completions \
     -H <span class="s">'Content-Type: application/json'</span> \
-    -d <span class="s">'{"messages":[{"role":"user","content":"hello"}],"model":"deepseek"}'</span></pre>
-        </div>
-      </section>
-    </div>
-    <div class="container">
-      <section id="faq">
-        <div class="section-eyebrow">/faq</div>
-        <h2>Before you ask</h2>
-        <p class="section-lead">Objections handled up front, so you can decide in one read.</p>
-        <div class="card-grid">
-          <div class="card">
-            <h3>Does this cost anything?</h3>
-            <p>
-              No. ZeroKey itself is free and open source. You still need your own DeepSeek, Claude,
-              ChatGPT, or Qwen account, but you don't pay for a separate API on top of it.
-            </p>
-          </div>
-          <div class="card">
-            <h3>Do you ever see my password or API key?</h3>
-            <p>
-              No. There's no API key involved. You paste a
-              <code style="font-family: var(--font-mono); color: var(--accent); font-size: 12px"
-                >fetch()</code
-              >
-              copied from your own browser's DevTools — ZeroKey only ever sees the session cookie
-              you choose to share, and it stays on your machine.
-            </p>
-          </div>
-          <div class="card">
-            <h3>Is this against the provider's Terms of Service?</h3>
-            <p>
-              You're using your own account through your own browser session — but you are
-              responsible for reading and complying with each provider's ToS. ZeroKey doesn't create
-              access or bypass authentication.
-            </p>
-          </div>
-          <div class="card">
-            <h3>What happens if my session expires?</h3>
-            <p>
-              Re-paste a fresh
-              <code style="font-family: var(--font-mono); color: var(--accent); font-size: 12px"
-                >fetch()</code
-              >
-              in the wizard — takes about 30 seconds. Sessions otherwise persist across server
-              restarts.
-            </p>
-          </div>
-          <div class="card">
-            <h3>Which IDEs are supported?</h3>
-            <p>
-              VS Code (built-in Chat), Terax, and OpenCode today — any OpenAI-compatible client
-              works against
-              <code style="font-family: var(--font-mono); color: var(--accent); font-size: 12px"
-                >localhost:7250/v1</code
-              >.
-            </p>
-          </div>
-          <div class="card">
-            <h3>Can I switch providers later?</h3>
-            <p>
-              Yes. Restart the wizard and pick a different provider — no IDE reconfiguration needed.
-            </p>
-          </div>
-        </div>
-      </section>
-    </div>
-    <div class="container">
-      <section id="final-cta" style="text-align: center; padding-bottom: 60px">
-        <h2 style="margin-left: auto; margin-right: auto">
-          Your session. Your machine. Zero extra cost.
-        </h2>
-        <p class="section-lead" style="margin-left: auto; margin-right: auto">
-          Open source, self-hosted, no telemetry. If it doesn't work in 2 minutes, open an issue —
-          it's free either way.
-        </p>
-        <div class="hero-cta" style="justify-content: center; display: flex">
-          <a
-            class="btn btn-primary js-get-zerokey"
-            href="https://github.com/downloaddoctor/zerokey/releases/latest/download/zerokey.bat"
-            rel="noopener"
-            download
-            >Get ZeroKey free →</a
-          >
-          <a class="btn btn-ghost" href="#start">See the 3-step setup</a>
-        </div>
-      </section>
-      <footer class="big-footer">
-        <div class="footer-top">
-          <div class="footer-brand">
-            <a class="brand" href="#"
-              ><span class="brand-mark"
-                ><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                  <path
-                    d="M7 16 L13 22 L25 10"
-                    stroke="var(--bg)"
-                    stroke-width="3"
-                    fill="none"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  /></svg></span
-              ><span>ZeroKey</span></a
-            >
-            <p>
-              A self-hosted, personal-use proxy that turns your own browser session into a local
-              OpenAI-compatible endpoint. No API keys, no shared accounts, no telemetry.
-            </p>
-            <div class="footer-badge">
-              <span class="footer-badge-dot"></span>Built using ZeroKey
+    -d <span class="s">'{"messages":[{"role":"user","content":"hello"}],"model":"default"}'</span></pre>
+              </div>
             </div>
           </div>
-          <div class="footer-col">
-            <h4>Providers</h4>
-            <a href="#providers">DeepSeek</a>
-            <a href="#providers">Claude</a>
-            <a href="#providers">ChatGPT</a>
-            <a href="#providers">Qwen</a>
+        </section>
+
+        <section id="faq">
+          <div class="slab">
+            <div class="slab-frame">
+              <span class="corner-bl"></span><span class="corner-br"></span>
+              <div class="sec-head">
+                <div class="sec-eyebrow">// faq</div>
+                <h2 class="sec-title">Before you ask.</h2>
+                <p class="sec-lead">Objections handled up front, so you can decide in one read.</p>
+              </div>
+              <div class="card-grid c2">
+                <div class="card">
+                  <h3>Does this cost anything?</h3>
+                  <p>
+                    No. ZeroKey itself is free and open source. You still need your own DeepSeek,
+                    Claude, ChatGPT, Qwen, or Inception account, but you don't pay for a separate
+                    API on top of it.
+                  </p>
+                </div>
+                <div class="card">
+                  <h3>Do you ever see my password or API key?</h3>
+                  <p>
+                    No. There's no API key involved. You paste a <code>fetch()</code> copied from
+                    your own browser's DevTools — ZeroKey only ever sees the session cookie you
+                    choose to share, and it stays on your machine.
+                  </p>
+                </div>
+                <div class="card">
+                  <h3>Is this against the provider's Terms of Service?</h3>
+                  <p>
+                    You're using your own account through your own browser session — but you are
+                    responsible for reading and complying with each provider's ToS. ZeroKey doesn't
+                    create access or bypass authentication.
+                  </p>
+                </div>
+                <div class="card">
+                  <h3>What happens if my session expires?</h3>
+                  <p>
+                    Re-paste a fresh <code>fetch()</code> in the wizard. Sessions otherwise persist
+                    across server restarts.
+                  </p>
+                </div>
+                <div class="card">
+                  <h3>Which IDEs are supported?</h3>
+                  <p>
+                    VS Code (built-in Chat), Terax, and OpenCode today — any OpenAI-compatible
+                    client works against <code>localhost:7250/v1</code>.
+                  </p>
+                </div>
+                <div class="card">
+                  <h3>Can I switch providers later?</h3>
+                  <p>
+                    Yes. Restart the wizard and pick a different provider — no IDE reconfiguration
+                    needed.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="footer-col">
-            <h4>IDEs</h4>
-            <a href="#ides">VS Code</a>
-            <a href="#ides">Terax</a>
-            <a href="#ides">OpenCode</a>
+        </section>
+
+        <section id="final-cta" class="cta">
+          <div class="container">
+            <div class="sec-eyebrow" style="justify-content: center">// start building</div>
+            <h2 class="sec-title">Start in three minutes.</h2>
+            <p class="sec-lead">Free, open source, self-hosted. No card. One base_url.</p>
+            <div class="hero-cta">
+              <a
+                class="btn btn-primary js-get-zerokey"
+                href="https://github.com/downloaddoctor/zerokey/releases/latest/download/zerokey.bat"
+                rel="noopener"
+                download
+                >Get ZeroKey free →</a
+              >
+              <a class="btn btn-ghost" href="#start">See the 3-step setup</a>
+            </div>
+            <div class="cta-terminal">
+              <span class="p">$</span> base_url="http://localhost:7250/v1"
+            </div>
           </div>
-          <div class="footer-col">
-            <h4>Project</h4>
-            <a href="#start">Quickstart</a>
-            <a href="#architecture">Architecture</a>
-            <a href="#faq">FAQ</a>
-            <a href="https://github.com/downloaddoctor/zerokey" target="_blank" rel="noopener"
-              >GitHub</a
+        </section>
+      </div>
+
+      <footer>
+        <div class="container">
+          <div class="footer-top">
+            <div class="footer-brand">
+              <a class="brand" href="#">
+                <img class="brand-mark" src="favicon.svg" alt="" width="26" height="26" />
+                <span>ZeroKey</span>
+              </a>
+              <p>
+                A self-hosted, personal-use proxy that turns your own browser session into a local
+                OpenAI-compatible endpoint. No API keys, no shared accounts, no telemetry.
+              </p>
+              <div class="footer-badge"><span class="dot"></span>Built using ZeroKey</div>
+            </div>
+            <div class="footer-col">
+              <h4>Providers</h4>
+              <a href="#providers">DeepSeek</a>
+              <a href="#providers">Claude</a>
+              <a href="#providers">ChatGPT</a>
+              <a href="#providers">Qwen</a>
+              <a href="#providers">Inception</a>
+            </div>
+            <div class="footer-col">
+              <h4>IDEs</h4>
+              <a href="#ides">VS Code</a>
+              <a href="#ides">Terax</a>
+              <a href="#ides">OpenCode</a>
+            </div>
+            <div class="footer-col">
+              <h4>Developers</h4>
+              <a href="#start">Quickstart</a>
+              <a href="#architecture">Architecture</a>
+              <a href="#faq">FAQ</a>
+              <a href="https://github.com/downloaddoctor/zerokey" target="_blank" rel="noopener"
+                >GitHub</a
+              >
+              <a href="llms.txt" target="_blank" rel="noopener">llms.txt</a>
+            </div>
+            <div class="footer-col">
+              <h4>Legal</h4>
+              <a href="https://github.com/downloaddoctor/zerokey" target="_blank" rel="noopener"
+                >License (MIT)</a
+              >
+              <a href="#faq">Terms of Service Notice</a>
+            </div>
+          </div>
+          <div class="footer-bottom">
+            <span
+              >Licensed for personal, non-commercial use only. Users are responsible for complying
+              with each provider's Terms of Service.</span
             >
-            <a href="llms.txt" target="_blank" rel="noopener">llms.txt</a>
-          </div>
-          <div class="footer-col">
-            <h4>Legal</h4>
-            <a href="https://github.com/downloaddoctor/zerokey" target="_blank" rel="noopener"
-              >License (MIT)</a
+            <span
+              >© 2026 ZeroKey ·
+              <a href="https://github.com/downloaddoctor/zerokey" target="_blank" rel="noopener"
+                >github.com/downloaddoctor/zerokey</a
+              ></span
             >
-            <a href="#faq">Terms of Service Notice</a>
           </div>
-        </div>
-        <div class="footer-bottom">
-          <span
-            >Licensed for personal, non-commercial use only. Users are responsible for complying
-            with each provider's Terms of Service.</span
-          >
-          <span
-            >© 2026 ZeroKey ·
-            <a href="https://github.com/downloaddoctor/zerokey" target="_blank" rel="noopener"
-              >github.com/downloaddoctor/zerokey</a
-            ></span
-          >
         </div>
       </footer>
     </div>
+
     <script>
-      /* OS-aware download link for primary CTA */
       ;(function () {
         var isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent)
         var isLinux =
@@ -1748,114 +2024,149 @@
         })
       })()
 
-      /* Preloader */
-      window.addEventListener('load', function () {
-        var pre = document.getElementById('preloader')
-        if (pre) {
-          pre.style.transition = 'opacity 0.5s ease, transform 0.5s ease'
-          pre.style.opacity = '0'
-          pre.style.transform = 'scale(1.04)'
-          setTimeout(function () {
-            pre.remove()
-          }, 520)
-        }
-      })
-
-      /* Split-text hero entrance */
       ;(function () {
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
         var lines = document.querySelectorAll('h1 .line')
         lines.forEach(function (line, i) {
           line.style.opacity = '0'
-          line.style.transform = 'translateY(16px)'
-          line.style.transition = 'opacity 0.5s ease, transform 0.5s ease'
+          line.style.transform = 'translateY(18px)'
+          line.style.transition = 'opacity 0.6s ease, transform 0.6s ease'
           line.style.transitionDelay = i * 0.12 + 's'
-          requestAnimationFrame(function () {
-            requestAnimationFrame(function () {
-              line.style.opacity = '1'
-              line.style.transform = 'translateY(0)'
-            })
-          })
         })
+        var reveal = function () {
+          lines.forEach(function (line) {
+            line.style.opacity = '1'
+            line.style.transform = 'translateY(0)'
+          })
+        }
+        if (document.readyState === 'complete') reveal()
+        else window.addEventListener('load', reveal)
+        setTimeout(reveal, 300)
       })()
 
-      /* Hide-on-scroll-down nav */
       ;(function () {
-        var nav = document.querySelector('nav')
-        if (!nav) return
-        var lastY = window.scrollY
-        window.addEventListener(
-          'scroll',
-          function () {
-            var y = window.scrollY
-            if (y > lastY && y > 120) nav.classList.add('nav-hidden')
-            else nav.classList.remove('nav-hidden')
-            lastY = y
-          },
-          { passive: true },
-        )
-      })()
+        var progCur = document.querySelector('.js-side-cur')
+        var progTotal = document.querySelector('.js-side-total')
+        var nav = document.querySelector('.side-nav')
+        var rail = document.querySelector('.side-rail .fill')
+        var pills = Array.prototype.slice.call(document.querySelectorAll('.side-pill'))
+        if (!nav || !pills.length) return
 
-      /* Magnetic primary CTA */
-      ;(function () {
-        if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return
-        document.querySelectorAll('.btn-primary').forEach(function (btn) {
-          btn.addEventListener('mousemove', function (e) {
-            var r = btn.getBoundingClientRect()
-            var x = e.clientX - r.left - r.width / 2
-            var y = e.clientY - r.top - r.height / 2
-            btn.style.transform = 'translate3d(' + x * 0.15 + 'px,' + y * 0.25 + 'px,0)'
+        var items = pills
+          .map(function (p) {
+            return { pill: p, el: document.getElementById(p.getAttribute('data-sec')) }
           })
-          btn.addEventListener('mouseleave', function () {
-            btn.style.transform = 'translate3d(0,0,0)'
+          .filter(function (it) {
+            return it.el
           })
-        })
-      })()
 
-      /* Cursor trail + click burst */
-      ;(function () {
-        var TRAIL_GAP = 28,
-          ptimer = null
-        document.addEventListener('mousemove', function (e) {
-          if (ptimer) return
-          ptimer = setTimeout(function () {
-            ptimer = null
-          }, TRAIL_GAP)
-          var p = document.createElement('div')
-          p.className = 'cursor-particle'
-          p.style.left = e.clientX - 2 + 'px'
-          p.style.top = e.clientY - 2 + 'px'
-          p.style.setProperty('--dx', (Math.random() - 0.5) * 2)
-          p.style.setProperty('--dy', (Math.random() - 0.5) * 2 - 0.4)
-          document.body.appendChild(p)
-          p.addEventListener('animationend', function () {
-            p.remove()
+        if (!items.length) return
+
+        var up = document.querySelector('.js-jump-up')
+        var down = document.querySelector('.js-jump-down')
+        var current = 0
+
+        if (progTotal) progTotal.textContent = String(items.length).padStart(2, '0')
+
+        function goTo(i) {
+          var n = Math.max(0, Math.min(items.length - 1, i))
+          items[n].el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+
+        var upTo = 0
+        var downTo = 0
+
+        if (up)
+          up.addEventListener('click', function (e) {
+            e.preventDefault()
+            goTo(upTo)
           })
-        })
-        document.addEventListener('click', function (e) {
-          var ring = document.createElement('div')
-          ring.className = 'click-ring'
-          ring.style.left = e.clientX + 'px'
-          ring.style.top = e.clientY + 'px'
-          document.body.appendChild(ring)
-          ring.addEventListener('animationend', function () {
-            ring.remove()
+        if (down)
+          down.addEventListener('click', function (e) {
+            e.preventDefault()
+            goTo(downTo)
           })
-          for (var i = 0; i < 10; i++) {
-            var s = document.createElement('div')
-            s.className = 'click-spark'
-            s.style.left = e.clientX + 'px'
-            s.style.top = e.clientY + 'px'
-            var a = Math.random() * Math.PI * 2,
-              d = 30 + Math.random() * 40
-            s.style.setProperty('--sx', Math.cos(a) * d + 'px')
-            s.style.setProperty('--sy', Math.sin(a) * d + 'px')
-            document.body.appendChild(s)
-            s.addEventListener('animationend', function () {
-              s.remove()
-            })
+
+        function update() {
+          var probe = window.scrollY + window.innerHeight * 0.35
+          var hit = -1
+
+          for (var i = 0; i < items.length; i++) {
+            var top = items[i].el.getBoundingClientRect().top + window.scrollY
+            var next =
+              i + 1 < items.length
+                ? items[i + 1].el.getBoundingClientRect().top + window.scrollY
+                : top + items[i].el.offsetHeight
+            if (probe >= top && probe < next) {
+              hit = i
+              break
+            }
           }
-        })
+
+          if (hit >= 0) current = hit
+
+          if (progCur) {
+            progCur.textContent = hit >= 0 ? String(hit + 1).padStart(2, '0') : '--'
+          }
+
+          nav.classList.toggle('between', hit < 0)
+
+          var last = items.length - 1
+          var prevIdx = -1
+          var nextIdx = -1
+          if (hit >= 0) {
+            prevIdx = hit - 1
+            nextIdx = hit < last ? hit + 1 : -1
+          } else {
+            for (var j = 0; j < items.length; j++) {
+              var jt = items[j].el.getBoundingClientRect().top + window.scrollY
+              if (jt <= probe) prevIdx = j
+              else if (nextIdx < 0) nextIdx = j
+            }
+          }
+          upTo = prevIdx
+          downTo = nextIdx
+          var hideUp = prevIdx < 0
+          var hideDown = nextIdx < 0
+          nav.classList.toggle('edge', hit < 0 && (hideUp || hideDown))
+          if (up) {
+            up.classList.toggle('is-hidden', hideUp)
+            up.setAttribute('aria-hidden', hideUp ? 'true' : 'false')
+            up.setAttribute('tabindex', hideUp ? '-1' : '0')
+          }
+          if (down) {
+            down.classList.toggle('is-hidden', hideDown)
+            down.setAttribute('aria-hidden', hideDown ? 'true' : 'false')
+            down.setAttribute('tabindex', hideDown ? '-1' : '0')
+          }
+
+          for (var k = 0; k < items.length; k++) {
+            var cls = items[k].pill.classList
+            cls.toggle('active', k === hit)
+            cls.toggle('done', hit >= 0 && k < hit)
+            cls.toggle('upcoming', hit >= 0 && k > hit)
+          }
+
+          if (rail) {
+            var pos = 0
+            for (var r = 0; r < items.length; r++) {
+              var rTop = items[r].el.getBoundingClientRect().top + window.scrollY
+              if (probe < rTop) break
+              if (r === last) {
+                pos = last
+                break
+              }
+              var rNext = items[r + 1].el.getBoundingClientRect().top + window.scrollY
+              pos = probe < rNext ? r + (probe - rTop) / Math.max(1, rNext - rTop) : r + 1
+            }
+            var span = Math.max(1, items.length - 1)
+            rail.style.height = Math.min(100, Math.max(0, (pos / span) * 100)) + '%'
+          }
+        }
+
+        update()
+        window.addEventListener('scroll', update, { passive: true })
+        window.addEventListener('resize', update)
       })()
     </script>
   </body>

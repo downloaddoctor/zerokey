@@ -15,7 +15,7 @@ router.get('/', (req, res) => {
   res.json({
     name: 'ZeroKey API Server',
     version: pkgVersion,
-    description: 'OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT & Qwen',
+    description: 'OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT, Qwen & Inception',
     endpoints: {
       health: 'GET /health',
       models: 'GET /v1/models',

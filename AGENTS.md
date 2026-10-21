@@ -156,7 +156,7 @@ TESTING
  test/modules.test.js — module boundary rules; runs scripts/check-modules.js
  test/surfaces/prefixes.test.js + prefixes.snapshot.json — append-only ledger: every shipped real/utility prefix must stay declared
  test/core/mhi/* — parser, files, path-policy, view-image
- test/providers/chatgpt-recovery.test.js, test/providers/inception.test.js, test/providers/inception-transport.test.js, test/surfaces/*, test/engine/*
+ test/providers/chatgpt-recovery.test.js, test/providers/inception.test.js, test/providers/inception-transport.test.js, test/providers/inception-summary.test.js, test/providers/inception-reasoning.test.js, test/surfaces/*, test/engine/*
  New executors must add a matching test/core/mhi/*.test.js
  Adding a surface prefix → declare in surfaces/<name>/index.js AND append to test/surfaces/prefixes.snapshot.json (same commit); never remove a shipped prefix
 

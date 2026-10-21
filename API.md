@@ -2,7 +2,7 @@
 
 ## Overview
 
-ZeroKey is an OpenAI-compatible AI proxy server that routes chat completion requests to real browser sessions for **DeepSeek**, **Claude**, **ChatGPT**, and **Qwen** — without requiring API keys. It presents an OpenAI-compatible `/v1/chat/completions` endpoint that IDE plugins (VS Code, Terax, Opencode) can use as a drop-in replacement.
+ZeroKey is an OpenAI-compatible AI proxy server that routes chat completion requests to real browser sessions for **DeepSeek**, **Claude**, **ChatGPT**, **Qwen**, and **Inception (Mercury)** — without requiring API keys. It presents an OpenAI-compatible `/v1/chat/completions` endpoint that IDE plugins (VS Code, Terax, Opencode) can use as a drop-in replacement.
 
 **Version:** 0.3.0
 **Base URL:** `http://localhost:{PORT}` (default port: 7250, auto-increments if occupied)
@@ -16,7 +16,7 @@ The machine-readable contract is **[`openapi.json`](./openapi.json)** (OpenAPI 3
 - **Spec file:** `openapi.json` (repo root)
 - **Interactive docs:** `GET /docs` (Swagger UI, served by the running server)
 - **Raw spec:** `GET /openapi.json`
-- **Regenerate the spec:** `node scripts/gen-openapi.js`
+- **Maintenance:** hand-maintained — edit `openapi.json` directly (there is no generator script)
 
 **Public endpoints:**
 
@@ -51,7 +51,7 @@ For request/response shapes, error categories, and SSE chunk examples, see `open
 
 ## Providers
 
-The server supports four AI providers. One is selected at startup via an interactive wizard, and the server routes all `/v1/chat/completions` requests through that provider.
+The server supports five AI providers. One is selected at startup via an interactive wizard, and the server routes all `/v1/chat/completions` requests through that provider.
 
 **Per-provider internal reference** (upstream endpoints, POW flow, HAR header ordering, SSE event tables, session shapes):
 
@@ -65,7 +65,7 @@ The server supports four AI providers. One is selected at startup via an interac
 ```
 server start
   → SessionSelector.select()
-    → _stepProviderSelection()  → choose: deepseek | claude | chatgpt | qwen
+    → _stepProviderSelection()  → choose: deepseek | claude | chatgpt | qwen | inception
     → _stepUserLogin()          → choose existing user or create new
     → _stepSessionSelection()   → choose existing session or create new
   → ChatRouter.mount(preSelected)
@@ -74,12 +74,13 @@ server start
 
 ### Provider Overview
 
-| Provider | Base URL                           | Auth Method                                      | Session Model                                         | Auto-Switch                  | Internal Ref                          |
-| -------- | ---------------------------------- | ------------------------------------------------ | ----------------------------------------------------- | ---------------------------- | ------------------------------------- |
-| DeepSeek | `https://chat.deepseek.com/api/v0` | Browser cookies + POW challenge                  | `chatSessionId` + `parentMessageId`                   | No                           | [api.md](./providers/deepseek/api.md) |
-| Claude   | `https://claude.ai/api`            | Browser cookies + HAR headers                    | `chatSessionId` (UUID) + `parentMessageId` (UUID)     | Yes (rate-limit → next user) | [api.md](./providers/claude/api.md)   |
-| ChatGPT  | `https://chatgpt.com/backend-api`  | Browser cookies + sentinel POW                   | `chatSessionId` (conversation_id) + `parentMessageId` | No                           | [api.md](./providers/chatgpt/api.md)  |
-| Qwen     | `https://chat.qwen.ai/api/v2`      | Browser cookies (`token=` JWT) + optional Bearer | `chatSessionId` (chat id) + `parentMessageId`         | No                           | [api.md](./providers/qwen/api.md)     |
+| Provider  | Base URL                           | Auth Method                                        | Session Model                                                                                                                | Auto-Switch                  | Internal Ref                          |
+| --------- | ---------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ------------------------------------- |
+| DeepSeek  | `https://chat.deepseek.com/api/v0` | Browser cookies + POW challenge                    | `chatSessionId` + `parentMessageId`                                                                                          | No                           | [api.md](./providers/deepseek/api.md) |
+| Claude    | `https://claude.ai/api`            | Browser cookies + HAR headers                      | `chatSessionId` (UUID) + `parentMessageId` (UUID)                                                                            | Yes (rate-limit → next user) | [api.md](./providers/claude/api.md)   |
+| ChatGPT   | `https://chatgpt.com/backend-api`  | Browser cookies + sentinel POW                     | `chatSessionId` (conversation_id) + `parentMessageId`                                                                        | No                           | [api.md](./providers/chatgpt/api.md)  |
+| Qwen      | `https://chat.qwen.ai/api/v2`      | Browser cookies (`token=` JWT) + optional Bearer   | `chatSessionId` (chat id) + `parentMessageId`                                                                                | No                           | [api.md](./providers/qwen/api.md)     |
+| Inception | `https://chat.inceptionlabs.ai`    | None (authless); real Chromium profile, no capture | none server-side; the browser UI keeps the thread; `session.metadata.promptCount` drives summary rotation at the 95th prompt | No                           | see `AGENTS.md`                       |
 
 ---
 
@@ -87,7 +88,7 @@ server start
 
 ### Rate Limiter (`utils/rate-limiter.js`)
 
-**Algorithm:** Sliding window — 15 requests per 60 seconds per label (`DeepSeek`, `Claude`, `ChatGPT`, `Qwen`).
+**Algorithm:** Sliding window — 15 requests per 60 seconds per label (`DeepSeek`, `Claude`, `ChatGPT`, `Qwen`, `Inception`).
 
 **Function:** `acquireSlot(label, reset)`
 
@@ -114,16 +115,17 @@ See `openapi.json` `components.schemas.ErrorCategory` for the full category enum
 - Detects `[DONE]` → calls `onDone`
 - 1MB buffer cap for malformed lines
 
-### Stream Helpers (`utils/stream-helpers.js`)
+### SSE Writer (`utils/sse-writer.js`)
 
-**`createSendFinalChunk(res, session, parser, tokenUsage)`**
+**`createWriter(res, {id, model})`** — backpressure-aware SSE frame writer (awaits `drain` when the socket is full)
 
-- Once-guard: calls `parser.flush()`, emits stop with usage, writes `[DONE]`, ends response
-- Updates `session.lastUsed` in memory (no disk flush — done on shutdown via `selector.flush()`)
+- Methods: `reasoning`, `text`, `toolCalls`, `finish(reason, usage)`, `fail(message, code)`
+- Every frame runs through one promise chain, so wire order equals call order
+- `finish` and `fail` are idempotent; both end the stream with `[DONE]`
 
-**`createOnError(res, parser, provider)`**
+**`joinMessages(soFar, next)`** — pure helper; pads the gap between two assistant messages to exactly two newlines
 
-- Once-guard: classifies error, emits error chunk, ends response
+The per-request stream lifecycle (scan, flush, stop, error emission) lives in `engine/pipeline.js`.
 
 ### Cookie Jar (`utils/cookie-jar.js`)
 
@@ -159,84 +161,33 @@ Created per-request by routes — owns the SSE lifecycle:
 Singleton that loads and caches system prompts:
 
 - **`instructions.md`** — base system prompt with tool runtime format (SYNTAX/RULES/EXTRA)
-- **`skills-extra.md`** — extra blocks (memory, save_workflow)
+- **`extra/*.md`** — extra prompt fragments (memory, save_workflow, summary), one per file in `engine/extra/`
 - SHA-256 hashed for cache invalidation
 
 ---
 
-## User Data Schema (users.json)
+## User Data Schema (SQLite)
 
-```json
-{
-  "deepseek": {
-    "username1": {
-      "username": "username1",
-      "parsedFetch": {
-        "headers": { "cookie": "...", "user-agent": "..." },
-        "body": {},
-        "url": "https://chat.deepseek.com/..."
-      },
-      "sessions": [
-        {
-          "name": "2026-07-06 10:30",
-          "chatSessionId": "abc123",
-          "parentMessageId": "xyz789",
-          "createdAt": "2026-07-06T10:30:00.000Z",
-          "lastUsed": "2026-07-06T10:35:00.000Z",
-          "todos": {}
-        }
-      ],
-      "instructionsHash": null,
-      "instructionsAppliedAt": null
-    }
-  },
-  "claude": {
-    "username1": {
-      "username": "username1",
-      "parsedFetch": {
-        "headers": { "cookie": "...", "user-agent": "...", "sec-ch-ua": "..." },
-        "body": {},
-        "url": "https://claude.ai/api/organizations/..."
-      },
-      "sessions": [],
-      "instructionsHash": "abc123...",
-      "instructionsAppliedAt": "2026-07-06T10:30:00.000Z",
-      "waitUntil": null,
-      "waitReason": null
-    }
-  },
-  "chatgpt": {
-    "username1": {
-      "username": "username1",
-      "parsedFetch": {
-        "headers": {
-          "cookie": "...",
-          "authorization": "...",
-          "openai-sentinel-proof-token": "..."
-        },
-        "body": { "action": "next", "messages": [], "client_contextual_info": {} },
-        "url": "https://chatgpt.com/backend-api/f/conversation"
-      },
-      "sessions": [],
-      "instructionsHash": null,
-      "instructionsAppliedAt": null,
-      "model": null
-    }
-  }
-}
-```
+Users and sessions persist in `temp/db/zerokey.db` (SQLite). Column names are snake_case; JS objects are camelCase (mapped in `core/state/users.js` and `core/state/sessions.js`). The authoritative schema is `core/state/schema.sql`.
 
-**Claude-specific fields:**
+| Table      | Key                          | Holds                                                                                                                                                                                                      |
+| ---------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`    | `UNIQUE(provider, username)` | `parsed_fetch` (headers/body/url), `instructions_hash`, `instructions_applied_at`, `wait_until`, `wait_reason`, `state_json`                                                                               |
+| `sessions` | `PK(user_id, name)`          | `id`, `parent_id`, `generation`, `tool_calling`, `vision`, `model`, `todos_json`, `turn_count`, `dynamic_tools_hash`, `mcp_injected_json`, `metadata_json`, `usage_totals_json`, `last_used`, `created_at` |
+| `meta`     | `key`                        | `schema_version`, `users_json_migrated`                                                                                                                                                                    |
 
-- `waitUntil` — timestamp (ms epoch) when rate limit resets
-- `waitReason` — e.g. `"rate_limit_error"`
+**Claude-specific user fields:**
+
+- `wait_until` — timestamp (ms epoch) when the rate limit resets
+- `wait_reason` — e.g. `"rate_limit_error"`
 
 **Session-specific fields:**
 
-- `disableTools` — boolean; when true, tools + instructions not prepended
+- `tool_calling` — boolean; when false, tools + instructions are not prepended
 - `model` — provider-specific model string (e.g. "default", "claude-sonnet-4-6", "auto")
-- `dynamicToolsHash` — SHA-256 hash of req.body.tools[] for MCP cache invalidation
-- `todos` — persisted todo items from `todos_add`/`todos_set` tool calls
+- `dynamic_tools_hash` — SHA-256 hash of req.body.tools[] for MCP cache invalidation
+- `todos_json` — persisted todo items from `todos_add`/`todos_set` tool calls
+- `metadata_json` — provider extras (Inception keeps `promptCount` here for summary rotation)
 
 ---
 
@@ -252,7 +203,7 @@ A request with no recognizable surface (e.g. an ephemeral title-generation call)
 
 On `SIGINT` / `SIGTERM`:
 
-1. `selector.flush()` — persist current in-memory user state to users.json (atomic write via `.tmp` rename)
+1. `users.flushAll()` / `sessions.flushAll()` — drain pending debounced writes, then close the store
 2. `server.close()` — stop accepting new connections
 3. 5-second force-kill timeout
 
@@ -260,10 +211,4 @@ On `SIGINT` / `SIGTERM`:
 
 ## Storage
 
-All user data persists in users.json (atomic writes via `.tmp` rename). Sessions are updated in-memory during operation; `lastUsed` timestamp is set in-memory after each stream completes. Full disk flush happens only on:
-
-- Graceful shutdown (`selector.flush()`)
-- Claude rate-limit exit (flushes before process.exit(0))
-- Initial session creation (eager write)
-- Manual session deletion
-- New user creation
+All user and session data persists in SQLite (`temp/db/zerokey.db`). Rows are Proxy objects: top-level and nested writes (`parsedFetch.*`, `metadata.*`, `todos`) schedule a 250 ms debounced write-through. `sessions.flushNow` runs when a response finishes or closes, and `flushAll()` drains everything at shutdown.
