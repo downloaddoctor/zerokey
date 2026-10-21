@@ -14,7 +14,7 @@ const models = {
       created: 1_784_736_000,
       context_length: 1_000_000,
       max_output_length: 1_000_000,
-      defaultReasoning: 'Search',
+      defaultReasoning: 'Off',
     },
   },
 }

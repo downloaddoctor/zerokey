@@ -13,6 +13,7 @@ const parser = require('./parser')
 const files = require('./files')
 const commands = require('./commands')
 const viewImage = require('./view-image')
+const SYNTAX = require('../../engine/syntax')
 
 const FILE_TOOLS = new Set(['read', 'ls', 'glob', 'grep', 'write', 'replace'])
 const MAX_ROUNDS = 8
@@ -112,7 +113,27 @@ function formatResults(results) {
  *   { kind: 'calls', calls }
  *   { kind: 'continue', prompt, reason }   — repair round needed
  */
+// Tool-call markup from other formats (DeepSeek DSML, Anthropic-style XML, etc.).
+// The model sometimes falls back to its native format instead of MHI; nothing
+// would execute it, so it must be answered with a repair round.
+const FOREIGN_MARKUP = /<\/?\s*[｜|]+\s*DSML|<\/?function_calls\b|<invoke\s+name=|<\/?tool_call\b/i
+const MHI_EXAMPLE = SYNTAX.OPEN + 'read' + SYNTAX.SEP + 'path=D:/file.txt' + SYNTAX.CLOSE
+
 function evaluateAssistant(text) {
+  if (typeof text === 'string' && FOREIGN_MARKUP.test(text)) {
+    const valid = Object.keys(parser.DEFINITIONS).join(', ')
+    return {
+      kind: 'continue',
+      prompt:
+        'MHI(parser): ERROR [mhi_foreign_markup] DSML or XML tool tags are not supported and nothing was executed. ' +
+        'Do not use DSML, XML, or JSON tool tags. Use only MHI blocks like ' +
+        MHI_EXAMPLE +
+        ' (open and close brackets exactly as shown, values raw), no prose. Valid tools: ' +
+        valid +
+        '. Resend your call as MHI.',
+      reason: 'mhi_foreign_markup',
+    }
+  }
   let parsed
   try {
     parsed = parser.parseAssistantText(text)
