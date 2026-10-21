@@ -77,6 +77,7 @@ class ProviderRegistry {
           owned_by,
           context_length: meta.context_length,
           max_output_length: meta.max_output_length,
+          paid: Boolean(meta.paid),
         }
       }
     }

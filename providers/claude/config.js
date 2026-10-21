@@ -3,9 +3,20 @@
  * Moved from config/constants.js
  */
 
+const PAID_MODELS = new Set([
+  'claude-fable-5-1',
+  'claude-opus-5-5',
+  'claude-fable-5',
+  'claude-opus-5',
+  'claude-opus-4-8',
+  'claude-opus-4-7',
+  'claude-opus-4-6',
+])
+
 const model = (id, name, defaultReasoning, extra = {}) => ({
   id,
   name,
+  paid: PAID_MODELS.has(id),
   vision: true,
   created: 1_772_736_000,
   context_length: 1_000_000,

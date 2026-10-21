@@ -475,15 +475,27 @@ class SessionSelector {
 
     if (modelEntries.length > 0) {
       const label = providerModels.title || providerDef.displayName || this.provider
+      const toChoice = ([value, meta]) => ({
+        title: meta.name,
+        value,
+        description: meta.recommendedForTools ? 'recommended for tools' : undefined,
+      })
+      const freeChoices = modelEntries.filter(([, m]) => !m.paid).map(toChoice)
+      const paidChoices = modelEntries.filter(([, m]) => m.paid).map(toChoice)
+      const choices = paidChoices.length
+        ? [
+            { title: '── Free models ──', value: '', disabled: true },
+            ...freeChoices,
+            { title: '── Paid models (subscription required) ──', value: '', disabled: true },
+            ...paidChoices,
+          ]
+        : freeChoices
       questions.push({
         type: 'select',
         name: 'model',
         message: label + ' model',
-        choices: modelEntries.map(([value, meta]) => ({
-          title: meta.name,
-          value,
-          description: meta.recommendedForTools ? 'recommended for tools' : undefined,
-        })),
+        choices,
+        initial: paidChoices.length ? 1 : 0,
       })
     }
 
