@@ -6,26 +6,26 @@ const express = require('express')
 const { StreamPipeline } = require('../../engine/pipeline')
 const { getSharedTransport } = require('./browser-transport')
 
-const { streamHandler } = require('./stream-handler')
+const { streamHandler, collectReply } = require('./stream-handler')
+const instructions = require('../../engine/instructions')
 const { acquireSlot, setProviderCooldown } = require('../../utils/rate-limiter')
 const retry = require('../../utils/retry')
 const { runToolLoop } = require('../../core/mhi/loop')
 const { CONFIG } = require('../../config/constants')
-const { reasoning } = require('./config')
-
-const HISTORY_CHAR_CAP = 120_000
+const { reasoning, summaryAt } = require('./config')
 
 function randomId() {
   return crypto.randomBytes(12).toString('base64url').slice(0, 16)
 }
 
-function historyChars(history) {
-  return history.reduce((n, m) => n + JSON.stringify(m.parts).length, 0)
+// Summary-rotation prompt counter lives on the session row (metadata.promptCount).
+function promptCountOf(s) {
+  return (s.metadata && s.metadata.promptCount) || 0
 }
 
-// Keep the first exchange (it carries the instructions); drop the oldest after it.
-function trimHistory(history) {
-  while (historyChars(history) > HISTORY_CHAR_CAP && history.length > 4) history.splice(2, 2)
+function setPromptCount(s, n) {
+  if (!s.metadata || typeof s.metadata !== 'object') s.metadata = {}
+  s.metadata.promptCount = n
 }
 
 async function buildInceptionRouter(parsedFetch, session, userData = null) {
@@ -35,12 +35,30 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
 
   if (!session) throw new Error('No session provided')
 
-  // The site keeps no server-side chat state: history lives in memory for this
-  // process only, so every start is a fresh conversation (parentId cleared so
-  // the instructions ride in the first prompt again).
-  const history = []
+  // The site keeps no server-side chat state and the browser UI keeps the thread,
+  // so every start is a fresh conversation (parentId cleared so the instructions
+  // ride in the first prompt again; prompt counter reset).
   session.id = randomId()
   session.parentId = null
+  setPromptCount(session, 0)
+
+  let carriedSummary = null
+
+  // Ask Mercury for a session summary in the current thread, then drop the
+  // thread so the next real turn opens a new chat with base prompt + summary.
+  async function rotateWithSummary(pipeline, reasoningEffort, signal) {
+    const { content } = instructions.getExtra('summary')
+    const stream = await withRetry(
+      () => browser.chatCompletion({ prompt: content, fresh: false, reasoningEffort, signal }),
+      pipeline,
+    )
+    const summary = (await collectReply(stream)).trim()
+    if (!summary) throw new Error('[Inception] summary request returned an empty reply')
+    carriedSummary = summary
+    session.parentId = null
+    setPromptCount(session, 0)
+    console.info('[Inception] summary captured — next turn starts a new chat')
+  }
 
   const router = express.Router()
 
@@ -50,7 +68,8 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
     const ephemeral = pipeline.ephemeralMode
 
     const map = reasoning.map
-    const reasoningEffort = map[req.body.reasoning_effort] || map.Medium
+    const { effort: reasoningEffort, search: webSearch } =
+      map[req.body.reasoning_effort] || map.Medium
 
     pipeline.deferFinish = true
 
@@ -66,18 +85,47 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
 
           pipeline.beginTurn()
 
-          const userMsg = {
-            id: randomId(),
-            role: 'user',
-            parts: [{ type: 'text', text: prompt }],
+          // Real user prompts only: tool-loop rounds (role 'mhi') are not counted.
+          const lastRole = (payload.messages[payload.messages.length - 1] || {}).role
+          let newThread = false
+          if (!ephemeral && lastRole !== 'mhi') {
+            setPromptCount(active, promptCountOf(active) + 1)
+            if (promptCountOf(active) >= summaryAt) {
+              try {
+                await rotateWithSummary(pipeline, reasoningEffort, req.signal)
+                newThread = true
+                // Client-only notice: pipeline.emit skips assistantText, so the MHI loop and history never see it.
+                pipeline.emit({
+                  role: 'assistant',
+                  content:
+                    '\n> ♻ New session started: previous chat summarized and carried over.\n\n',
+                })
+              } catch (summaryErr) {
+                console.error('inception: summary rotation failed:', summaryErr)
+              }
+            }
+          }
+
+          // New chat after a summary: base prompt (when the pipeline did not
+          // already add it) + the carried summary, then the current prompt.
+          let sendPrompt = prompt
+          if (newThread && carriedSummary) {
+            const base =
+              !pipeline.isNewSession && pipeline.toolCalling
+                ? instructions.getFull().content + '\n\n'
+                : ''
+            sendPrompt = `${base}<previous_session_summary>\n${carriedSummary}\n</previous_session_summary>\n\n${prompt}`
+            carriedSummary = null
           }
 
           const stream = await withRetry(
             () =>
               browser.chatCompletion({
-                prompt,
+                prompt: sendPrompt,
+                newThread,
                 fresh: ephemeral,
                 reasoningEffort,
+                webSearch,
                 signal: req.signal,
               }),
             pipeline,
@@ -85,19 +133,7 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
 
           const reply = await streamHandler(stream, active, pipeline)
 
-          if (!ephemeral && reply) {
-            const assistantMsg = {
-              id: randomId(),
-              role: 'assistant',
-              parts: [
-                { type: 'reasoning', id: 'reasoning-0', text: '', state: 'done' },
-                { type: 'text', text: reply, state: 'done' },
-              ],
-            }
-            history.push(userMsg, assistantMsg)
-            trimHistory(history)
-            active.parentId = assistantMsg.id
-          }
+          if (!ephemeral && reply) active.parentId = randomId()
           return { assistantText: pipeline.assistantText }
         },
       })
@@ -139,4 +175,4 @@ async function withRetry(fn, pipeline) {
   }
 }
 
-module.exports = { buildInceptionRouter, withRetry, trimHistory }
+module.exports = { buildInceptionRouter, withRetry }

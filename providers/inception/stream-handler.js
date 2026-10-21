@@ -76,4 +76,28 @@ async function streamHandler(stream, session, parser) {
   return reply
 }
 
-module.exports = { streamHandler }
+/**
+ * Silent variant of streamHandler: drains an Inception SSE stream and returns
+ * the assistant text without emitting anything to the client. Rejects on a
+ * stream-level error or an upstream error frame.
+ */
+async function collectReply(stream) {
+  let text = ''
+  let failure = null
+  await readSSE(stream, {
+    onData: (data) => {
+      if (data.type === 'text-delta' && typeof data.delta === 'string') text += data.delta
+      else if (data.type === 'error' && !failure) {
+        failure = new Error(data.errorText || data.message || 'unknown error')
+      }
+    },
+    onDone: () => {},
+    onError: (err) => {
+      failure = failure || err
+    },
+  })
+  if (failure) throw failure
+  return text
+}
+
+module.exports = { streamHandler, collectReply }

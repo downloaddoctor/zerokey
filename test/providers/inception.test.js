@@ -7,7 +7,6 @@ const { Readable } = require('node:stream')
 const registry = require('../../providers/registry')
 const inception = require('../../providers/inception')
 const { streamHandler } = require('../../providers/inception/stream-handler')
-const { trimHistory } = require('../../providers/inception/router')
 
 function frames(events) {
   return events.map((e) => 'data: ' + (typeof e === 'string' ? e : JSON.stringify(e)) + '\n\n')
@@ -60,21 +59,4 @@ test('streamHandler scans text deltas, forwards reasoning, finishes once', async
   assert.deepEqual(parser.calls.scan, ['Hello', ' world'])
   assert.equal(parser.calls.final, 1)
   assert.equal(parser.calls.chunks.at(-1).choices[0].delta.reasoning_content, 'thinking')
-})
-
-test('trimHistory keeps the first exchange and drops the oldest after it', () => {
-  const big = 'x'.repeat(50_000)
-  const mk = (role, text) => ({ role, parts: [{ type: 'text', text }] })
-  const history = [
-    mk('user', 'first'),
-    mk('assistant', 'first-reply'),
-    mk('user', big),
-    mk('assistant', big),
-    mk('user', big),
-    mk('assistant', 'last'),
-  ]
-  trimHistory(history)
-  assert.equal(history[0].parts[0].text, 'first')
-  assert.equal(history.at(-1).parts[0].text, 'last')
-  assert.ok(history.length < 6)
 })

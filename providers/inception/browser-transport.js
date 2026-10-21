@@ -6,14 +6,15 @@
  * The site is authless, so nothing is captured and nothing is pasted.
  *
  * - Prompt: typed into the composer with CDP Input.insertText, then Enter.
- * - Settings: web search is forced off and the thinking mode is picked from the
+ * - Settings: web search follows opts.webSearch and the thinking mode is picked from the
  *   real listbox before every send (they persist in the page, so unchanged
  *   values cost no clicks).
  * - Stream: an init-script fetch tee copies the app's own POST /api/chat
  *   response to Node, so the stream-handler still sees live deltas.
  * - Threads: the site keeps chats only in the browser. The UI thread is reused
- *   while it matches the router history (same message count); otherwise
- *   "New Chat" is clicked and the history is sent as one transcript prompt.
+ *   and resends its own history, so only the new prompt is typed. "New Chat"
+ *   is clicked on the first turn, after any failure, for ephemeral requests
+ *   and when the router asks for a rotation (opts.newThread).
  * - One composer means one request at a time (a queue holds the next call until
  *   the current stream closes). Closing the stream early clicks "Stop generating".
  */
@@ -35,9 +36,7 @@ const HEADLESS = /^(1|true|yes)$/i.test(process.env.INCEPTION_HEADLESS || '')
 const COMPOSER_NAME = 'How can I help you?'
 
 // The site refuses to continue a thread that grew too large. Recover by
-// opening a new chat and resending once. Proactive cap: 48 messages (~24
-// turns) per browser thread, then rotate before the upstream rejects it.
-const MAX_THREAD_MESSAGES = 48
+// opening a new chat and resending once.
 const CONVERSATION_TOO_LONG_RE = /conversation is too long|start a new chat/i
 
 function isConversationTooLong(err) {
@@ -314,7 +313,7 @@ class InceptionBrowserTransport {
   }
 
   /**
-   * One chat turn through the UI. opts: { prompt, history, fresh, reasoningEffort, signal }.
+   * One chat turn through the UI. opts: { prompt, fresh, newThread, reasoningEffort, webSearch, signal }.
    * `history` is the router's message list BEFORE this turn. Resolves to a Readable of the
    * raw SSE bytes once the response headers arrive; the next call waits until it closes.
    */
@@ -332,8 +331,7 @@ class InceptionBrowserTransport {
       this._pending = null
       if (isConversationTooLong(err)) {
         // The upstream thread is too long to continue: open a fresh chat and
-        // resend exactly once. The router's history is sent as one transcript
-        // prompt, so the recovery is invisible to the client.
+        // resend exactly once with the current prompt.
         console.warn('[Inception/browser] conversation too long — rotating to a new chat')
         this._threadLen = -1
         await this._newChat().catch((newChatErr) => {
@@ -361,22 +359,11 @@ class InceptionBrowserTransport {
 
     // The UI keeps the thread and resends its own history, so only the new prompt is typed.
     // A new chat is opened for the first turn, after any failure, and for ephemeral requests.
-    if (opts.fresh || this._threadLen < 0) await this._newChat()
-    else if (this._threadLen >= MAX_THREAD_MESSAGES) {
-      // Proactive rotation: the site rejects conversations past a size limit.
-      // The router keeps the first exchange and trims old turns, so the browser
-      // thread grows without bound; rotate before the upstream returns 400.
-      console.warn(
-        '[Inception/browser] thread reached ' +
-          MAX_THREAD_MESSAGES +
-          ' messages — rotating to a new chat',
-      )
-      await this._newChat()
-    }
+    if (opts.fresh || opts.newThread || this._threadLen < 0) await this._newChat()
     const prompt = opts.prompt
 
     await this._dismissOverlays()
-    await this._setWebSearch(false)
+    await this._setWebSearch(Boolean(opts.webSearch))
     await this._setEffort(capitalize(opts.reasoningEffort))
 
     const stream = new PassThrough()

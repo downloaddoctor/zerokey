@@ -17,23 +17,49 @@ const models = {
       created: 1_792_569_000,
       context_length: 128_000,
       max_output_length: 16_384,
-      reasoning: ['Instant', 'Low', 'Medium', 'High'],
+      reasoning: [
+        'Instant',
+        'Low',
+        'Medium',
+        'High',
+        'Instant Search',
+        'Low Search',
+        'Medium Search',
+        'High Search',
+      ],
       defaultReasoning: 'Medium',
     },
   },
 }
 
 const reasoning = {
-  labels: ['Instant', 'Low', 'Medium', 'High'],
+  labels: [
+    'Instant',
+    'Low',
+    'Medium',
+    'High',
+    'Instant Search',
+    'Low Search',
+    'Medium Search',
+    'High Search',
+  ],
   map: {
-    Instant: 'instant',
-    Low: 'low',
-    Medium: 'medium',
-    High: 'high',
+    Instant: { effort: 'instant', search: false },
+    Low: { effort: 'low', search: false },
+    Medium: { effort: 'medium', search: false },
+    High: { effort: 'high', search: false },
+    'Instant Search': { effort: 'instant', search: true },
+    'Low Search': { effort: 'low', search: true },
+    'Medium Search': { effort: 'medium', search: true },
+    'High Search': { effort: 'high', search: true },
   },
 }
 
 const promptLimit = 64_000
+
+// Every Nth prompt sent upstream asks Mercury for a session summary, then the
+// router opens a new chat seeded with the base prompt plus that summary.
+const summaryAt = 95
 
 const setupSteps = {
   url: 'https://chat.inceptionlabs.ai',
@@ -41,4 +67,4 @@ const setupSteps = {
   instructions: 'No capture needed — the provider is authless and browser-only.',
 }
 
-module.exports = { models, reasoning, promptLimit, setupSteps }
+module.exports = { models, reasoning, promptLimit, summaryAt, setupSteps }
