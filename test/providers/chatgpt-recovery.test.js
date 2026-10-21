@@ -49,6 +49,35 @@ test('withAuthRecovery propagates a 401 when the capture reload fails', async ()
   )
 })
 
+test('withAuthRecovery reloads from the SQLite user row on 401', async () => {
+  const parsedFetch = { url: 'x', method: 'POST', headers: {}, body: '{}' }
+  let initialized = false
+  const api = {
+    _providerKey: 'chatgpt',
+    initializeFromJSON: async (capture) => {
+      assert.equal(capture, parsedFetch)
+      initialized = true
+    },
+  }
+  const calls = []
+  const result = await recovery.withAuthRecovery(
+    api,
+    async () => {
+      calls.push(calls.length)
+      if (calls.length === 1) {
+        const error = new Error('unauth')
+        error.status = 401
+        throw error
+      }
+      return 'recovered'
+    },
+    { username: 'chat-user', parsedFetch },
+  )
+  assert.equal(result, 'recovered')
+  assert.equal(initialized, true)
+  assert.equal(calls.length, 2)
+})
+
 test('withAuthRecovery refuses to retry a second 401 in the same process', async () => {
   const api = {
     _providerKey: 'chatgpt',
@@ -57,13 +86,17 @@ test('withAuthRecovery refuses to retry a second 401 in the same process', async
   }
   let calls = 0
   await assert.rejects(
-    recovery.withAuthRecovery(api, async () => {
-      calls += 1
-      const error = new Error('unauth')
-      error.status = 401
-      throw error
-    }),
-    (err) => err.code === 'chatgpt_401_recovery_failed' || err.status === 401,
+    recovery.withAuthRecovery(
+      api,
+      async () => {
+        calls += 1
+        const error = new Error('unauth')
+        error.status = 401
+        throw error
+      },
+      { username: 'u', parsedFetch: {} },
+    ),
+    (err) => err.code === 'chatgpt_401_after_recovery' || err.status === 401,
   )
   assert.equal(calls, 1)
 })

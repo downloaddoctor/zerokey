@@ -20,11 +20,10 @@ function buildHealthRouter(preSelected, context = {}) {
     if (store) {
       try {
         const count = store.prepare('SELECT COUNT(*) AS n FROM sessions').get().n
-        const importDone = db.getMeta(store, 'legacy_import_done')
         persistence = {
           schema_version: db.getMeta(store, 'schema_version'),
           sessions: count,
-          legacy_import_done: Boolean(importDone),
+          users_json_migrated: Boolean(db.getMeta(store, 'users_json_migrated')),
         }
       } catch (error) {
         console.error('store.prepare() failed:', error)

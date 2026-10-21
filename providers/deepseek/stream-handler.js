@@ -129,10 +129,12 @@ function streamHandler(stream, session, parser, retry) {
       const usageEntry = data.v?.find((e) => e.p === 'accumulated_token_usage')
       const statusEntry = data.v?.find((e) => e.p === 'quasi_status')
       if (usageEntry) {
+        // `accumulated_token_usage` is the whole chat's output total — i.e.
+        // total_tokens === completion_tokens. Send it straight through; no
+        // prompt side to add.
         parser.tokenUsage.prompt_tokens = 0
         parser.tokenUsage.completion_tokens = usageEntry.v
-        parser.tokenUsage.total_tokens =
-          parser.tokenUsage.completion_tokens + parser.tokenUsage.prompt_tokens
+        parser.tokenUsage.total_tokens = usageEntry.v
         console.debug(`[DEEPSEEK] Tokens: ${usageEntry.v} (status: ${statusEntry?.v ?? '-'})`)
       }
       return

@@ -34,6 +34,16 @@ const HEAD_TIMEOUT_MS = 90_000
 const HEADLESS = /^(1|true|yes)$/i.test(process.env.INCEPTION_HEADLESS || '')
 const COMPOSER_NAME = 'How can I help you?'
 
+// The site refuses to continue a thread that grew too large. Recover by
+// opening a new chat and resending once. Proactive cap: 48 messages (~24
+// turns) per browser thread, then rotate before the upstream rejects it.
+const MAX_THREAD_MESSAGES = 48
+const CONVERSATION_TOO_LONG_RE = /conversation is too long|start a new chat/i
+
+function isConversationTooLong(err) {
+  return CONVERSATION_TOO_LONG_RE.test(String((err && err.message) || err || ''))
+}
+
 function statusError(status, type, text) {
   const err = new Error(`[Inception] chat: HTTP ${status} (${type || 'no content-type'}): ${text}`)
   err.status = status
@@ -227,6 +237,7 @@ class InceptionBrowserTransport {
       await this._waitForCheckpoint()
     }
     await this._waitForComposer()
+    this._threadLen = 0
   }
 
   /** The cookie banner is fixed over the composer toolbar and swallows clicks; close it like a user. */
@@ -319,6 +330,25 @@ class InceptionBrowserTransport {
       return await this._run(opts, release)
     } catch (err) {
       this._pending = null
+      if (isConversationTooLong(err)) {
+        // The upstream thread is too long to continue: open a fresh chat and
+        // resend exactly once. The router's history is sent as one transcript
+        // prompt, so the recovery is invisible to the client.
+        console.warn('[Inception/browser] conversation too long — rotating to a new chat')
+        this._threadLen = -1
+        await this._newChat().catch((newChatErr) => {
+          console.error('inception: new chat after too-long failed:', newChatErr)
+        })
+        try {
+          const recovered = await this._run(opts, release)
+          release()
+          return recovered
+        } catch (recoveredErr) {
+          this._threadLen = -1
+          release()
+          throw recoveredErr
+        }
+      }
       this._threadLen = -1
       release()
       throw err
@@ -327,11 +357,22 @@ class InceptionBrowserTransport {
 
   async _run(opts, release) {
     await this._ensureContext()
-    await humanDelay(1000, 5000)
+    await humanDelay(3000, 5000)
 
     // The UI keeps the thread and resends its own history, so only the new prompt is typed.
     // A new chat is opened for the first turn, after any failure, and for ephemeral requests.
     if (opts.fresh || this._threadLen < 0) await this._newChat()
+    else if (this._threadLen >= MAX_THREAD_MESSAGES) {
+      // Proactive rotation: the site rejects conversations past a size limit.
+      // The router keeps the first exchange and trims old turns, so the browser
+      // thread grows without bound; rotate before the upstream returns 400.
+      console.warn(
+        '[Inception/browser] thread reached ' +
+          MAX_THREAD_MESSAGES +
+          ' messages — rotating to a new chat',
+      )
+      await this._newChat()
+    }
     const prompt = opts.prompt
 
     await this._dismissOverlays()
@@ -372,7 +413,10 @@ class InceptionBrowserTransport {
       clearTimeout(timer)
     }
 
-    this._threadLen = opts.fresh ? -1 : 1
+    // Real turns accumulate two messages per browser thread; ephemeral (fresh)
+    // calls always rotate to a new chat, so they leave no reusable thread.
+    if (opts.fresh) this._threadLen = -1
+    else this._threadLen += 2
     return stream
   }
 

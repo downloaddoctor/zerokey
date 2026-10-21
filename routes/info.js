@@ -3,11 +3,18 @@ const registry = require('../providers/registry')
 
 const router = express.Router()
 
+let pkgVersion = 'unknown'
+try {
+  pkgVersion = require('../package.json').version
+} catch {
+  // Non-fatal: fall back to 'unknown' if package.json is unavailable.
+}
+
 // GET / - Root endpoint with API info
 router.get('/', (req, res) => {
   res.json({
     name: 'ZeroKey API Server',
-    version: '1.0.0',
+    version: pkgVersion,
     description: 'OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT & Qwen',
     endpoints: {
       health: 'GET /health',

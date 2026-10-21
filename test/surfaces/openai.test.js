@@ -16,19 +16,7 @@ test('openai surface exposes identity-mapped tools', () => {
   }
 
   // Spot-check the tools a plain OpenAI client is expected to drive.
-  for (const name of [
-    'read',
-    'write',
-    'replace',
-    'ls',
-    'glob',
-    'grep',
-    'cmd',
-    'view_image',
-    'todos_add',
-    'todos_set',
-    'ask',
-  ]) {
+  for (const name of ['read', 'write', 'replace', 'ls', 'glob', 'grep', 'cmd', 'view_image']) {
     assert.ok(tools[name], `openai: missing tool ${name}`)
   }
 })

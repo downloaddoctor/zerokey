@@ -36,6 +36,23 @@ function classifyError(error, provider) {
     }
   }
 
+  // ── Cloudflare JS challenge (anti-bot interstitial) ──
+  // A 403 whose body is a challenge page (or whose headers carry cf-mitigated)
+  // is not a stale session — the TLS fingerprint was rejected. Retrying won't
+  // help; the session needs a real browser (or a fresh cf_clearance).
+  if (
+    statusCode === 403 &&
+    /just a moment|cf-mitigated|__cf_chl|challenge\.cloudflare\.com|cf-ray/i.test(msg)
+  ) {
+    return {
+      category: 'cloudflare_block',
+      message: `${provider} answered with a Cloudflare challenge (HTTP 403).`,
+      action:
+        'Clear the challenge in a real browser profile, then re-capture a fresh fetch(). Retrying quickly will not help.',
+      status: 403,
+    }
+  }
+
   // ── Device/IP flagged (Cloudflare bot-behavior detection) ──
   // Distinct from a stale session: re-capturing a fetch() from the same
   // flagged device/IP will not fix this — it needs time (and/or a different

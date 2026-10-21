@@ -12,10 +12,9 @@
  *     decide whether to trust the numbers or fall back to context-window
  *     heuristics of its own.
  *
- * The session-total accumulator (accumulate / sessionTotals) counts only
- * estimated turns. Providers that send real numbers already tell the client
- * the truth per turn; summing context-window numbers across turns would be
- * misleading.
+ * applyTurnUsage folds a turn into the session total: providers that send
+ * real numbers (upstream) SET the session total to that number; estimated
+ * providers ADD each turn onto a running total that starts at 0.
  */
 
 const CHARS_PER_TOKEN = 4
@@ -199,12 +198,20 @@ function buildUsage(realUsage, promptInfo, modelChars, promptText, completionTex
     }
   }
 
+  // Shared char context: every non-pure-upstream frame carries it.
+  const promptChars = promptInfo && typeof promptInfo.chars === 'number' ? promptInfo.chars : 0
+  const fallbackPrompt = Math.round(promptChars / CHARS_PER_TOKEN)
+  const fallbackCompletion = Math.round((modelChars || 0) / CHARS_PER_TOKEN)
+  const withChars = (result) => ({
+    ...result,
+    prompt_chars: promptInfo?.chars ?? null,
+    prompt_chars_limit: promptInfo?.limit ?? null,
+    prompt_chars_headroom: promptInfo?.headroom ?? null,
+    prompt_chars_dropped: promptInfo?.dropped ?? 0,
+  })
+
   // Partial real numbers: fill the missing side from the estimate.
   if (normalized !== null) {
-    const promptChars = promptInfo && typeof promptInfo.chars === 'number' ? promptInfo.chars : 0
-    const fallbackPrompt = Math.round(promptChars / CHARS_PER_TOKEN)
-    const fallbackCompletion = Math.round((modelChars || 0) / CHARS_PER_TOKEN)
-
     let promptTokens = normalized.promptTokens
     let completionTokens = normalized.completionTokens
 
@@ -223,40 +230,24 @@ function buildUsage(realUsage, promptInfo, modelChars, promptText, completionTex
     const hasRealPrompt = normalized.promptTokens !== null
     const hasRealCompletion = normalized.completionTokens !== null
 
-    return {
+    return withChars({
       prompt_tokens: promptTokens,
       completion_tokens: completionTokens,
       total_tokens: promptTokens + completionTokens,
       source: hasRealPrompt && hasRealCompletion ? 'upstream' : 'mixed',
-      prompt_chars: promptInfo?.chars ?? null,
-      prompt_chars_limit: promptInfo?.limit ?? null,
-      prompt_chars_headroom: promptInfo?.headroom ?? null,
-      prompt_chars_dropped: promptInfo?.dropped ?? 0,
-    }
+    })
   }
 
   // Nothing real: estimate from characters.
-  const promptChars = promptInfo && typeof promptInfo.chars === 'number' ? promptInfo.chars : 0
-  const promptTokens = Math.round(promptChars / CHARS_PER_TOKEN)
-  const completionTokens = Math.round((modelChars || 0) / CHARS_PER_TOKEN)
+  console.debug('[USAGE] estimate', { modelChars, promptChars, realUsage })
 
-  console.debug('[USAGE] estimate', {
-    modelChars,
-    promptChars,
-    realUsage,
-  })
-
-  return {
-    prompt_tokens: promptTokens,
-    completion_tokens: completionTokens,
-    total_tokens: promptTokens + completionTokens,
+  return withChars({
+    prompt_tokens: fallbackPrompt,
+    completion_tokens: fallbackCompletion,
+    total_tokens: fallbackPrompt + fallbackCompletion,
     source: 'estimated',
     estimated: true,
-    prompt_chars: promptChars,
-    prompt_chars_limit: promptInfo?.limit ?? null,
-    prompt_chars_headroom: promptInfo?.headroom ?? null,
-    prompt_chars_dropped: promptInfo?.dropped ?? 0,
-  }
+  })
 }
 
 // ── session totals (estimated turns only) ─────────────────────────────────
@@ -266,29 +257,52 @@ function emptyTotals() {
 }
 
 /**
- * Rolling per-session totals for providers that do NOT report real usage.
- * Claude and DeepSeek send real turn numbers already; summing those across
- * turns would double-count. `usage.estimated` marks a fallback-built object;
- * `usage.source === 'estimated'` is the canonical signal.
+ * Fold this turn's usage into the session and return the client frame.
+ *
+ * Two provider classes:
+ *   - real usage (`source === 'upstream'`, DeepSeek/Claude): the turn number
+ *     IS the session total — SET it (no addition).
+ *   - estimate (`estimated`/`mixed`): the session total starts at 0 and each
+ *     turn is ADDED to it.
+ * Retained turns just echo an earlier total, so they are not folded in.
  */
-function accumulate(session, usage) {
+function applyTurnUsage(session, turnUsage) {
   const t = (session._usageTotals ||= emptyTotals())
-  // Always remember the last real turn's split (input/output/total). Retained
-  // turns only echo session.lastTokenUsage, so they never overwrite it.
-  if (usage.source !== 'retained') {
+  const p = (turnUsage && turnUsage.prompt_tokens) || 0
+  const c = (turnUsage && turnUsage.completion_tokens) || 0
+  const total = (turnUsage && turnUsage.total_tokens) || p + c
+  if (turnUsage && turnUsage.source !== 'retained') {
     t.last = {
-      input_tokens: usage.prompt_tokens || 0,
-      output_tokens: usage.completion_tokens || 0,
-      total_tokens: usage.total_tokens || 0,
-      source: usage.source || null,
+      input_tokens: p,
+      output_tokens: c,
+      total_tokens: total,
+      source: turnUsage.source || null,
     }
+    if (turnUsage.source === 'upstream') {
+      t.prompt_tokens = p
+      t.completion_tokens = c
+      t.total_tokens = total
+    } else {
+      t.prompt_tokens += p
+      t.completion_tokens += c
+      t.total_tokens += total
+    }
+    t.turns += 1
   }
-  if (usage.source !== 'estimated') return t
-  t.prompt_tokens += usage.prompt_tokens || 0
-  t.completion_tokens += usage.completion_tokens || 0
-  t.total_tokens += usage.total_tokens || 0
-  t.turns += 1
-  return t
+  return {
+    prompt_tokens: t.prompt_tokens,
+    completion_tokens: t.completion_tokens,
+    total_tokens: t.total_tokens,
+    source: (turnUsage && turnUsage.source) || null,
+    estimated: !!(turnUsage && turnUsage.estimated),
+    turn: {
+      prompt_tokens: p,
+      completion_tokens: c,
+      total_tokens: total,
+      source: (turnUsage && turnUsage.source) || null,
+    },
+    session: t,
+  }
 }
 
 function sessionTotals(session) {
@@ -298,7 +312,7 @@ function sessionTotals(session) {
 module.exports = {
   CHARS_PER_TOKEN,
   buildUsage,
-  accumulate,
+  applyTurnUsage,
   sessionTotals,
   estimateTokens,
   mergeUsage,

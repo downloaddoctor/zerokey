@@ -12,7 +12,7 @@ const {
   registerAutoMcpServers,
 } = require('./triggers')
 const { ephemeralSession } = require('../utils/ephemeral-session')
-const { buildUsage, accumulate } = require('./usage')
+const { buildUsage, applyTurnUsage } = require('./usage')
 const { inspectBatch, signature, pushHistory, MAX_BATCH } = require('./loop-guard')
 
 let callCounter = 0
@@ -181,11 +181,9 @@ class StreamPipeline {
    */
   beginTurn() {
     this.assistantText = ''
-    // Keep the last round that actually produced usage so a failed or empty
-    // later round never reports zero.
-    if (Object.keys(this.tokenUsage || {}).length > 0 || this._modelChars > 0) {
-      this._prevUsage = { tokenUsage: this.tokenUsage, modelChars: this._modelChars }
-    }
+    // Current-turn tracking only. Cumulative numbers live on the session row
+    // (session._usageTotals / session.lastTokenUsage); empty or failed rounds
+    // fall back to those in _turnUsage().
     this.tokenUsage = {}
     this._modelChars = 0
   }
@@ -193,20 +191,11 @@ class StreamPipeline {
   // One place builds the usage frame. A turn that computes zero (ephemeral
   // utility call, errored round) reports session.lastTokenUsage instead of 0.
   _turnUsage() {
-    this._restorePrevUsage()
     const usage = buildUsage(this.tokenUsage, this.compiler.lastPrompt, this._modelChars)
     if ((usage.total_tokens || 0) > 0) return usage
     const kept = this.session.lastTokenUsage || 0
     if (kept <= 0) return usage
     return { prompt_tokens: kept, completion_tokens: 0, total_tokens: kept, source: 'retained' }
-  }
-
-  _restorePrevUsage() {
-    const empty = Object.keys(this.tokenUsage || {}).length === 0 && !(this._modelChars > 0)
-    if (empty && this._prevUsage) {
-      this.tokenUsage = this._prevUsage.tokenUsage
-      this._modelChars = this._prevUsage.modelChars
-    }
   }
 
   /**
@@ -228,26 +217,27 @@ class StreamPipeline {
       // Role-only frame — writer.text emits the role implicitly on first text.
     }
     if (finishReason === 'stop' || finishReason === 'length') {
-      const turnUsage = this._turnUsage()
-      const totals = accumulate(this.session, turnUsage)
-      this.session.lastTokenUsage = turnUsage.total_tokens || 0
-      this.writer.finish(finishReason, { ...turnUsage, session: totals })
-      this._finished = true
-      this.session.lastUsed = new Date().toISOString()
-      if (this.onFinalChunk) this.onFinalChunk()
+      this._finishStream(finishReason)
     }
+  }
+
+  // Single exit path: fold this turn's usage into the session, close the
+  // writer, and fire the per-turn callback. Every finish (chunk, emitAndEnd,
+  // sendFinalChunk, flushFinish) goes through here.
+  _finishStream(finishReason) {
+    const turnUsage = this._turnUsage()
+    const usage = applyTurnUsage(this.session, turnUsage)
+    this.session.lastTokenUsage = turnUsage.total_tokens || 0
+    this.writer.finish(finishReason, usage)
+    this._finished = true
+    this.session.lastUsed = new Date().toISOString()
+    if (this.onFinalChunk) this.onFinalChunk()
   }
 
   emitAndEnd(text) {
     this.scan(text)
     this.flush()
-    const turnUsage = this._turnUsage()
-    const totals = accumulate(this.session, turnUsage)
-    this.session.lastTokenUsage = turnUsage.total_tokens || 0
-    this.writer.finish('stop', { ...turnUsage, session: totals })
-    this._finished = true
-    this.session.lastUsed = new Date().toISOString()
-    if (this.onFinalChunk) this.onFinalChunk()
+    this._finishStream('stop')
   }
 
   sendFinalChunk() {
@@ -271,12 +261,7 @@ class StreamPipeline {
     this._finished = true
     this.flush()
     // Real provider numbers win; estimate is the fallback. See engine/usage.js.
-    const turnUsage = this._turnUsage()
-    const totals = accumulate(this.session, turnUsage)
-    this.session.lastTokenUsage = turnUsage.total_tokens || 0
-    this.writer.finish('stop', { ...turnUsage, session: totals })
-    this.session.lastUsed = new Date().toISOString()
-    if (this.onFinalChunk) this.onFinalChunk()
+    this._finishStream('stop')
   }
 
   /**
@@ -286,14 +271,8 @@ class StreamPipeline {
   flushFinish() {
     if (this._finished) return
     this.deferFinish = false
-    this._finished = true
     this.flush()
-    const turnUsage = this._turnUsage()
-    const totals = accumulate(this.session, turnUsage)
-    this.session.lastTokenUsage = turnUsage.total_tokens || 0
-    this.writer.finish('stop', { ...turnUsage, session: totals })
-    this.session.lastUsed = new Date().toISOString()
-    if (this.onFinalChunk) this.onFinalChunk()
+    this._finishStream('stop')
   }
 
   // ── file upload ────────────────────────────────────────────────────────

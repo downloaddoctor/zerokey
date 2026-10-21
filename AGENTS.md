@@ -98,7 +98,7 @@ ARCHITECTURE
 SCHEMA
  users(id PK, provider, username, parsed_fetch, instructions_hash, instructions_applied_at, wait_until, wait_reason, state_json, created_at, updated_at, UNIQUE(provider, username))
  sessions(user_id FK→users.id CASCADE, name, id, parent_id, generation, tool_calling, vision, model, todos_json, turn_count, dynamic_tools_hash, mcp_injected_json, state, metadata_json, last_token_usage, usage_totals_json, last_used, created_at, state_json, updated_at, PK(user_id,name))
- meta(key PK, value) — holds schema_version and legacy_import_done
+ meta(key PK, value) — holds schema_version and users_json_migrated
  Column map is snake_case; JS objects camelCase via core/state/users.js and core/state/sessions.js
  Rule: lifecycle data only — never prompt or response content
 
@@ -180,4 +180,4 @@ EXTENSIONS
  New MHI executor → core/mhi/<name>.js + wire into core/mhi/index.js + test/core/mhi/<name>.test.js
  New skill → engine/triggers.js entry OR a new engine/extra/<name>.md (auto-registers as $<basename>)
  New MCP server → expose tools named mcp_<server>_<tool> in req.body.tools[]; auto-registers as $<server>
- Token-threshold reinjection → provider index.js exports reinjectAt: [{tokens, fragment}]; pipeline re-injects $<fragment> on each crossing; pipeline sets session.lastTokenUsage after every finished turn; _turnUsage() builds the usage frame for all finish paths and falls back to session.lastTokenUsage (source 'retained') when a turn computes zero; usage.accumulate stores the last real turn in session._usageTotals.last; ephemeral clones deep-copy usageTotals so utility calls never touch the real row; only Claude and DeepSeek set parser.tokenUsage (ChatGPT/Qwen use the chars/4 estimate); Qwen image upload = QwenAPI.uploadFile: POST /api/v2/files/getstsToken → OSS4-HMAC-SHA256 signed PUT to the bucket → descriptor pushed into message.files[] (chatCompletion options.files); pipeline.bindUploader skips with a notice if a provider lacks uploadFile
+ Token-threshold reinjection → provider index.js exports reinjectAt: [{tokens, fragment}]; pipeline re-injects $<fragment> on each crossing; pipeline sets session.lastTokenUsage after every finished turn; _turnUsage() builds the usage frame for all finish paths and falls back to session.lastTokenUsage (source 'retained') when a turn computes zero; usage.applyTurnUsage folds each turn into session._usageTotals (upstream source sets the total; estimated adds; retained turns skipped); ephemeral clones deep-copy usageTotals so utility calls never touch the real row; only Claude and DeepSeek set parser.tokenUsage (ChatGPT/Qwen use the chars/4 estimate); Qwen image upload = QwenAPI.uploadFile: POST /api/v2/files/getstsToken → OSS4-HMAC-SHA256 signed PUT to the bucket → descriptor pushed into message.files[] (chatCompletion options.files); pipeline.bindUploader skips with a notice if a provider lacks uploadFile

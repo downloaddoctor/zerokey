@@ -4,15 +4,15 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const usage = require('../../engine/usage')
 
-test('accumulate stores the last turn split and ignores retained turns', () => {
+test('applyTurnUsage stores the last turn split and counts upstream turns', () => {
   const session = {}
-  usage.accumulate(session, {
+  usage.applyTurnUsage(session, {
     prompt_tokens: 8,
     completion_tokens: 3,
     total_tokens: 11,
     source: 'upstream',
   })
-  usage.accumulate(session, {
+  usage.applyTurnUsage(session, {
     prompt_tokens: 11,
     completion_tokens: 0,
     total_tokens: 11,
@@ -24,7 +24,7 @@ test('accumulate stores the last turn split and ignores retained turns', () => {
     total_tokens: 11,
     source: 'upstream',
   })
-  assert.equal(session._usageTotals.turns, 0)
+  assert.equal(session._usageTotals.turns, 1)
 })
 
 test('normalizeUsage collapses all prompt-side spellings', () => {
@@ -147,24 +147,32 @@ test('buildUsage carries truncation state through from promptInfo', () => {
   assert.equal(result.prompt_chars_dropped, 0)
 })
 
-test('accumulate only counts estimated turns', () => {
+test('applyTurnUsage adds estimated turns onto a running session total', () => {
   const session = {}
-  usage.accumulate(session, { source: 'upstream', prompt_tokens: 100, completion_tokens: 50 })
-  assert.equal(usage.sessionTotals(session).turns, 0)
-  usage.accumulate(session, {
-    source: 'estimated',
-    prompt_tokens: 10,
-    completion_tokens: 5,
-    total_tokens: 15,
-  })
-  assert.equal(usage.sessionTotals(session).turns, 1)
-  assert.equal(usage.sessionTotals(session).total_tokens, 15)
+  usage.applyTurnUsage(session, { source: 'estimated', prompt_tokens: 20, completion_tokens: 10 })
+  usage.applyTurnUsage(session, { source: 'estimated', prompt_tokens: 4, completion_tokens: 2 })
+  const totals = usage.sessionTotals(session)
+  assert.equal(totals.turns, 2)
+  assert.equal(totals.total_tokens, 36)
 })
 
-test('accumulate does not count mixed turns either', () => {
+test('applyTurnUsage ignores retained turns (they echo an earlier turn)', () => {
   const session = {}
-  usage.accumulate(session, { source: 'mixed', prompt_tokens: 100, completion_tokens: 20 })
-  assert.equal(usage.sessionTotals(session).turns, 0)
+  usage.applyTurnUsage(session, { source: 'estimated', prompt_tokens: 100, completion_tokens: 50 })
+  usage.applyTurnUsage(session, { source: 'retained', prompt_tokens: 100, completion_tokens: 50 })
+  assert.equal(usage.sessionTotals(session).turns, 1)
+  assert.equal(usage.sessionTotals(session).total_tokens, 150)
+})
+
+test('applyTurnUsage sets (not adds) the total for real-total (upstream) providers', () => {
+  const session = {}
+  // DeepSeek-style: each upstream frame already carries the whole-chat total.
+  usage.applyTurnUsage(session, { source: 'upstream', completion_tokens: 200, total_tokens: 200 })
+  usage.applyTurnUsage(session, { source: 'upstream', completion_tokens: 400, total_tokens: 400 })
+  const totals = usage.sessionTotals(session)
+  assert.equal(totals.turns, 2)
+  assert.equal(totals.completion_tokens, 400)
+  assert.equal(totals.total_tokens, 400)
 })
 
 test('sessionTotals returns zeros for a fresh session', () => {

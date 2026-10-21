@@ -62,14 +62,17 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
           const stream = await withRetry(
             () =>
               recovery.withConversationRecovery(activeSession, () =>
-                recovery.withAuthRecovery(chatgptApi, () =>
-                  chatgptApi.chatCompletion(
-                    prompt,
-                    activeSession.id,
-                    activeSession.parentId,
-                    model,
-                    attachments,
-                  ),
+                recovery.withAuthRecovery(
+                  chatgptApi,
+                  () =>
+                    chatgptApi.chatCompletion(
+                      prompt,
+                      activeSession.id,
+                      activeSession.parentId,
+                      model,
+                      attachments,
+                    ),
+                  userData,
                 ),
               ),
             pipeline,

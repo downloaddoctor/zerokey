@@ -16,9 +16,6 @@
  * header names.
  */
 
-const fs = require('fs')
-const path = require('path')
-
 const ONE_SHOT_401 = 'chatgpt_401_retry_used'
 
 function isUnauthorized(error) {
@@ -72,48 +69,28 @@ async function withConversationRecovery(session, fn) {
 }
 
 /**
- * Force-reload the browser capture from disk so the client re-seeds headers
- * and cookies. The capture file is the source of truth; the process keeps no
- * backstop copy.
+ * Force-re-apply the persisted browser capture from the SQLite user row.
+ * State now lives in SQLite (temp/users.json was migrated away); the live
+ * user row is the source of truth for headers/cookies.
  */
-async function forceReloadCapture(api) {
-  const file = path.join(__dirname, '..', '..', 'temp', 'users.json')
-  let data = null
+async function forceReloadCapture(api, userData) {
+  if (!userData || typeof userData !== 'object' || !userData.parsedFetch) {
+    return { ok: false, reason: 'no_user_row' }
+  }
   try {
-    data = JSON.parse(fs.readFileSync(file, 'utf8'))
+    await api.initializeFromJSON(userData.parsedFetch)
+    return { ok: true, username: userData.username || 'unknown' }
   } catch (error) {
-    console.error('JSON.parse() failed:', error)
-    if (error && error.code === 'ENOENT') return { ok: false, reason: 'no_users_file' }
-    return { ok: false, reason: 'users_file_unreadable' }
+    console.error('api.initializeFromJSON() failed:', error)
+    return { ok: false, reason: error && error.message ? error.message : String(error) }
   }
-
-  // Walk the tree looking for a parsedFetch whose provider matches this API.
-  // The selector's JSON shape is { <provider>: { <username>: { parsedFetch } } }.
-  const provider = api && api._providerKey ? api._providerKey : 'chatgpt'
-  const bucket = data && data[provider]
-  if (!bucket || typeof bucket !== 'object') return { ok: false, reason: 'provider_missing' }
-
-  for (const username of Object.keys(bucket)) {
-    const entry = bucket[username]
-    if (!entry || !entry.parsedFetch) continue
-    try {
-      await api.initializeFromJSON(entry.parsedFetch)
-      return { ok: true, username }
-    } catch (error) {
-      console.error('api.initializeFromJSON() failed:', error)
-      console.warn(
-        'Force-reload of capture failed for user ' + username + ': ' + (error.message || error),
-      )
-    }
-  }
-  return { ok: false, reason: 'no_parsed_fetch' }
 }
 
 /**
  * Run fn() once. On 401, force-reload the capture and retry exactly once.
  * A second 401 propagates to the caller.
  */
-async function withAuthRecovery(api, fn) {
+async function withAuthRecovery(api, fn, userData = null) {
   try {
     return await fn()
   } catch (error) {
@@ -121,7 +98,7 @@ async function withAuthRecovery(api, fn) {
     if (!isUnauthorized(error)) throw error
 
     console.warn('ChatGPT returned 401; forcing a capture reload and retrying once.')
-    const reload = await forceReloadCapture(api)
+    const reload = await forceReloadCapture(api, userData)
     if (!reload.ok) {
       const wrapped = new Error(
         'ChatGPT returned 401 and the browser capture could not be reloaded (' +
@@ -172,9 +149,9 @@ async function refreshSentinelSafe(api) {
 function wrap(api) {
   return {
     api,
-    withAuthRecovery: (fn) => withAuthRecovery(api, fn),
+    withAuthRecovery: (fn, userData) => withAuthRecovery(api, fn, userData),
     refreshSentinelSafe: () => refreshSentinelSafe(api),
-    forceReloadCapture: () => forceReloadCapture(api),
+    forceReloadCapture: (userData) => forceReloadCapture(api, userData),
   }
 }
 
