@@ -3,54 +3,62 @@
  * Moved from config/constants.js
  */
 
+const model = (id, name, defaultReasoning, extra = {}) => ({
+  id,
+  name,
+  vision: true,
+  created: 1_772_736_000,
+  context_length: 1_000_000,
+  max_output_length: 128_000,
+  defaultReasoning,
+  ...extra,
+})
+
 const models = {
   title: 'Claude',
   owned_by: 'anthropic',
   models: {
-    'claude-sonnet-5-5': {
-      id: 'claude-sonnet-5-5',
-      name: 'Claude Sonnet 5.5',
-      vision: true,
+    'claude-fable-5-1': model('claude-fable-5-1', 'Claude Fable 5.1', 'Medium Think'),
+    'claude-opus-5-5': model('claude-opus-5-5', 'Claude Opus 5.5', 'Medium Think'),
+    'claude-sonnet-5-5': model('claude-sonnet-5-5', 'Claude Sonnet 5.5', 'Medium Think', {
       recommendedForTools: true,
-      created: 1_772_736_000,
-      context_length: 1_000_000,
-      max_output_length: 128_000,
-      defaultReasoning: 'Medium',
-    },
-    'claude-sonnet-4-6': {
-      id: 'claude-sonnet-4-6',
-      name: 'Claude Sonnet 4.6',
-      vision: true,
+    }),
+    'claude-haiku-5-5': model('claude-haiku-5-5', 'Claude Haiku 5.5', 'Medium Think'),
+    'claude-fable-5': model('claude-fable-5', 'Claude Fable 5', 'High Think'),
+    'claude-opus-5': model('claude-opus-5', 'Claude Opus 5', 'High Think'),
+    'claude-opus-4-8': model('claude-opus-4-8', 'Claude Opus 4.8', 'High Think'),
+    'claude-opus-4-7': model('claude-opus-4-7', 'Claude Opus 4.7', 'XHigh Think'),
+    'claude-opus-4-6': model('claude-opus-4-6', 'Claude Opus 4.6', 'Medium Think'),
+    'claude-sonnet-5': model('claude-sonnet-5', 'Claude Sonnet 5', 'Medium Think'),
+    'claude-sonnet-4-6': model('claude-sonnet-4-6', 'Claude Sonnet 4.6', 'Low', {
       recommendedForTools: true,
-      created: 1_772_736_000,
-      context_length: 1_000_000,
-      max_output_length: 128_000,
-      defaultReasoning: 'Low',
-    },
-    'claude-sonnet-5': {
-      id: 'claude-sonnet-5',
-      name: 'Claude Sonnet 5',
-      vision: true,
-      created: 1_772_736_000,
-      context_length: 1_000_000,
-      max_output_length: 128_000,
-      defaultReasoning: 'Medium',
-    },
-    'claude-haiku-4-5-20251001': {
-      id: 'claude-haiku-4-5-20251001',
-      name: 'Claude Haiku 4.5',
-      vision: true,
-      created: 1_772_736_000,
-      context_length: 200_000,
-      max_output_length: 64_000,
-      reasoning: ['No Think', 'Think'],
-      defaultReasoning: 'No Think',
-    },
+    }),
+    'claude-haiku-4-5-20251001': model(
+      'claude-haiku-4-5-20251001',
+      'Claude Haiku 4.5',
+      'No Think',
+      {
+        context_length: 200_000,
+        max_output_length: 64_000,
+        reasoning: ['No Think', 'Think'],
+      },
+    ),
   },
 }
 
 const reasoning = {
-  labels: ['Low', 'Low Think', 'Medium', 'Medium Think', 'High', 'High Think', 'Max', 'Max Think'],
+  labels: [
+    'Low',
+    'Low Think',
+    'Medium',
+    'Medium Think',
+    'High',
+    'High Think',
+    'XHigh',
+    'XHigh Think',
+    'Max',
+    'Max Think',
+  ],
   map: {
     Off: { think: false },
     Low: { think: false, tier: 'low' },
@@ -59,9 +67,11 @@ const reasoning = {
     'Medium Think': { think: true, tier: 'medium' },
     High: { think: false, tier: 'high' },
     'High Think': { think: true, tier: 'high' },
+    XHigh: { think: false, tier: 'xhigh' },
+    'XHigh Think': { think: true, tier: 'xhigh' },
     Max: { think: false, tier: 'max' },
     'Max Think': { think: true, tier: 'max' },
-    // Haiku: extended thinking only, no tier budget
+    // Haiku 4.5: mode only (no effort tier)
     Think: { think: true, extended: true },
     'No Think': { think: false, extended: false },
   },
