@@ -117,15 +117,15 @@ fi
 
 if [ "$ASK" = "1" ]; then
     rm -f version.new
-    ans="y"
+    ans="n"
     if [ -t 0 ]; then
-        printf "Update now? [Y/n] (10s) "
-        read -r -t 10 ans || ans="y"
+        printf "\n%s[??]%s Update now? [y/N] " "$C_YELLOW" "$C_RESET"
+        read -r ans || ans="n"
         echo ""
     fi
-    case "${ans:-y}" in
-        [Nn]*) warn "Keeping current version" ;;
-        *) UPDATE=1 ;;
+    case "${ans:-n}" in
+        [Yy]) UPDATE=1 ;;
+        *) warn "Keeping current version" ;;
     esac
 fi
 

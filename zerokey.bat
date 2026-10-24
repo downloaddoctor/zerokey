@@ -64,11 +64,12 @@ call :warn "Update available"
 
 :askupdate
 del "version.new" >nul 2>nul
-choice /c YN /t 10 /d Y /m "Update now"
-if errorlevel 2 (
-    call :warn "Keeping current version"
-    goto start
-)
+echo.
+set "ANS="
+set /p "ANS=!C_YELLOW![??]!C_RESET! Update now? [y/N] "
+if /i "!ANS!"=="y" goto doupdate
+call :warn "Keeping current version"
+goto start
 
 :doupdate
 call :section "Update - downloading"
