@@ -20,7 +20,7 @@ const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
 const { CONFIG } = require('../../config/constants')
 
-const SCHEMA_FILE = path.join(__dirname, 'schema.sql')
+const { readAsset } = require('../../utils/bundle')
 const SCHEMA_VERSION = 3
 
 // Columns added after the initial schema. CREATE TABLE IF NOT EXISTS will not
@@ -41,7 +41,7 @@ function open(options = {}) {
   db.exec('PRAGMA busy_timeout = 5000')
 
   assertSupportedSchema(db)
-  db.exec(fs.readFileSync(SCHEMA_FILE, 'utf8'))
+  db.exec(readAsset('core/state/schema.sql', 'utf8'))
   applyAddedColumns(db)
   setMeta(db, 'schema_version', SCHEMA_VERSION)
 
@@ -122,7 +122,6 @@ function getMeta(db, key) {
 
 module.exports = {
   SCHEMA_VERSION,
-  SCHEMA_FILE,
   ADDED_COLUMNS,
   open,
   assertSupportedSchema,

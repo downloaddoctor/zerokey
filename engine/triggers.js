@@ -11,7 +11,7 @@ const PLAYWRIGHT_MCP = require('./mcp/playwright')
 
 // $test scratch root: always the server's own cwd + /test, regardless of
 // where the request came from — never user-supplied.
-const TEST_ROOT = path.join(__dirname, '..')
+const TEST_ROOT = require('../utils/bundle').ROOT
 
 // Alias-map registry keyed by the same tag used in session.mcpInjected.
 const MCP_ALIAS_MAPS = { $browser: BROWSER_MCP, $playwright: PLAYWRIGHT_MCP }

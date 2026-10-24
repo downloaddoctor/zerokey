@@ -24,7 +24,7 @@ DIRECTORY
 ENTRY-POINTS
  node server.js — interactive wizard
  ZEROKEY_PROVIDER=… ZEROKEY_USER=… ZEROKEY_SESSION=… node server.js — headless
- zerokey.bat / zerokey.sh — clone + install + run launcher
+ zerokey.bat / zerokey.sh — launcher: portable Node → curl server.js + package.json (+ lock/workspace on change) from the dist branch → pnpm install --prod → node server.js; no git, no clone
  pnpm start / pnpm test / pnpm lint / pnpm format / pnpm check
 
 MODULES
@@ -146,6 +146,9 @@ CONFIG
   real IDE fingerprint wins; else utility prompt (surface-declared utilityPrefixes, matched via registry.resolveUtility) is ephemeral; else openai — a real turn (raw mode still skips instructions/skills/MCP; cloned session; real chatSessionId/parentId untouched)
 
 BUILD
+ pnpm build — scripts/build.mjs: esbuild bundles own code to dist/server.js (npm packages external, define process.env.ZK_BUNDLED=1); virtual modules zk-assets (openapi.json, schema.sql, deepseek wasm, engine/extra/*.md as base64) and zk-modules (providers/surfaces static lists); dist/ also gets slim package.json + pnpm-lock.yaml + pnpm-workspace.yaml
+ utils/bundle.js — seam: ROOT, readAsset, listAssets, bundled; disk-backed from source, bundle-backed when ZK_BUNDLED=1; new runtime file reads must go through it
+ .github/workflows/release.yml — on push to main builds and force-pushes dist/ to the dist branch (what the launchers download)
  pnpm install → postinstall sets core.hooksPath=.githooks
  pnpm start — server; pnpm test — node --test test/**/*.test.js
  pnpm lint (eslint), pnpm format (prettier check), pnpm format:fix

@@ -1,7 +1,6 @@
-const fs = require('fs')
-const path = require('path')
+const { readAsset } = require('../../utils/bundle')
 
-const WASM_PATH = path.join(__dirname, 'wasm', 'sha3_wasm_bg.7b9ca65ddd.wasm')
+const WASM_PATH = 'providers/deepseek/wasm/sha3_wasm_bg.7b9ca65ddd.wasm'
 
 class DeepSeekHash {
   constructor() {
@@ -12,7 +11,7 @@ class DeepSeekHash {
 
   async init(wasmPath) {
     try {
-      const wasmBuffer = fs.readFileSync(wasmPath)
+      const wasmBuffer = readAsset(wasmPath)
 
       this.wasmModule = await WebAssembly.compile(wasmBuffer)
 

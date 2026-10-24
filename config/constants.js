@@ -6,6 +6,8 @@
 
 const path = require('path')
 
+const { ROOT } = require('../utils/bundle')
+
 function envInt(name, fallback, minimum, maximum) {
   const raw = process.env[name]
   if (raw === undefined || raw === '') return fallback
@@ -30,7 +32,7 @@ const CONFIG = {
   // already gitignored in this repo.
   DATA_DIR: process.env.ZEROKEY_DATA_DIR
     ? path.resolve(process.env.ZEROKEY_DATA_DIR)
-    : path.resolve(__dirname, '..', 'temp'),
+    : path.join(ROOT, 'temp'),
 
   HOST: '127.0.0.1',
 

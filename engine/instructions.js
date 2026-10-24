@@ -1,8 +1,8 @@
-const fs = require('fs')
-const path = require('path')
 const crypto = require('crypto')
 
-const EXTRA_DIR = path.join(__dirname, 'extra')
+const { readAsset, listAssets } = require('../utils/bundle')
+
+const EXTRA_DIR = 'engine/extra'
 
 class Instructions {
   constructor() {
@@ -39,7 +39,7 @@ class Instructions {
   getExtra(name) {
     let entry = this._skills[name]
     if (!entry) {
-      const content = fs.readFileSync(path.join(EXTRA_DIR, `${name}.md`), 'utf8')
+      const content = readAsset(`${EXTRA_DIR}/${name}.md`, 'utf8')
       entry = { content, hash: this._sha(content) }
       this._skills[name] = entry
     }
@@ -51,10 +51,7 @@ class Instructions {
    * Consumed by triggers.js to auto-register one passthrough trigger per file.
    */
   list() {
-    return fs
-      .readdirSync(EXTRA_DIR)
-      .filter((f) => f.endsWith('.md'))
-      .map((f) => f.slice(0, -3))
+    return listAssets(EXTRA_DIR, '.md').map((f) => f.slice(0, -3))
   }
 }
 

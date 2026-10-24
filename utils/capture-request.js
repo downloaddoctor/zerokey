@@ -1,7 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 
-const CAPTURES_DIR = path.join(__dirname, '..', 'temp', 'captures')
+const CAPTURES_DIR = path.join(require('./bundle').ROOT, 'temp', 'captures')
 
 function ensureDir() {
   if (!fs.existsSync(CAPTURES_DIR)) {

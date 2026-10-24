@@ -1,16 +1,14 @@
 const express = require('express')
-const fs = require('fs')
-const path = require('path')
+const { readAsset } = require('../utils/bundle')
 
 const router = express.Router()
 
-const openapiPath = path.join(__dirname, '..', 'openapi.json')
-
 router.get('/openapi.json', (req, res) => {
-  fs.readFile(openapiPath, 'utf8', (err, data) => {
-    if (err) return res.status(500).json({ error: { message: 'openapi.json unavailable' } })
-    res.type('application/json').send(data)
-  })
+  try {
+    res.type('application/json').send(readAsset('openapi.json', 'utf8'))
+  } catch {
+    res.status(500).json({ error: { message: 'openapi.json unavailable' } })
+  }
 })
 
 router.get('/docs', (req, res) => {

@@ -238,7 +238,7 @@ class SessionSelector {
   }
 
   _profileDirFor(username) {
-    return path.join(__dirname, '..', 'temp', 'profiles', this.provider, username)
+    return path.join(require('../utils/bundle').ROOT, 'temp', 'profiles', this.provider, username)
   }
 
   _validateLocalKey(raw) {

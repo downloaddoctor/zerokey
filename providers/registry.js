@@ -1,6 +1,8 @@
 const fs = require('fs')
 const path = require('path')
 
+const { bundled } = require('../utils/bundle')
+
 /**
  * Auto-discovers and registers provider plugins.
  * Scans providers/<name>/index.js folders.
@@ -18,6 +20,15 @@ class ProviderRegistry {
   }
 
   _autoDiscover() {
+    const prebuilt = bundled('providers')
+    if (prebuilt) {
+      for (const provider of prebuilt) {
+        const providerDef = provider.default || provider
+        if (providerDef && providerDef.name) this.providers.set(providerDef.name, providerDef)
+      }
+      return
+    }
+
     const providersDir = __dirname
 
     if (!fs.existsSync(providersDir)) {

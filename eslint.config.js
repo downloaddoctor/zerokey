@@ -35,6 +35,6 @@ module.exports = [
     },
   },
   {
-    ignores: ['node_modules/', 'temp/', 'worktemp/', 'docs/'],
+    ignores: ['node_modules/', 'temp/', 'worktemp/', 'docs/', 'dist/'],
   },
 ]

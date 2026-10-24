@@ -2,6 +2,7 @@ const fs = require('fs')
 const path = require('path')
 
 const { IDEToolSurface } = require('./base')
+const { bundled } = require('../utils/bundle')
 
 // One folder per surface: surfaces/<name>/index.js (+ template.json capture).
 // base.js, specs.js and registry.js are shared files, not surfaces.
@@ -27,16 +28,20 @@ class SurfaceRegistry {
   }
 
   _autoDiscover() {
+    const prebuilt = bundled('surfaces')
     const dir = __dirname
-    const entries = fs.readdirSync(dir, { withFileTypes: true })
+    const entries = prebuilt
+      ? prebuilt.map(([name, mod]) => ({ name, mod }))
+      : fs
+          .readdirSync(dir, { withFileTypes: true })
+          .filter((e) => e.isDirectory())
+          .map((e) => ({ name: e.name }))
 
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue
-
       const filePath = path.join(dir, entry.name, 'index.js')
-      if (!fs.existsSync(filePath)) continue
+      if (!prebuilt && !fs.existsSync(filePath)) continue
       try {
-        const configure = require(filePath)
+        const configure = prebuilt ? entry.mod : require(filePath)
         const fn = configure.default || configure
         if (typeof fn !== 'function') continue
 
