@@ -13,6 +13,7 @@ module.exports = {
   defaultVision: false,
   reinjectEvery: 50,
   requiresCapture: false,
+
   createAPI: () => ({
     initializeFromJSON: async () => {},
     deleteSession: async () => {},

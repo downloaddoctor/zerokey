@@ -4,6 +4,7 @@ const crypto = require('crypto')
 const express = require('express')
 
 const { StreamPipeline } = require('../../engine/pipeline')
+const { InceptionApi } = require('./api')
 const { getSharedTransport } = require('./browser-transport')
 
 const { streamHandler, collectReply } = require('./stream-handler')
@@ -13,6 +14,8 @@ const retry = require('../../utils/retry')
 const { runToolLoop } = require('../../core/mhi/loop')
 const { CONFIG } = require('../../config/constants')
 const { reasoning, summaryAt } = require('./config')
+
+const TRANSPORT = (process.env.INCEPTION_TRANSPORT || 'browser').toLowerCase()
 
 function randomId() {
   return crypto.randomBytes(12).toString('base64url').slice(0, 16)
@@ -29,9 +32,12 @@ function setPromptCount(s, n) {
 }
 
 async function buildInceptionRouter(parsedFetch, session, userData = null) {
-  console.debug('[Inception] Browser-only transport, no capture required')
-  const browser = getSharedTransport({ username: userData && userData.username })
+  const browser =
+    TRANSPORT === 'api'
+      ? new InceptionApi()
+      : getSharedTransport({ username: userData && userData.username })
   await browser.initializeFromJSON(parsedFetch || {})
+  console.debug('[Inception] transport=' + TRANSPORT)
 
   if (!session) throw new Error('No session provided')
 
@@ -49,7 +55,14 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
   async function rotateWithSummary(pipeline, reasoningEffort, signal) {
     const { content } = instructions.getExtra('summary')
     const stream = await withRetry(
-      () => browser.chatCompletion({ prompt: content, fresh: false, reasoningEffort, signal }),
+      () =>
+        browser.chatCompletion({
+          prompt: content,
+          messages: [{ role: 'user', content }],
+          fresh: false,
+          reasoningEffort,
+          signal,
+        }),
       pipeline,
     )
     const summary = (await collectReply(stream)).trim()
@@ -122,6 +135,7 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
             () =>
               browser.chatCompletion({
                 prompt: sendPrompt,
+                messages: payload.messages,
                 newThread,
                 fresh: ephemeral,
                 reasoningEffort,
