@@ -1,0 +1,19 @@
+{
+  "name": "zerokey-proxy",
+  "version": "0.5.0",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "impit": "^0.14.7",
+    "playwright": "^1.63.0",
+    "prompts": "^2.4.2"
+  }
+}
