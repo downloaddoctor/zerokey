@@ -14,6 +14,7 @@ async function streamHandler(stream, session, parser) {
   let dataCount = 0
   let lastEventType = null
   let producedOutput = false
+  const sources = []
 
   const emitChunk = (delta) => {
     parser.writeChunk({
@@ -38,6 +39,7 @@ async function streamHandler(stream, session, parser) {
   const finish = () => {
     if (finalized) return
     finalized = true
+    if (sources.length) emitChunk({ role: 'assistant', content: '', sources })
     parser.sendFinalChunk()
   }
 
@@ -52,6 +54,24 @@ async function streamHandler(stream, session, parser) {
       producedOutput = true
       reply += data.delta
       parser.scan(data.delta)
+      return
+    }
+    if (data.type === 'source-url' && data.sourceId !== '__searching__' && data.url) {
+      let site = ''
+      try {
+        site = new URL(data.url).host
+      } catch {
+        site = ''
+      }
+      sources.push({
+        url: data.url,
+        title: data.title || '',
+        snippet: '',
+        cite_index: sources.length + 1,
+        published_at: null,
+        site_name: site,
+        query_indexes: [0],
+      })
       return
     }
     if (data.type === 'error') {
