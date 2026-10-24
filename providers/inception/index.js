@@ -11,6 +11,14 @@ module.exports = {
   promptLimit,
   setupSteps,
   defaultVision: false,
+  transports: [
+    { value: 'browser', title: 'Browser', description: 'Playwright UI driver - safe, recommended' },
+    {
+      value: 'api',
+      title: 'API',
+      description: 'Direct HTTPS, no browser - can get the account banned',
+    },
+  ],
   reinjectEvery: 50,
   requiresCapture: false,
 

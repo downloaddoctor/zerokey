@@ -10,6 +10,18 @@ module.exports = {
   promptLimit,
   setupSteps,
   defaultVision: true,
+  transports: [
+    {
+      value: 'completion',
+      title: 'Completion',
+      description: 'REST SSE, works with old and new captures (default)',
+    },
+    {
+      value: 'rpc',
+      title: 'RPC',
+      description: 'Connect/proto, experimental (blocked on f15 signer)',
+    },
+  ],
   waitPolicy: {
     label: 'at limit',
     userMessage: (username, resetsAt, mins) =>

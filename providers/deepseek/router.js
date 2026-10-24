@@ -11,13 +11,15 @@ const retry = require('../../utils/retry')
 const { runToolLoop } = require('../../core/mhi/loop')
 const { CONFIG } = require('../../config/constants')
 const { reasoning } = require('./config')
+const { resolveSessionTransport } = require('../../utils/session-transport')
 
-const TRANSPORT = (process.env.DEEPSEEK_TRANSPORT || 'browser').toLowerCase()
+const DEFAULT_TRANSPORT = (process.env.DEEPSEEK_TRANSPORT || 'browser').toLowerCase()
 
 const REASONING_MAP = reasoning.map
 
 async function buildDeepSeekRouter(parsedFetch, session, userData) {
   const username = userData?.username
+  const TRANSPORT = resolveSessionTransport(session, DEFAULT_TRANSPORT, ['browser', 'api'])
   if (TRANSPORT !== 'api' && !username) {
     throw new Error('[DEEPSEEK] userData.username (local key) is required for browser transport')
   }

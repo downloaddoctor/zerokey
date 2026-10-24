@@ -14,8 +14,9 @@ const retry = require('../../utils/retry')
 const { runToolLoop } = require('../../core/mhi/loop')
 const { CONFIG } = require('../../config/constants')
 const { reasoning, summaryAt } = require('./config')
+const { resolveSessionTransport } = require('../../utils/session-transport')
 
-const TRANSPORT = (process.env.INCEPTION_TRANSPORT || 'browser').toLowerCase()
+const DEFAULT_TRANSPORT = (process.env.INCEPTION_TRANSPORT || 'browser').toLowerCase()
 
 function randomId() {
   return crypto.randomBytes(12).toString('base64url').slice(0, 16)
@@ -32,6 +33,7 @@ function setPromptCount(s, n) {
 }
 
 async function buildInceptionRouter(parsedFetch, session, userData = null) {
+  const TRANSPORT = resolveSessionTransport(session, DEFAULT_TRANSPORT, ['browser', 'api'])
   const browser =
     TRANSPORT === 'api'
       ? new InceptionApi()

@@ -15,6 +15,7 @@
 const { CONFIG } = require('../../config/constants')
 const { ClaudeAPI } = require('./api')
 const { ClaudeConnectRpc } = require('./connect-rpc')
+const { resolveSessionTransport } = require('../../utils/session-transport')
 
 const completion = CONFIG.CLAUDE_TRANSPORT === 'completion'
 
@@ -34,18 +35,19 @@ const COMPLETION = Object.freeze({ name: 'completion', IS_RPC: false, IS_COMPLET
  * get the configured transport (completion by default), so new users can use
  * either one.
  */
-function resolveTransport(parsedFetch) {
+function resolveTransport(parsedFetch, session = null) {
   const req = (parsedFetch && parsedFetch.request) || {}
   const url = String((parsedFetch && parsedFetch.url) || req.url || '')
   const legacy = !/\/claudeai-rpc\//i.test(url) && /\/organizations\/[a-f0-9-]{36}/i.test(url)
   if (legacy) return COMPLETION
   // RPC is broken (f15 device signature); completion serves old and new captures.
-  return CONFIG.CLAUDE_TRANSPORT === 'rpc' ? RPC : COMPLETION
+  const choice = resolveSessionTransport(session, CONFIG.CLAUDE_TRANSPORT, ['completion', 'rpc'])
+  return choice === 'rpc' ? RPC : COMPLETION
 }
 
 /** The API client for the capture's transport (global transport if no capture). */
-function createAPI(options = {}, parsedFetch = null) {
-  const t = parsedFetch ? resolveTransport(parsedFetch) : TRANSPORT
+function createAPI(options = {}, parsedFetch = null, session = null) {
+  const t = parsedFetch ? resolveTransport(parsedFetch, session) : TRANSPORT
   return t.IS_COMPLETION ? new ClaudeAPI(options) : new ClaudeConnectRpc(options)
 }
 

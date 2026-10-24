@@ -509,6 +509,19 @@ class SessionSelector {
       })
     }
 
+    if (Array.isArray(providerDef?.transports) && providerDef.transports.length > 1) {
+      questions.push({
+        type: 'select',
+        name: 'transport',
+        message: 'Transport',
+        choices: providerDef.transports.map((t) => ({
+          title: t.title,
+          description: t.description,
+          value: t.value,
+        })),
+      })
+    }
+
     const answers = await prompts(questions, { onCancel: () => process.exit(0) })
     if (!answers.name) return null
 
@@ -525,6 +538,7 @@ class SessionSelector {
     }
 
     return sessionsState.create(this._db, this.user.id, {
+      transport: answers.transport,
       name: answers.name || defaultName,
       toolCalling: answers.toolCalling ?? true,
       vision,

@@ -131,6 +131,7 @@ function create(db, userId, fields = {}) {
     toolCalling: fields.toolCalling ?? true,
     vision: fields.vision ?? false,
     model: fields.model ?? null,
+    transport: fields.transport ?? null,
     todos: fields.todos ?? null,
     turnCount: fields.turnCount ?? 0,
     dynamicToolsHash: fields.dynamicToolsHash ?? null,

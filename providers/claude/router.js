@@ -20,10 +20,10 @@ const PROVIDER_REASONING_LABELS = reasoning.labels
 
 async function buildClaudeRouter(parsedFetch, session, userData = null) {
   console.debug(
-    `[Claude] Initializing from parsed capture JSON (transport: ${resolveTransport(parsedFetch).name})`,
+    `[Claude] Initializing from parsed capture JSON (transport: ${resolveTransport(parsedFetch, session).name})`,
   )
-  const transport = resolveTransport(parsedFetch)
-  const claudeApi = createAPI({}, parsedFetch)
+  const transport = resolveTransport(parsedFetch, session)
+  const claudeApi = createAPI({}, parsedFetch, session)
   await claudeApi.initializeFromJSON(parsedFetch)
 
   const router = express.Router()
