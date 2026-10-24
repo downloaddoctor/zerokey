@@ -107,6 +107,7 @@ class BaseAPI {
       res = await this._client.fetch(url, {
         ...options,
         headers: this._cleanHeaders(options.headers),
+        timeout: options.timeout === undefined ? timeoutMs : options.timeout,
         signal: controller.signal,
       })
     } catch (err) {

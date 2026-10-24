@@ -183,7 +183,21 @@ async function claimFirstFree(options = {}) {
   const exact = options.exact === true
 
   for (let port = start; port <= start + range; port += 1) {
-    if (acquire(port) === 'taken') return port
+    if (acquire(port) === 'taken') {
+      // The lock is ours and nothing of ours is listening yet, so any
+      // listener here belongs to another process or another data root.
+      if (!(await isPortActive(port))) return port
+      release(port)
+      if (!exact) {
+        console.warn(`[PORT] ${port} is in use by another process, trying next.`)
+        continue
+      }
+      const error = new Error(
+        `Port ${port} is in use by another process and ZEROKEY_EXACT_PORT is on.`,
+      )
+      error.code = 'EADDRINUSE'
+      throw error
+    }
     if (exact) {
       const error = new Error(
         `Port ${start} is busy and ZEROKEY_EXACT_PORT is on. A silently relocated ` +

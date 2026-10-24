@@ -24,7 +24,7 @@ DIRECTORY
 ENTRY-POINTS
  node server.js — interactive wizard
  ZEROKEY_PROVIDER=… ZEROKEY_USER=… ZEROKEY_SESSION=… node server.js — headless
- zerokey.bat / zerokey.sh — launcher: portable Node → curl server.js + package.json (+ lock/workspace on change) from the dist branch → pnpm install --prod → node server.js; no git, no clone
+ zerokey.bat / zerokey.sh — launcher: portable Node → if core/state/db.js sits next to the launcher it runs that local project (pnpm install only when node_modules is missing, no update check) → else compares dist version.txt with local .version; newer → .update marker + 10 s Y/n prompt (default Y) → downloads server.js + package.json + version.txt (+ lock/workspace) → pnpm install --prod only when package.json changed → node server.js; offline or failed download keeps existing files; no git, no clone
  pnpm start / pnpm test / pnpm lint / pnpm format / pnpm check
 
 MODULES
@@ -78,7 +78,7 @@ MODULES
  routes/health.js — includes pid, provider, session, persistence, promptLimit
  utils/sse-writer.js — serialized SSE frames with backpressure; finish()/fail() idempotent
  utils/rate-limiter.js — sliding window 15/60s per label; setProviderCooldown on 429
- utils/startup.js — per-port lock file temp/db/.start.<port>.lock; probeHealth/postClaim
+ utils/startup.js — per-port lock file temp/db/.start.<port>.lock; probeHealth/postClaim; claimFirstFree releases a won lock and skips the port (or throws EADDRINUSE when exact) if isPortActive finds a foreign listener
  utils/errors.js — classifyError → toOpenAIError (two calling conventions)
  utils/uuid.js — uuid() v4 via crypto.randomUUID; the only UUID helper for provider clients
  utils/http-error.js — assertOk(res, {allow, prefix, limit}) opt-in non-OK guard (reads body slice, throws Error with .status/.statusCode); used by sentinel prepare/finalize, DeepSeek and Claude completion calls; not used where the body is parsed for structure (ChatGPT completion 429 cooldown, Qwen _buildQwenError → code/num/waitMs for RateLimited)
@@ -146,7 +146,7 @@ CONFIG
   real IDE fingerprint wins; else utility prompt (surface-declared utilityPrefixes, matched via registry.resolveUtility) is ephemeral; else openai — a real turn (raw mode still skips instructions/skills/MCP; cloned session; real chatSessionId/parentId untouched)
 
 BUILD
- pnpm build — scripts/build.mjs: esbuild bundles own code to dist/server.js (npm packages external, define process.env.ZK_BUNDLED=1); virtual modules zk-assets (openapi.json, schema.sql, deepseek wasm, engine/extra/*.md as base64) and zk-modules (providers/surfaces static lists); dist/ also gets slim package.json + pnpm-lock.yaml + pnpm-workspace.yaml
+ pnpm build — scripts/build.mjs: esbuild bundles own code to dist/server.js (npm packages external, define process.env.ZK_BUNDLED=1); virtual modules zk-assets (openapi.json, schema.sql, deepseek wasm, engine/extra/*.md as base64) and zk-modules (providers/surfaces static lists); dist/ also gets slim package.json + pnpm-lock.yaml + pnpm-workspace.yaml + version.txt (<pkg.version>+<GITHUB_SHA first 8 or local>; launchers compare it); bundle is whitespace/syntax-minified with a linked sourcemap
  utils/bundle.js — seam: ROOT, readAsset, listAssets, bundled; disk-backed from source, bundle-backed when ZK_BUNDLED=1; new runtime file reads must go through it
  .github/workflows/release.yml — on push to main builds and force-pushes dist/ to the dist branch (what the launchers download)
  pnpm install → postinstall sets core.hooksPath=.githooks

@@ -30,30 +30,58 @@ call :ensure_pnpm
 if errorlevel 1 goto fail
 call :ok "Toolchain ready"
 
-if not exist "%DIR%" mkdir "%DIR%"
+if exist "%~dp0core\state\db.js" (set "DIR=%~dp0") else (if not exist "%DIR%" mkdir "%DIR%")
 cd /d "%DIR%"
 
-call :section "Update - fetching server.js"
-call :download "%RAW%/server.js" "server.js.new"
-if errorlevel 1 (
-    if not exist "server.js" (
-        call :err "Could not download server.js"
-        goto fail
-    )
-    call :warn "Offline - using existing server.js"
-) else (
-    move /y "server.js.new" "server.js" >nul
-    call :ok "server.js up to date"
-)
-
-call :download "%RAW%/package.json" "package.json.new"
-if errorlevel 1 (
-    if not exist "node_modules\" (
-        call :err "Could not download package.json"
-        goto fail
-    )
+if exist "core\state\db.js" (
+    call :ok "Local project detected, using its server.js"
+    if not exist "node_modules\" call pnpm install
     goto start
 )
+call :section "Update - checking"
+set "UPDATE=0"
+if not exist "server.js" set "UPDATE=1"
+if not exist "node_modules\" set "UPDATE=1"
+if "!UPDATE!"=="1" goto doupdate
+if exist ".update" (
+    call :warn "Update available"
+    goto askupdate
+)
+call :download "%RAW%/version.txt" "version.new"
+if errorlevel 1 (
+    del "version.new" >nul 2>nul
+    call :warn "Offline - using existing files"
+    goto start
+)
+fc /b ".version" "version.new" >nul 2>nul
+if not errorlevel 1 (
+    del "version.new" >nul 2>nul
+    call :ok "Up to date"
+    goto start
+)
+type nul > ".update"
+call :warn "Update available"
+
+:askupdate
+del "version.new" >nul 2>nul
+choice /c YN /t 10 /d Y /m "Update now"
+if errorlevel 2 (
+    call :warn "Keeping current version"
+    goto start
+)
+
+:doupdate
+call :section "Update - downloading"
+call :download "%RAW%/version.txt" "version.new"
+if errorlevel 1 goto updfail
+call :download "%RAW%/server.js" "server.js.new"
+if errorlevel 1 goto updfail
+call :download "%RAW%/package.json" "package.json.new"
+if errorlevel 1 goto updfail
+call :download "%RAW%/pnpm-lock.yaml" "pnpm-lock.yaml.new"
+if errorlevel 1 del "pnpm-lock.yaml.new" >nul 2>nul
+call :download "%RAW%/pnpm-workspace.yaml" "pnpm-workspace.yaml.new"
+if errorlevel 1 del "pnpm-workspace.yaml.new" >nul 2>nul
 
 set "NEED=0"
 if not exist "node_modules\" set "NEED=1"
@@ -62,22 +90,33 @@ if "!NEED!"=="0" (
     fc /b "package.json" "package.json.new" >nul 2>nul
     if errorlevel 1 set "NEED=1"
 )
-if "!NEED!"=="0" (
-    del "package.json.new" >nul 2>nul
-    call :ok "Dependencies unchanged"
+move /y "server.js.new" "server.js" >nul
+move /y "package.json.new" "package.json" >nul
+if exist "pnpm-lock.yaml.new" move /y "pnpm-lock.yaml.new" "pnpm-lock.yaml" >nul
+if exist "pnpm-workspace.yaml.new" move /y "pnpm-workspace.yaml.new" "pnpm-workspace.yaml" >nul
+if "!NEED!"=="1" (
+    call :section "Dependencies - pnpm install --prod"
+    call pnpm install --prod
+    if errorlevel 1 (
+        call :err "Failed to install dependencies."
+        goto fail
+    )
+    call :ok "Dependencies installed."
+)
+move /y "version.new" ".version" >nul
+del ".update" >nul 2>nul
+call :ok "Update applied"
+
+goto start
+
+:updfail
+del "server.js.new" "package.json.new" "pnpm-lock.yaml.new" "pnpm-workspace.yaml.new" "version.new" >nul 2>nul
+if exist "server.js" (
+    call :warn "Update download failed - using existing files"
     goto start
 )
-
-move /y "package.json.new" "package.json" >nul
-call :download "%RAW%/pnpm-lock.yaml" "pnpm-lock.yaml"
-call :download "%RAW%/pnpm-workspace.yaml" "pnpm-workspace.yaml"
-call :section "Dependencies - pnpm install --prod"
-call pnpm install --prod
-if errorlevel 1 (
-    call :err "Failed to install dependencies."
-    goto fail
-)
-call :ok "Dependencies installed."
+call :err "Could not download server.js"
+goto fail
 
 :start
 call :section "Start - node server.js"

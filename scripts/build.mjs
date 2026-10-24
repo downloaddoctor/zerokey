@@ -90,7 +90,9 @@ await build({
   format: 'cjs',
   target: 'node22',
   packages: 'external',
-  minify: false,
+  minifyWhitespace: true,
+  minifySyntax: true,
+  sourcemap: 'linked',
   keepNames: true,
   define: { 'process.env.ZK_BUNDLED': '"1"' },
   legalComments: 'none',
@@ -117,5 +119,9 @@ await writeFile(path.join(OUT, 'package.json'), JSON.stringify(slim, null, 2) + 
 for (const f of ['pnpm-lock.yaml', 'pnpm-workspace.yaml']) {
   if (existsSync(path.join(ROOT, f))) await copyFile(path.join(ROOT, f), path.join(OUT, f))
 }
+
+// 4. version marker: launchers compare it to decide whether an update exists
+const sha = (process.env.GITHUB_SHA || 'local').slice(0, 8)
+await writeFile(path.join(OUT, 'version.txt'), pkg.version + '+' + sha + '\n')
 
 console.log('dist ready: ' + posix(path.relative(ROOT, OUT)))
