@@ -788,7 +788,7 @@ class ClaudeConnectRpc extends BaseAPI {
   /**
    * Assert an RPC response is usable, with a clear error when Cloudflare served
    * its JS challenge ("Just a moment...") instead of the API. A challenge means
-   * the node-fetch TLS fingerprint was rejected — retrying won't help; the
+   * the impit TLS fingerprint was rejected — retrying won't help; the
    * session needs to run through a real browser (or supply a fresh cf_clearance).
    */
   async _assertRpcOk(res) {
@@ -821,7 +821,7 @@ class ClaudeConnectRpc extends BaseAPI {
       /Just a moment|cf-chl|__cf_chl/i.test(body) || hdr('cf-mitigated') === 'challenge'
     const err = new Error(
       challenge
-        ? `Cloudflare challenge (HTTP ${res.status}) — node-fetch fingerprint rejected. Use a real browser session or refresh cf_clearance. [${meta}]`
+        ? `Cloudflare challenge (HTTP ${res.status}) — impit fingerprint rejected. Use a real browser session or refresh cf_clearance. [${meta}]`
         : `HTTP ${res.status} ${res.statusText || ''}: ${detail} [${meta}]`,
     )
     err.status = res.status
@@ -940,6 +940,7 @@ class ClaudeConnectRpc extends BaseAPI {
     this._captureResponseHeaders(res)
     await this._assertRpcOk(res)
 
+    const nodeBody = this._nodeStream(res)
     const reader = makeFrameReader()
     const collector = sharedCollector || makeReplyCollector()
     let closed = false
@@ -947,14 +948,14 @@ class ClaudeConnectRpc extends BaseAPI {
       if (closed) return
       closed = true
       try {
-        res.body.destroy()
+        nodeBody.destroy()
       } catch {
         // already closed
       }
     }
 
-    // node-fetch v2 body is a Node Readable; iterate it and emit whole frames.
-    const iterator = res.body[Symbol.asyncIterator]()
+    // impit body is wrapped as a Node Readable; iterate it and emit whole frames.
+    const iterator = nodeBody[Symbol.asyncIterator]()
     const pending = []
     const next = async () => {
       if (closed) return null

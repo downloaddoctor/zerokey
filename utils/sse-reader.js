@@ -62,7 +62,7 @@ async function readSSE(stream, { onData, onDone, onError, onBytes }) {
 
   const decoder = new TextDecoder()
 
-  // node-fetch returns a Node.js Readable; native fetch returns a WHATWG ReadableStream
+  // BaseAPI._nodeStream returns a Node.js Readable; impit/native fetch return a WHATWG ReadableStream
   if (typeof stream.getReader === 'function') {
     const reader = stream.getReader()
     try {

@@ -121,7 +121,7 @@ ENV
  ZEROKEY_CLAUDE_F15_PROBE — 'zero'|'random': debug only, sends that 32-byte f15 to test whether the server validates it; unset → actionSignature() throws
 
 DEPENDENCIES
- express@^5, node-fetch@^2 (node-fetch@2, not global fetch, for cookie/agent control)
+ express@^5, impit@^0.14 (all provider HTTP via BaseAPI._client: Chrome TLS/HTTP2 fingerprint; _nodeStream(res) wraps the WHATWG body as a Node Readable)
  playwright@^1 — DeepSeek + Inception browser transports
  prompts@^2 — startup wizard
  Runtime: node:sqlite (built-in), node:test, node:crypto

@@ -1,5 +1,5 @@
-const https = require('https')
-const nodeFetch = require('node-fetch')
+const { Readable } = require('stream')
+const { Impit } = require('impit')
 const { CookieJar } = require('../../utils/cookie-jar')
 
 /**
@@ -13,15 +13,9 @@ class BaseAPI {
     this._log = options.log !== false
     this._cookies = new CookieJar()
     this._headers = {}
-    // Pool of 1 (sequentialQueue allows one in-flight request). 60s idle cap
-    // fires before any upstream cull — no zombie sockets, one handshake per gap.
-    this._httpAgent = new https.Agent({
-      keepAlive: true,
-      keepAliveMsecs: 15000,
-      maxSockets: 1,
-      maxFreeSockets: 1,
-      timeout: 60000,
-    })
+    // One impit client per API instance: Chrome TLS/HTTP2 fingerprint plus
+    // connection reuse. Redirects are followed; timeouts are enforced per request.
+    this._client = new Impit({ browser: 'chrome', followRedirects: true })
   }
 
   /**
@@ -75,17 +69,45 @@ class BaseAPI {
     return error
   }
 
+  /**
+   * Normalize request headers for impit: drop null/undefined values and
+   * accept-encoding (impit negotiates and decodes compression itself).
+   */
+  _cleanHeaders(headers = {}) {
+    const out = {}
+    for (const [k, v] of Object.entries(headers)) {
+      if (v === undefined || v === null) continue
+      if (k.toLowerCase() === 'accept-encoding') continue
+      out[k] = String(v)
+    }
+    return out
+  }
+
+  /**
+   * Node Readable view of a response body (impit returns a WHATWG stream).
+   * Chunks are Buffers; destroy() cancels the upstream stream.
+   */
+  _nodeStream(res) {
+    const web = res.body
+    if (!web) return Readable.from([], { objectMode: false })
+    return Readable.from(
+      (async function* () {
+        for await (const chunk of web) yield Buffer.from(chunk)
+      })(),
+      { objectMode: false },
+    )
+  }
+
   async _fetch(url, options = {}, parseJSON = false, timeoutMs = 300000) {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs)
 
     let res
     try {
-      res = await nodeFetch(url, {
+      res = await this._client.fetch(url, {
         ...options,
-        redirect: 'follow',
+        headers: this._cleanHeaders(options.headers),
         signal: controller.signal,
-        agent: this._httpAgent,
       })
     } catch (err) {
       console.error(`${this.constructor.name}: fetch failed for ${url}:`, err)

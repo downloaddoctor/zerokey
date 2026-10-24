@@ -141,7 +141,7 @@ class DeepSeekAPI extends BaseAPI {
 
     this._captureResponseHeaders(res)
 
-    return res.body
+    return this._nodeStream(res)
   }
 
   async uploadFile(file) {

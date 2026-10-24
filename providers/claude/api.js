@@ -210,7 +210,7 @@ class ClaudeAPI extends BaseAPI {
     this._captureResponseHeaders(res)
 
     return {
-      stream: res.body,
+      stream: this._nodeStream(res),
       chatSessionId,
     }
   }

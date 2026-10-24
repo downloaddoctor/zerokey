@@ -2,15 +2,15 @@ const fs = require('fs')
 const path = require('path')
 const os = require('os')
 
-const fetch = require('node-fetch')
-
 const { isPortActive } = require('./startup')
 const registry = require('../providers/registry')
 const { text } = require('./log')
 
 async function _fetchHealth(p) {
   try {
-    const res = await fetch(`http://localhost:${p}/health`, { timeout: 2000 })
+    const res = await globalThis.fetch(`http://localhost:${p}/health`, {
+      signal: globalThis.AbortSignal.timeout(2000),
+    })
     if (!res.ok) return null
     const data = await res.json()
     return data

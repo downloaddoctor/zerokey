@@ -1,5 +1,3 @@
-const nodeFetch = require('node-fetch')
-
 const { ChatGPTProofOfWork } = require('./pow')
 const { humanDelay } = require('../../utils/human-delay')
 const { uuid } = require('../../utils/uuid')
@@ -86,12 +84,15 @@ class ChatGPTAPI extends BaseAPI {
     }
 
     // Step 2: PUT raw bytes to the Azure Blob SAS URL
-    const putRes = await nodeFetch(uploadUrl, {
-      method: 'PUT',
-      headers: { 'x-ms-blob-type': 'BlockBlob', 'content-type': mimeType },
-      body: data,
-      agent: this._httpAgent,
-    })
+    const putRes = await this._fetch(
+      uploadUrl,
+      {
+        method: 'PUT',
+        headers: { 'x-ms-blob-type': 'BlockBlob', 'content-type': mimeType },
+        body: data,
+      },
+      false,
+    )
     await assertOk(putRes, { prefix: 'ChatGPT blob upload failed: ' })
 
     // Step 3: trigger processing, wait for completion via SSE
@@ -262,7 +263,7 @@ class ChatGPTAPI extends BaseAPI {
 
     this._captureResponseHeaders(res)
 
-    return res.body
+    return this._nodeStream(res)
   }
 
   // ─── Conversation prepare (conduit token refresh) ───────────
