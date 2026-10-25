@@ -23,16 +23,6 @@ function randomId() {
   return crypto.randomBytes(12).toString('base64url').slice(0, 16)
 }
 
-// Summary-rotation prompt counter lives on the session row (metadata.promptCount).
-function promptCountOf(s) {
-  return (s.metadata && s.metadata.promptCount) || 0
-}
-
-function setPromptCount(s, n) {
-  if (!s.metadata || typeof s.metadata !== 'object') s.metadata = {}
-  s.metadata.promptCount = n
-}
-
 async function buildInceptionRouter(parsedFetch, session, userData = null) {
   const TRANSPORT = resolveSessionTransport(session, DEFAULT_TRANSPORT, ['browser', 'api'])
   const browser =
@@ -49,7 +39,7 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
   // ride in the first prompt again; prompt counter reset).
   session.id = randomId()
   session.parentId = null
-  setPromptCount(session, 0)
+  session.turnCount = 0
 
   let carriedSummary = null
 
@@ -72,7 +62,7 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
     if (!summary) throw new Error('[Inception] summary request returned an empty reply')
     carriedSummary = summary
     session.parentId = null
-    setPromptCount(session, 0)
+    session.turnCount = 0
     console.info('[Inception] summary captured — next turn starts a new chat')
   }
 
@@ -101,12 +91,12 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
 
           pipeline.beginTurn()
 
-          // Real user prompts only: tool-loop rounds (role 'mhi') are not counted.
+          // session.turnCount is counted by pipeline.setup (every upstream round).
+          // Rotation is only checked on real user prompts, never mid tool loop (role 'mhi').
           const lastRole = (payload.messages[payload.messages.length - 1] || {}).role
           let newThread = false
           if (!ephemeral && lastRole !== 'mhi') {
-            setPromptCount(active, promptCountOf(active) + 1)
-            if (promptCountOf(active) >= summaryAt) {
+            if ((active.turnCount || 0) >= summaryAt) {
               try {
                 await rotateWithSummary(pipeline, reasoningEffort, req.signal)
                 newThread = true
@@ -118,6 +108,8 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
                 })
               } catch (summaryErr) {
                 console.error('inception: summary rotation failed:', summaryErr)
+                // Back off: retry in 5 turns instead of on every following prompt.
+                active.turnCount = Math.max(0, summaryAt - 5)
               }
             }
           }
@@ -173,6 +165,8 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
               pipeline,
             )
             outcome = {}
+            // The continue is a real upstream prompt, so it counts too.
+            active.turnCount = (active.turnCount || 0) + 1
             reply += await streamHandler(next, active, pipeline, outcome)
           }
           if (outcome.error) pipeline.emitText('\n\n⚠ Stream error: ' + outcome.error + '\n')

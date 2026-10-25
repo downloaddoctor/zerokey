@@ -168,7 +168,10 @@ async function execute(call, options = {}) {
         ')',
     }
   } catch (error) {
-    console.error('view-image: scope resolution failed:', error)
+    // MhiFileError = expected validation failure, returned to the model below; log only the unexpected.
+    if (!(error instanceof MhiFileError) && !(error && error.name === 'AbortError')) {
+      console.error('view-image: unexpected failure:', error)
+    }
     if (error && error.name === 'AbortError') throw error
     const code = error && typeof error.code === 'string' ? error.code : 'mhi_view_image_error'
     const message = error && error.message ? error.message : 'Unknown view_image error.'

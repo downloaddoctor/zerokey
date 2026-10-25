@@ -450,6 +450,50 @@ function toRecord(level, call) {
   )
 }
 
+// Session number: every process start claims the next number (+1, never reused,
+// claimed atomically with an exclusive create so parallel processes get distinct
+// numbers). Skipped in `node --test` children (SESSION_NO 0, no files touched).
+const DIGEST_ON = !process.env.NODE_TEST_CONTEXT
+const SESSIONS_DIR = path.join(CONFIG.LOG_DIR, 'sessions')
+const SESSION_KEEP = 300
+
+function pad(n) {
+  return String(n).padStart(3, '0')
+}
+
+function claimSession() {
+  try {
+    fs.mkdirSync(SESSIONS_DIR, { recursive: true })
+    const counterFile = path.join(CONFIG.LOG_DIR, 'session-counter.txt')
+    let n = 0
+    try {
+      n = parseInt(fs.readFileSync(counterFile, 'utf8'), 10) || 0
+    } catch (caughtErr) {
+      if (caughtErr.code !== 'ENOENT') reportLoggerError(caughtErr)
+    }
+    for (;;) {
+      n += 1
+      try {
+        fs.closeSync(fs.openSync(path.join(SESSIONS_DIR, 'session-' + pad(n) + '.log'), 'wx'))
+        break
+      } catch (caughtErr) {
+        if (caughtErr.code !== 'EEXIST') throw caughtErr
+      }
+    }
+    fs.writeFileSync(counterFile, String(n))
+    for (const entry of fs.readdirSync(SESSIONS_DIR)) {
+      const m = /^session-(\d+)\.log$/.exec(entry)
+      if (m && Number(m[1]) <= n - SESSION_KEEP) fs.unlinkSync(path.join(SESSIONS_DIR, entry))
+    }
+    return n
+  } catch (caughtErr) {
+    reportLoggerError(caughtErr)
+    return 0
+  }
+}
+
+const SESSION_NO = DIGEST_ON ? claimSession() : 0
+
 // Append-only history: every level (debug included) from every run, never
 // rotated or pruned. Each process start writes a SESSION marker row, so
 // "last N sessions" = the text after the Nth-from-last marker.
@@ -466,15 +510,42 @@ historySink.log(
     PID,
     'SESSION',
     'SESSION',
-    csvField('START node=' + process.version + ' cwd=' + process.cwd()),
+    csvField('START #' + pad(SESSION_NO) + ' node=' + process.version + ' cwd=' + process.cwd()),
   ].join(SEP) + CSV_EMPTY_TAIL,
 )
+
+// Per-session digest (temp/logs/sessions/session-<N>.log) for LLM reading: WARN/ERROR
+// rows plus SERVER lifecycle rows, each capped. One file per process start, so
+// parallel processes never mix and any run can be pointed to by its number.
+const DIGEST_MAX_LINE = 700
+const digestSink = new LogSaver({
+  name: 'session-' + pad(SESSION_NO),
+  dir: SESSIONS_DIR,
+  maxSize: Infinity,
+  header: CSV_HEADER,
+})
+const DIGEST_ACTIVE = DIGEST_ON && SESSION_NO > 0
+
+if (DIGEST_ACTIVE) {
+  digestSink.log(
+    [
+      csvField(new Date().toISOString()),
+      PID,
+      'SESSION',
+      'SESSION',
+      csvField('START #' + pad(SESSION_NO) + ' node=' + process.version + ' cwd=' + process.cwd()),
+    ].join(SEP) + CSV_EMPTY_TAIL,
+  )
+}
 
 function record(level, call) {
   try {
     const line = toRecord(level, call)
     if (LEVELS[level] <= THRESHOLD) sink.log(line)
     historySink.log(line)
+    if (DIGEST_ACTIVE && (level === 'error' || level === 'warn' || call.tag === 'SERVER')) {
+      digestSink.log(line.length > DIGEST_MAX_LINE ? line.slice(0, DIGEST_MAX_LINE) + '…' : line)
+    }
   } catch (caughtErr) {
     reportLoggerError(caughtErr)
   }
@@ -588,6 +659,16 @@ console.debug.mix = function mix(...args) {
     }),
   )
   record('debug', call)
+}
+
+if (DIGEST_ACTIVE) {
+  console.info(
+    '[SERVER] log session #' +
+      pad(SESSION_NO) +
+      ' → temp/logs/sessions/session-' +
+      pad(SESSION_NO) +
+      '.log',
+  )
 }
 
 module.exports = {

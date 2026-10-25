@@ -146,6 +146,7 @@ class StreamPipeline {
     this.tokenUsage = {}
     this._modelChars = 0
     this._finished = false
+    this._turnCounted = false
     // Accumulated assistant text for the internal MHI tool loop. Appended in
     // emitText; reset by beginTurn(). Never sent to the client directly — the
     // pipeline streams as it scans.
@@ -307,14 +308,19 @@ class StreamPipeline {
       this.compiler.surfaceDef?.browserNameMap,
     )
 
+    // Every provider counts upstream rounds, whether or not it reinjects by turn.
+    this.session.turnCount = (this.session.turnCount || 0) + 1
+    this._turnCounted = true
+
     const reinjectEvery = this.compiler.reinjectEvery || 0
-    if (reinjectEvery > 0) {
-      this.session.turnCount = (this.session.turnCount || 0) + 1
-      if (this.session.turnCount > 1 && this.session.turnCount % reinjectEvery === 0) {
-        const { content } = require('./instructions').getExtra('reminder')
-        this._injectLive(messages, content)
-        console.debug(`[REINJECT] turn ${this.session.turnCount} — instructions re-injected`)
-      }
+    if (
+      reinjectEvery > 0 &&
+      this.session.turnCount > 1 &&
+      this.session.turnCount % reinjectEvery === 0
+    ) {
+      const { content } = require('./instructions').getExtra('reminder')
+      this._injectLive(messages, content)
+      console.debug(`[REINJECT] turn ${this.session.turnCount} — instructions re-injected`)
     }
 
     // Token-threshold reinjection. Providers declare `reinjectAt` as a list of
@@ -410,6 +416,12 @@ class StreamPipeline {
     })
 
     if (responseClosed || contentComplete) return
+
+    // The round never completed: undo its count so a client resend is not counted twice.
+    if (this._turnCounted) {
+      this.session.turnCount = Math.max(0, (this.session.turnCount || 0) - 1)
+      this._turnCounted = false
+    }
 
     this._finished = true
     const err = toOpenAIError(error, this.provider)

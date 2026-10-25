@@ -453,7 +453,10 @@ async function execute(call, options = {}) {
       output: boundedOutput(result.output),
     }
   } catch (error) {
-    console.error('files: scope resolution failed:', error)
+    // MhiFileError = expected validation failure, returned to the model below; log only the unexpected.
+    if (!(error instanceof MhiFileError) && !(error && error.name === 'AbortError')) {
+      console.error('files: unexpected failure:', error)
+    }
     if (error && error.name === 'AbortError') throw error
     const code = error && typeof error.code === 'string' ? error.code : 'mhi_file_error'
     const message = error && error.message ? error.message : 'Unknown file error.'
@@ -468,7 +471,9 @@ async function executeMany(calls, options = {}) {
     try {
       results.push(await execute(call, options))
     } catch (error) {
-      console.error('files: glob/grep result collection failed:', error)
+      if (!(error instanceof MhiFileError) && !(error && error.name === 'AbortError')) {
+        console.error('files: unexpected failure:', error)
+      }
       if (error && error.name === 'AbortError') throw error
       const code = error && typeof error.code === 'string' ? error.code : 'mhi_file_error'
       const message = error && error.message ? error.message : 'Unknown file error.'
