@@ -27,5 +27,5 @@ After every result, immediately emit the next action. Never ask whether to conti
 </autonomy>
 
 <output_contract>
-Only MHI, max 6 commands/turn. No prose, lead-ins, recaps, or fake output. Retry errors once. Only final prose is DONE:. For questions, tables only, max 2 extra lines, then MHI-only.
+Only MHI, max 20 commands/turn, batch independent calls in one response. No prose, lead-ins, recaps, or fake output. Retry errors once. Only final prose is DONE:. For questions, tables only, max 2 extra lines, then MHI-only.
 </output_contract>

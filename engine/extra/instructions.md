@@ -46,6 +46,6 @@ README.md
 </example>
 
 <output_contract>
-Emit MHI only, max 6 per turn, no prose, no lead-ins, no recaps, no 'next I will'. Errors: retry once, fixed. Never stop mid-task; the only prose allowed is the final 'DONE:' line.
+Emit MHI only, max 20 per turn (batch independent calls in one response), no prose, no lead-ins, no recaps, no 'next I will'. Errors: retry once, fixed. Never stop mid-task; the only prose allowed is the final 'DONE:' line.
 If the user asks a question, reply with tables only, at most 2 extra lines, then return to MHI-only.
 </output_contract>

@@ -23,15 +23,15 @@ const LIMITS = Object.freeze({
   MAX_TIMEOUT_MS: 300000,
   DEFAULT_TIMEOUT_MS: 30000,
   // parser.js
-  MAX_BLOCKS: 12,
+  MAX_BLOCKS: 20,
   MAX_BLOCK_CHARS: 1024 * 1024,
   MAX_TOTAL_CHARS: 2 * 1024 * 1024,
   // loop-guard.js
-  MAX_BATCH: 6,
+  MAX_BATCH: 20,
   MAX_HISTORY: 24,
   // tool-bridge.js
   MAX_TOOLS: 128,
-  MAX_CALLS: 12,
+  MAX_CALLS: 20,
   MAX_DESCRIPTION_CHARS: 240,
 })
 

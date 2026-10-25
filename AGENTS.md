@@ -49,7 +49,7 @@ MODULES
  engine/pipeline.js — StreamPipeline: per-request SSE lifecycle, scan() FSM, deferFinish for tool loops; flush() dedupes via loop-guard and records read signatures to session._toolHistory, injecting $loop-break when a whole batch repeats prior reads
  engine/loop-guard.js — signature/inspectBatch (single-response dedup + drift), pushHistory/detectLoop (cross-turn ABAB/ABA/AA via session._toolHistory)
  engine/extra/loop-break.md — loop-break reminder text, injected live via pipeline._loopBreakText() on single-response drift or cross-turn repetition (not a $-trigger)
- engine/compiler.js — ToolCompiler singleton per ide×provider; parse/emit generic→native tool mapping
+ engine/compiler.js — ToolCompiler singleton per ide×provider; parse/emit generic→native tool mapping; limitPrompt delegates to utils/overflow.js: prompt over provider promptLimit keeps its head inline (cut on a line break) and only the leftover is written to ONE file DATA_DIR/overflow/<id>/prompt.txt; the text starts with a '[TRUNCATED: N chars left, read them from <path>]' header (lastPrompt.spilled = N); no part splitting; hard [TRUNCATED] cut (truncatePrompt) when the files cannot be written or the note would not fit; overflow dirs older than 24 h are pruned on each spill
  engine/tool-bridge.js — grammar injection + block parsing for providers with no native tool channel
  engine/triggers.js — $skill registry; auto-registers one passthrough per engine/extra/*.md
  engine/instructions.js — caches base prompt + extra/*.md fragments (SHA-256)
@@ -77,6 +77,7 @@ MODULES
  surfaces/<name>/index.js — IDE surface config fn (t) => {...}; declares ideName + realSessionPrefix + utilityPrefixes
  surfaces/<name>/template.json — captured system-prompt fingerprint for that IDE (docs/reference)
  routes/health.js — includes pid, provider, session, persistence, promptLimit
+ utils/overflow.js — limitPrompt(compiler, prompt): under limit passes through; over → spillOverflow part files + note, else truncatePrompt; sets compiler.lastPrompt {chars, limit, headroom, spilled?, dropped, truncated} read by engine/usage.js
  utils/sse-writer.js — serialized SSE frames with backpressure; finish()/fail() idempotent
  utils/rate-limiter.js — sliding window 15/60s per label; setProviderCooldown on 429
  utils/startup.js — per-port lock file temp/db/.start.<port>.lock; probeHealth/postClaim; claimFirstFree releases a won lock and skips the port (or throws EADDRINUSE when exact) if isPortActive finds a foreign listener
