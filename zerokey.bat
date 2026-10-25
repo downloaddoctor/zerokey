@@ -135,7 +135,7 @@ node server.js & endlocal & exit
 :verify
 if not exist "SHA256SUMS.new" exit /b 0
 set "WANT="
-for /f "tokens=1" %%a in ('findstr /e /c:" %~1" "SHA256SUMS.new"') do set "WANT=%%a"
+for /f "tokens=1" %%a in ('findstr /c:" %~1" "SHA256SUMS.new"') do set "WANT=%%a"
 set "GOT="
 for /f "delims=" %%h in ('certutil -hashfile "%~1.new" SHA256 ^| findstr /v ":"') do if not defined GOT set "GOT=%%h"
 set "GOT=!GOT: =!"
