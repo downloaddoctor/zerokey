@@ -112,3 +112,60 @@ test('normalizeEnablement defaults are sane', () => {
     viewImage: true,
   })
 })
+
+test('executeCalls forwards cmd capability options', async () => {
+  reset()
+  const base = {
+    context: { rootPath: SCRATCH },
+    fileTools: true,
+    cmdTools: true,
+    viewImage: false,
+  }
+
+  const writeBlocked = await mhi.executeCalls(
+    [{ tool: 'cmd', params: { args: ['node', '--version'] } }],
+    { ...base },
+  )
+  assert.equal(writeBlocked[0].ok, false)
+  assert.equal(writeBlocked[0].code, 'mhi_cmd_write_forbidden')
+
+  const networkBlocked = await mhi.executeCalls(
+    [{ tool: 'cmd', params: { args: ['node', '--version'] } }],
+    { ...base, allowWrite: true },
+  )
+  assert.equal(networkBlocked[0].ok, false)
+  assert.equal(networkBlocked[0].code, 'mhi_cmd_network_forbidden')
+
+  const allowed = await mhi.executeCalls(
+    [{ tool: 'cmd', params: { args: ['node', '--version'] } }],
+    { ...base, allowWrite: true, allowNetwork: true },
+  )
+  assert.equal(allowed[0].ok, true)
+  assert.match(allowed[0].output, /v\d+\.\d+\.\d+/)
+})
+
+test('executeCalls forwards programs allowlist', async () => {
+  reset()
+  const results = await mhi.executeCalls([{ tool: 'cmd', params: { args: ['git', 'status'] } }], {
+    context: { rootPath: SCRATCH },
+    fileTools: true,
+    cmdTools: true,
+    viewImage: false,
+    programs: ['node'],
+  })
+  assert.equal(results[0].ok, false)
+  assert.equal(results[0].code, 'mhi_cmd_program_forbidden')
+})
+
+test('executeCalls forwards projectPrograms allowlist', async () => {
+  reset()
+  const results = await mhi.executeCalls([{ tool: 'cmd', params: { args: ['./missing.exe'] } }], {
+    context: { rootPath: SCRATCH },
+    fileTools: true,
+    cmdTools: true,
+    viewImage: false,
+    projectPrograms: ['tool.exe'],
+  })
+  assert.equal(results[0].ok, false)
+  assert.equal(results[0].code, 'mhi_cmd_program_forbidden')
+})

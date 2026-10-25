@@ -98,7 +98,7 @@ test('grep finds a needle', async () => {
 test('grep with a glob filter narrows', async () => {
   reset()
   const result = await files.execute(
-    { tool: 'grep', params: { query: 'line', glob: '*.txt' } },
+    { tool: 'grep', params: { query: 'line', filter: '*.txt' } },
     ctx(),
   )
   assert.equal(result.ok, true)

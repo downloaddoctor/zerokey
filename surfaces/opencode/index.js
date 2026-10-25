@@ -4,13 +4,14 @@ const { getAllTags } = require('../base')
 module.exports = (t) => {
   t.ideName = 'opencode'
   t.newSessionStartLength = 2
-  // Current OpenCode prompt (sst/opencode @ dev):
-  // https://github.com/sst/opencode/blob/dev/packages/opencode/src/session/prompt/anthropic.txt
+  // Current OpenCode prompt (anomalyco/opencode @ dev):
+  // https://github.com/anomalyco/opencode/blob/dev/packages/core/src/session/runner/prompt/system.txt
+  // 'You are OpenCode' is the legacy prompt (sst/opencode, packages/opencode/src/session/prompt/anthropic.txt).
   t.realSessionPrefix = 'You are OpenCode'
   // Older OpenCode releases used lowercase "opencode"; users on those builds
   // still ship the old prompt. Never remove — see test/surfaces/prefixes.test.js.
-  t.realSessionPrefixAliases = ['You are opencode']
-  // IDE-internal utility prompts. Sources (sst/opencode @ dev):
+  t.realSessionPrefixAliases = ['You are opencode', 'You are an AI agent running in OpenCode']
+  // IDE-internal utility prompts. Legacy sources (sst/opencode, packages/opencode; the repo moved to anomalyco/opencode and these paths are gone):
   //   https://github.com/sst/opencode/blob/dev/packages/opencode/src/agent/prompt/title.txt
   //   https://github.com/sst/opencode/blob/dev/packages/opencode/src/agent/prompt/summary.txt
   //   https://github.com/sst/opencode/blob/dev/packages/opencode/src/agent/prompt/compaction.txt
@@ -21,6 +22,7 @@ module.exports = (t) => {
     'Summarize what was done in this conversation.',
     'You are a context summarization agent.',
     'You are an elite AI agent architect specializing',
+    'You name conversations so the user can find them later',
   ]
 
   t.tool('read', 'read', { params: { path: 'filePath', offset: 'offset', limit: 'limit' } })

@@ -11,8 +11,8 @@ function frames(events) {
   return events.map((e) => 'data: ' + (typeof e === 'string' ? e : JSON.stringify(e)) + '\n\n')
 }
 
-test('inception summaryAt is the 95th prompt', () => {
-  assert.equal(config.summaryAt, 95)
+test('inception summaryAt is the 47th prompt', () => {
+  assert.equal(config.summaryAt, 47)
 })
 
 test('collectReply returns only the text deltas, silently', async () => {

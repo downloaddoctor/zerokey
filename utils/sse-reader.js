@@ -37,14 +37,15 @@ async function readSSE(stream, { onData, onDone, onError, onBytes, onRawLine }) 
     const dataStr = line.slice(5).trim()
     if (!dataStr) return
     if (dataStr === '[DONE]') {
-      onDone()
+      finishOnce(onDone)
       return
     }
 
     let data = dataStr
     try {
       data = JSON.parse(dataStr)
-    } catch {
+    } catch (caughtErr) {
+      console.warn('[SSE] malformed data line dropped: ' + caughtErr.message)
       return
     }
 
@@ -66,8 +67,14 @@ async function readSSE(stream, { onData, onDone, onError, onBytes, onRawLine }) 
     const lines = buffer.split('\n')
     buffer = lines.pop() || ''
     for (const line of lines) {
-      processLine(line)
+      processLine(line.endsWith('\r') ? line.slice(0, -1) : line)
     }
+  }
+
+  const flushTail = () => {
+    const tail = buffer
+    buffer = ''
+    if (tail.trim() !== '') processLine(tail)
   }
 
   const decoder = new TextDecoder()
@@ -81,6 +88,7 @@ async function readSSE(stream, { onData, onDone, onError, onBytes, onRawLine }) 
         if (done) break
         processChunk(decoder.decode(value, { stream: true }))
       }
+      flushTail()
       finishOnce(onDone)
     } catch (err) {
       finishOnce(() => onError(err))
@@ -91,6 +99,7 @@ async function readSSE(stream, { onData, onDone, onError, onBytes, onRawLine }) 
         processChunk(Buffer.isBuffer(chunk) ? decoder.decode(chunk, { stream: true }) : chunk)
       })
       stream.on('end', () => {
+        flushTail()
         finishOnce(onDone)
         resolve()
       })

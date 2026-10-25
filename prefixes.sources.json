@@ -2,6 +2,24 @@
   "_comment": "Upstream sources for scripts/check-prefix-drift.js. Each 'watch' entry: fetch url, check that 'declared' still appears verbatim. Missing = upstream moved/renamed the prompt — re-read the file, append the new prefix to surfaces/<name>/index.js AND test/surfaces/prefixes.snapshot.json, keep the old one. 'unwatched' entries have no public source; they are checked by prefix snapshot tests only.",
   "watch": [
     {
+      "surface": "opencode",
+      "kind": "utility",
+      "declared": "You name conversations so the user can find them later",
+      "url": "https://raw.githubusercontent.com/anomalyco/opencode/dev/packages/core/src/plugin/agent.ts"
+    },
+    {
+      "surface": "opencode",
+      "kind": "utility",
+      "declared": "Summarize what was done in this conversation.",
+      "url": "https://raw.githubusercontent.com/anomalyco/opencode/dev/packages/core/src/plugin/agent.ts"
+    },
+    {
+      "surface": "opencode",
+      "kind": "real",
+      "declared": "You are an AI agent running in OpenCode",
+      "url": "https://raw.githubusercontent.com/anomalyco/opencode/dev/packages/core/src/session/runner/prompt/system.txt"
+    },
+    {
       "surface": "vscode",
       "kind": "utility",
       "declared": "You are an expert in crafting ultra-compact titles",
@@ -14,36 +32,6 @@
       "url": "https://raw.githubusercontent.com/microsoft/vscode/main/extensions/copilot/src/extension/prompts/node/panel/terminalQuickFix.tsx"
     },
     {
-      "surface": "opencode",
-      "kind": "real",
-      "declared": "You are OpenCode",
-      "url": "https://raw.githubusercontent.com/sst/opencode/dev/packages/opencode/src/session/prompt/anthropic.txt"
-    },
-    {
-      "surface": "opencode",
-      "kind": "utility",
-      "declared": "You are a title generator.",
-      "url": "https://raw.githubusercontent.com/sst/opencode/dev/packages/opencode/src/agent/prompt/title.txt"
-    },
-    {
-      "surface": "opencode",
-      "kind": "utility",
-      "declared": "Summarize what was done in this conversation.",
-      "url": "https://raw.githubusercontent.com/sst/opencode/dev/packages/opencode/src/agent/prompt/summary.txt"
-    },
-    {
-      "surface": "opencode",
-      "kind": "utility",
-      "declared": "You are a context summarization agent.",
-      "url": "https://raw.githubusercontent.com/sst/opencode/dev/packages/opencode/src/agent/prompt/compaction.txt"
-    },
-    {
-      "surface": "opencode",
-      "kind": "utility",
-      "declared": "You are an elite AI agent architect specializing",
-      "url": "https://raw.githubusercontent.com/sst/opencode/dev/packages/opencode/src/agent/generate.txt"
-    },
-    {
       "surface": "terax",
       "kind": "real",
       "declared": "You are Terax, an AI agent",
@@ -51,6 +39,31 @@
     }
   ],
   "unwatched": [
+    {
+      "surface": "opencode",
+      "kind": "real",
+      "declared": "You are OpenCode",
+      "reason": "Legacy prefix for older OpenCode builds. Upstream moved to anomalyco/opencode and dropped it; the current prompt is watched under 'You are an AI agent running in OpenCode'."
+    },
+    {
+      "surface": "opencode",
+      "kind": "utility",
+      "declared": "You are a title generator.",
+      "reason": "Same upstream restructure as opencode/real; source file not located yet."
+    },
+
+    {
+      "surface": "opencode",
+      "kind": "utility",
+      "declared": "You are a context summarization agent.",
+      "reason": "Same upstream restructure as opencode/real; source file not located yet."
+    },
+    {
+      "surface": "opencode",
+      "kind": "utility",
+      "declared": "You are an elite AI agent architect specializing",
+      "reason": "Same upstream restructure as opencode/real; source file not located yet. packages/core/src/generate.ts holds no prompt text."
+    },
     {
       "surface": "vscode",
       "kind": "utility",

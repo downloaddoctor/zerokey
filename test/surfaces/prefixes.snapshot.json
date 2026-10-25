@@ -20,10 +20,11 @@
     "utility": []
   },
   "opencode": {
-    "real": ["You are OpenCode", "You are opencode"],
+    "real": ["You are OpenCode", "You are opencode", "You are an AI agent running in OpenCode"],
     "utility": [
       "You are a title generator.",
       "Summarize what was done in this conversation.",
+      "You name conversations so the user can find them later",
       "You are a context summarization agent.",
       "You are an elite AI agent architect specializing"
     ]

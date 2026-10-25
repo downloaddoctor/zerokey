@@ -126,11 +126,14 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
             async (limitReached) => {
               if (!limitReached?.resets_at) return
               limitHandled = true
-              userData.waitUntil = limitReached.resets_at * 1000
-              userData.waitReason = 'Claude rate limit'
+              const waitUntil = limitReached.resets_at * 1000
+              if (userData) {
+                userData.waitUntil = waitUntil
+                userData.waitReason = 'Claude rate limit'
+              }
 
-              const resetTime = new Date(userData.waitUntil).toLocaleTimeString()
-              const mins = Math.max(1, Math.ceil((userData.waitUntil - Date.now()) / 60000))
+              const resetTime = new Date(waitUntil).toLocaleTimeString()
+              const mins = Math.max(1, Math.ceil((waitUntil - Date.now()) / 60000))
               const overUtilized = limitReached.util >= 1.0
 
               if (overUtilized) {

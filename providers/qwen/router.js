@@ -37,6 +37,10 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
 
   router.post('/', async (req, res) => {
     const pipeline = new StreamPipeline(res, session, 'qwen', req.surface, req.isRealSession)
+    if (pipeline.ephemeralMode) {
+      pipeline.sendFinalChunk()
+      return
+    }
     const activeSession = pipeline.session
 
     const modelMeta = QWEN_MODELS[activeSession.model] || QWEN_MODELS[session.model] || {}
@@ -49,7 +53,12 @@ async function buildQwenRouter(parsedFetch, session, userData = null) {
     }
 
     if (!activeSession.id) {
-      activeSession.id = await qwenApi.createChatSession(activeSession.model || 'qwen3.7-max')
+      try {
+        activeSession.id = await qwenApi.createChatSession(activeSession.model || 'qwen3.7-max')
+      } catch (error) {
+        console.error('qwen: createChatSession failed:', error)
+        return pipeline.onError(error)
+      }
     }
 
     pipeline.deferFinish = true

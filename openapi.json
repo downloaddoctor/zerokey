@@ -67,6 +67,26 @@
         }
       }
     },
+    "/v1/diagnostics": {
+      "get": {
+        "tags": ["Info"],
+        "summary": "Bounded, redacted, loopback-only diagnostics summary",
+        "operationId": "getDiagnostics",
+        "responses": {
+          "200": {
+            "description": "Diagnostics payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/models": {
       "get": {
         "tags": ["Models"],
@@ -185,7 +205,7 @@
           },
           "version": {
             "type": "string",
-            "example": "1.0.0"
+            "example": "0.5.0"
           },
           "description": {
             "type": "string"
@@ -503,7 +523,17 @@
     "auth": "none"
   },
   "x-reasoning-labels": {
-    "deepseek": ["Off", "DeepThink"],
+    "deepseek": ["Off", "Search", "DeepThink", "DeepThink Search"],
+    "inception": [
+      "Instant",
+      "Low",
+      "Medium",
+      "High",
+      "Instant Search",
+      "Low Search",
+      "Medium Search",
+      "High Search"
+    ],
     "claude": [
       "Low",
       "Low Think",
@@ -511,6 +541,8 @@
       "Medium Think",
       "High",
       "High Think",
+      "XHigh",
+      "XHigh Think",
       "Max",
       "Max Think"
     ]
@@ -519,6 +551,7 @@
     "claude": 64000,
     "chatgpt": 50000,
     "deepseek": 128000,
+    "inception": 64000,
     "qwen": 128000
   }
 }

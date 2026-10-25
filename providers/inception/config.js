@@ -57,9 +57,9 @@ const reasoning = {
 
 const promptLimit = 64_000
 
-// Every Nth prompt sent upstream asks Mercury for a session summary, then the
+// Every 47th prompt sent upstream asks Mercury for a session summary, then the
 // router opens a new chat seeded with the base prompt plus that summary.
-const summaryAt = 95
+const summaryAt = 47
 
 const setupSteps = {
   url: 'https://chat.inceptionlabs.ai',
@@ -67,14 +67,10 @@ const setupSteps = {
   instructions: 'No capture needed — the provider is authless and browser-only.',
 }
 
-// Mercury stops at ~150k tokens per chat. Rotate with a summary below that, leaving room for the summary request and its reply.
-const summaryAtTokens = 120_000
-
 module.exports = {
   models,
   reasoning,
   promptLimit,
   summaryAt,
-  summaryAtTokens,
   setupSteps,
 }

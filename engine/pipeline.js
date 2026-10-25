@@ -145,7 +145,6 @@ class StreamPipeline {
     this.tokenUsage = {}
     this._modelChars = 0
     this._finished = false
-    this._turnCounted = false
     // Accumulated assistant text for the internal MHI tool loop. Appended in
     // emitText; reset by beginTurn(). Never sent to the client directly — the
     // pipeline streams as it scans.
@@ -231,6 +230,8 @@ class StreamPipeline {
     this.writer.finish(finishReason, usage)
     this._finished = true
     this.session.lastUsed = new Date().toISOString()
+    // Deferred tool-loop rounds already counted in sendFinalChunk.
+    if (!this._turnFinished) this.session.turnCount = (this.session.turnCount || 0) + 1
     if (this.onFinalChunk) this.onFinalChunk()
   }
 
@@ -249,6 +250,7 @@ class StreamPipeline {
     // current upstream stream before reading pipeline.assistantText.
     if (this.deferFinish) {
       this._turnFinished = true
+      this.session.turnCount = (this.session.turnCount || 0) + 1
       if (this.onFinalChunk) {
         try {
           this.onFinalChunk()
@@ -306,10 +308,6 @@ class StreamPipeline {
       tools,
       this.compiler.surfaceDef?.browserNameMap,
     )
-
-    // Every provider counts upstream rounds, whether or not it reinjects by turn.
-    this.session.turnCount = (this.session.turnCount || 0) + 1
-    this._turnCounted = true
 
     const reinjectEvery = this.compiler.reinjectEvery || 0
     if (
@@ -415,12 +413,6 @@ class StreamPipeline {
     })
 
     if (responseClosed || contentComplete) return
-
-    // The round never completed: undo its count so a client resend is not counted twice.
-    if (this._turnCounted) {
-      this.session.turnCount = Math.max(0, (this.session.turnCount || 0) - 1)
-      this._turnCounted = false
-    }
 
     this._finished = true
     const err = toOpenAIError(error, this.provider)

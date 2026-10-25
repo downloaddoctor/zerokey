@@ -164,7 +164,7 @@ through the real web UI — no further captures needed.
 No capture needed — the site is authless. ZeroKey drives a real Chromium window (profile in `temp/profiles/inception/<username>/`) on `chat.inceptionlabs.ai`, like DeepSeek, so plain HTTP is not used. Set `INCEPTION_HEADLESS=1` to run it headless.
 
 - Model: `mercury`; reasoning `Instant`, `Low`, `Medium`, `High`, plus `<Effort> Search` variants that turn the site's Web search on.
-- Long chats: every 95th real prompt, ZeroKey asks Mercury for a session summary and continues in a new chat seeded with the base prompt plus that summary. The client gets a short notice when this happens.
+- Long chats: every 47th real prompt, ZeroKey asks Mercury for a session summary and continues in a new chat seeded with the base prompt plus that summary. The client gets a short notice when this happens.
 
 ## IDE Integration
 

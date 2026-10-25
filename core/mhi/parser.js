@@ -20,10 +20,7 @@ const MAX_TOTAL_CHARS = LIMITS.MAX_TOTAL_CHARS
 
 const DEFINITIONS = {
   read: { keys: new Set(['path', 'from', 'to']), required: ['path'] },
-  grep: {
-    keys: new Set(['query', 'queryR', 'glob', 'max']),
-    requiredOneOf: [['query', 'queryR']],
-  },
+  grep: { keys: new Set(['query', 'dir', 'filter', 'max']), required: ['query'] },
   write: { keys: new Set(['path', 'content']), required: ['path', 'content'] },
   replace: { keys: new Set(['path', 'old', 'new']), required: ['path', 'old', 'new'] },
   ls: { keys: new Set(['path']), required: [] },
@@ -152,7 +149,7 @@ function parseBlockAll(rawBody) {
   if (params.from !== undefined && params.to !== undefined && params.to < params.from) {
     throw new MhiParseError('mhi_invalid_range', 'to must be >= from')
   }
-  if (params.max !== undefined) params.max = positiveInteger(params.max, 'max', 1, 500)
+  if (params.max !== undefined) params.max = positiveInteger(params.max, 'max', 1, 200)
 
   return [{ tool, params }]
 }

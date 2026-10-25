@@ -86,11 +86,11 @@ function parseArguments(raw) {
       value = JSON.parse(raw)
     } catch (caughtErr) {
       console.error('JSON.parse() failed:', caughtErr)
-      throw new MhiCommandError('mhi_cmd_args_invalid', 'args must be a JSON array of strings.')
+      throw new MhiCommandError('mhi_cmd_args_invalid', 'run must be a command string.')
     }
   }
   if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
-    throw new MhiCommandError('mhi_cmd_args_invalid', 'args must be a JSON array of strings.')
+    throw new MhiCommandError('mhi_cmd_args_invalid', 'run must be a command string.')
   }
   if (value.length > MAX_ARGUMENTS) {
     throw new MhiCommandError('mhi_cmd_args_too_many', 'Too many arguments.')

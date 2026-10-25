@@ -59,14 +59,20 @@ test('duplicate parameter throws', () => {
   )
 })
 
-test('grep requires exactly one of query or queryR', () => {
+test('grep requires query and accepts dir/filter/max', () => {
   assert.throws(
     () => parser.parseBlock('grep'),
-    (e) => e.code === 'mhi_parameter_conflict',
+    (e) => e.code === 'mhi_missing_parameter',
   )
   assert.throws(
     () => parser.parseBlock(body('grep', { query: 'a' }) + S + 'queryR=b'),
-    (e) => e.code === 'mhi_parameter_conflict',
+    (e) => e.code === 'mhi_unknown_parameter',
+  )
+  const call = parser.parseBlock(body('grep', { query: 'a|b', dir: 'src', filter: '*.js', max: 5 }))
+  assert.deepEqual(call.params, { query: 'a|b', dir: 'src', filter: '*.js', max: 5 })
+  assert.throws(
+    () => parser.parseBlock(body('grep', { query: 'a', max: 201 })),
+    (e) => e.code === 'mhi_parameter_out_of_range',
   )
 })
 

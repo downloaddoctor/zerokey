@@ -15,14 +15,7 @@ const { runToolLoop } = require('../../core/mhi/loop')
 
 const withRetry = (fn, pipeline) => sharedWithRetry(fn, { pipeline, label: 'Inception' })
 const { CONFIG } = require('../../config/constants')
-const { reasoning, summaryAt, summaryAtTokens } = require('./config')
-
-// Rough size of the upstream thread (~4 chars per token), used to rotate before the 150k limit.
-function estimateThreadTokens(messages) {
-  let chars = 0
-  for (const m of messages) chars += String((m && m.content) || '').length + 16
-  return Math.ceil(chars / 4)
-}
+const { reasoning, summaryAt } = require('./config')
 const { resolveSessionTransport } = require('../../utils/session-transport')
 
 const MAX_CONTINUES = 3
@@ -101,29 +94,32 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
 
           pipeline.beginTurn()
 
-          // session.turnCount is counted by pipeline.setup (every upstream round).
-          // Rotation is only checked on real user prompts, never mid tool loop (role 'mhi').
+          // A cleared parentId means the client started a new conversation (e.g.
+          // compaction zeroed id/parentId on the session row). The router-level
+          // thread must not leak that stale history into the new conversation.
+          if (active.parentId == null && thread.messages.length > 0) {
+            thread.messages = []
+          }
+
+          // Rotation is only checked on real user prompts. The counter is
+          // advanced by the pipeline when each upstream round finishes, so MHI
+          // tool-loop rounds and 'continue' retries count too.
           const lastRole = (payload.messages[payload.messages.length - 1] || {}).role
           let newThread = false
-          if (lastRole !== 'mhi') {
-            if (
-              (active.turnCount || 0) >= summaryAt ||
-              estimateThreadTokens(thread.messages) >= summaryAtTokens
-            ) {
-              try {
-                await rotateWithSummary(pipeline, reasoningEffort, req.signal)
-                newThread = true
-                // Client-only notice: pipeline.emit skips assistantText, so the MHI loop and history never see it.
-                pipeline.emit({
-                  role: 'assistant',
-                  content:
-                    '\n> ♻ New session started: previous chat summarized and carried over.\n\n',
-                })
-              } catch (summaryErr) {
-                console.error('inception: summary rotation failed:', summaryErr)
-                // Back off: retry in 5 turns instead of on every following prompt.
-                active.turnCount = Math.max(0, summaryAt - 5)
-              }
+          if (lastRole !== 'mhi' && (active.turnCount || 0) >= summaryAt) {
+            try {
+              await rotateWithSummary(pipeline, reasoningEffort, req.signal)
+              newThread = true
+              // Client-only notice: pipeline.emit skips assistantText, so the MHI loop and history never see it.
+              pipeline.emit({
+                role: 'assistant',
+                content:
+                  '\n> ♻ New session started: previous chat summarized and carried over.\n\n',
+              })
+            } catch (summaryErr) {
+              console.error('inception: summary rotation failed:', summaryErr)
+              // Back off: retry in 5 turns instead of on every following prompt.
+              active.turnCount = Math.max(0, summaryAt - 5)
             }
           }
 
@@ -182,8 +178,6 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
               pipeline,
             )
             outcome = {}
-            // The continue is a real upstream prompt, so it counts too.
-            active.turnCount = (active.turnCount || 0) + 1
             reply += await streamHandler(next, active, pipeline, outcome)
           }
           if (outcome.error) pipeline.emitText('\n\n⚠ Stream error: ' + outcome.error + '\n')

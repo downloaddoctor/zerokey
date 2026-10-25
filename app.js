@@ -30,14 +30,22 @@ const app = express()
 // CORS: default allows any origin (local IDE clients). Set
 // ZEROKEY_ALLOWED_ORIGINS to a comma-separated list to restrict.
 const corsAllowed = CONFIG.CORS_ALLOWED_ORIGINS
+const LOOPBACK_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i
 function corsMiddleware(req, res, next) {
-  const origin = req.headers.origin
-  if (corsAllowed.includes('*')) {
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    return next()
+  // Reject foreign Host headers (DNS rebinding): the proxy only serves loopback names.
+  if (!LOOPBACK_HOST.test(String(req.headers.host || ''))) {
+    return res.status(403).json({
+      error: { message: 'Host not allowed.', type: 'host_error', status: 403 },
+    })
   }
-  if (!origin || corsAllowed.includes(origin)) {
-    if (origin) res.setHeader('Access-Control-Allow-Origin', origin)
+  const origin = req.headers.origin
+  const wildcard = corsAllowed.includes('*')
+  if (!origin || wildcard || corsAllowed.includes(origin)) {
+    if (wildcard) res.setHeader('Access-Control-Allow-Origin', '*')
+    else if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin)
+      res.setHeader('Vary', 'Origin')
+    }
     if (req.method === 'OPTIONS') {
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
       res.setHeader(

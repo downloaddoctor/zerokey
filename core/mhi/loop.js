@@ -85,10 +85,11 @@ function internalToolDescription(name, _config) {
       required: ['pattern'],
     },
     grep: {
-      description: 'Search file contents inside the workspace.',
+      description: 'Search file contents inside the workspace with a regex.',
       properties: {
         query: { type: 'string' },
-        glob: { type: 'string' },
+        dir: { type: 'string' },
+        filter: { type: 'string' },
         max: { type: 'integer' },
       },
       required: ['query'],
@@ -241,11 +242,11 @@ async function runToolLoop(options) {
       fileTools: config.MHI_FILE_TOOLS,
       cmdTools: config.MHI_CMD_TOOLS,
       viewImage: config.MHI_VIEW_IMAGE,
-      cmdPrograms: config.MHI_CMD_PROGRAMS,
-      cmdProjectPrograms: config.MHI_CMD_PROJECT_PROGRAMS,
-      cmdAllowWrite: config.MHI_CMD_ALLOW_WRITE,
-      cmdAllowNetwork: config.MHI_CMD_ALLOW_NETWORK,
-      cmdTimeoutMs: config.MHI_CMD_TIMEOUT_MS,
+      programs: config.MHI_CMD_PROGRAMS,
+      projectPrograms: config.MHI_CMD_PROJECT_PROGRAMS,
+      allowWrite: config.MHI_CMD_ALLOW_WRITE,
+      allowNetwork: config.MHI_CMD_ALLOW_NETWORK,
+      timeoutMs: config.MHI_CMD_TIMEOUT_MS,
     })
 
     const formatted = mhi.formatResults(results)

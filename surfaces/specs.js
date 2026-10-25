@@ -38,8 +38,8 @@ const specs = {
   },
 
   replace: {
-    desc: 'Exact string swap. Supports multiple edits across one or more files in one call.',
-    grammar: '(path={str}|old={str}|new={str})+',
+    desc: 'Exact string swap in one file. Supports multiple edits across one or more files in one call.',
+    grammar: 'path={str}|old={str}|new={str}',
     eg: [{ path: '/path/to/file.txt', old: 'const name = "old"', new: 'const name = "new"' }],
     repeatable: { path: true, old: true, new: true },
   },

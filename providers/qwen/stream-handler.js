@@ -132,11 +132,13 @@ function streamHandler(stream, session, parser, retry, onFinished) {
           .catch((retryErr) => {
             logIssue('retry failed — ' + (retryErr?.message || retryErr), retryErr)
             parser.emitText('\n⚠ Retry failed: ' + (retryErr?.message || retryErr) + '\n')
+            finish()
           })
         return
       }
 
       parser.emitText('\n\n⚠ Stream error: ' + reason + '\n')
+      finish()
       return
     }
 

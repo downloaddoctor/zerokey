@@ -153,6 +153,7 @@ class DeepSeekBrowserTransport {
     await this._context.exposeFunction('__dsChunk', (arr) => {
       const p = this._pendingTap
       if (!p) return
+      clearTimeout(p.timer)
       p.stream.push(Buffer.from(arr))
     })
     await this._context.exposeFunction('__dsDone', () => {
@@ -305,15 +306,22 @@ class DeepSeekBrowserTransport {
   // ── Tap plumbing ─────────────────────────────────────────────────────────
 
   _tapCompletion() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const stream = new PassThrough()
-      this._pendingTap = { stream, resolve, reject }
-      setTimeout(() => {
-        if (this._pendingTap && this._pendingTap.resolve === resolve) {
+      const tap = { stream, timer: null }
+      this._pendingTap = tap
+      // The timer only guards the wait for the first chunk; it is cleared on
+      // the first chunk and when the stream closes.
+      tap.timer = setTimeout(() => {
+        if (this._pendingTap === tap) {
           this._pendingTap = null
-          reject(new Error('[DeepSeek/browser] stream tap timed out'))
+          stream.destroy(new Error('[DeepSeek/browser] stream tap timed out'))
         }
       }, TAP_TIMEOUT_MS)
+      stream.once('close', () => {
+        clearTimeout(tap.timer)
+        if (this._pendingTap === tap) this._pendingTap = null
+      })
       resolve(stream)
     })
   }

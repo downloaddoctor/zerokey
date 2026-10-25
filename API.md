@@ -80,7 +80,7 @@ server start
 | Claude    | `https://claude.ai/api`            | Browser cookies + HAR headers                      | `chatSessionId` (UUID) + `parentMessageId` (UUID)                                                                            | Yes (rate-limit → next user) | [api.md](./providers/claude/api.md)   |
 | ChatGPT   | `https://chatgpt.com/backend-api`  | Browser cookies + sentinel POW                     | `chatSessionId` (conversation_id) + `parentMessageId`                                                                        | No                           | [api.md](./providers/chatgpt/api.md)  |
 | Qwen      | `https://chat.qwen.ai/api/v2`      | Browser cookies (`token=` JWT) + optional Bearer   | `chatSessionId` (chat id) + `parentMessageId`                                                                                | No                           | [api.md](./providers/qwen/api.md)     |
-| Inception | `https://chat.inceptionlabs.ai`    | None (authless); real Chromium profile, no capture | none server-side; the browser UI keeps the thread; `session.metadata.promptCount` drives summary rotation at the 95th prompt | No                           | see `AGENTS.md`                       |
+| Inception | `https://chat.inceptionlabs.ai`    | None (authless); real Chromium profile, no capture | none server-side; the browser UI keeps the thread; `session.metadata.promptCount` drives summary rotation at the 47th prompt | No                           | see `AGENTS.md`                       |
 
 ---
 

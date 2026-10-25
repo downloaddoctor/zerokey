@@ -236,12 +236,15 @@ function globOperation(call, fileScope, signal) {
 }
 
 function hasUnsafeRegexSyntax(source) {
+  // Reject only what enables catastrophic backtracking: backreferences and
+  // quantified groups. Alternation, classes and simple quantifiers are allowed.
   const BS = String.fromCharCode(0x5c)
   let escaped = false
   let inClass = false
-  for (const char of source) {
+  for (let i = 0; i < source.length; i += 1) {
+    const char = source[i]
     if (escaped) {
-      if (!inClass && /[1-9]/.test(char)) return true
+      if (!inClass && /[1-9k]/.test(char)) return true
       escaped = false
       continue
     }
@@ -249,26 +252,21 @@ function hasUnsafeRegexSyntax(source) {
       escaped = true
       continue
     }
-    if (char === '[' && !inClass) {
+    if (inClass) {
+      if (char === ']') inClass = false
+      continue
+    }
+    if (char === '[') {
       inClass = true
       continue
     }
-    if (char === ']' && inClass) {
-      inClass = false
-      continue
-    }
-    if (!inClass && '()*+?{}|'.includes(char)) return true
+    if (char === ')' && /[*+{]/.test(source[i + 1] || '')) return true
   }
   return false
 }
 
 function safeSearch(call) {
-  if (call.params.query !== undefined) {
-    const needle = call.params.query
-    if (needle.length > 4096) throw new MhiFileError('mhi_query_too_large', 'Query too long.')
-    return (line) => line.includes(needle)
-  }
-  const source = call.params.queryR
+  const source = call.params.query
   if (source.length > 256) throw new MhiFileError('mhi_regex_too_large', 'Regex too long.')
   if (hasUnsafeRegexSyntax(source)) {
     throw new MhiFileError('mhi_regex_unsafe', 'Regex contains unsafe syntax.')
@@ -285,7 +283,7 @@ function safeSearch(call) {
 
 function grepOperation(call, fileScope, signal, options = {}) {
   const matcher = safeSearch(call)
-  const include = globRegex(call.params.glob)
+  const include = globRegex(call.params.filter)
   const maximum = call.params.max || 100
   const context = options && options.context ? options.context : null
   const cwd = context && typeof context.cwd === 'string' && context.cwd !== '' ? context.cwd : null
@@ -298,6 +296,7 @@ function grepOperation(call, fileScope, signal, options = {}) {
       basePath = fileScope.rootPath
     }
   }
+  if (call.params.dir) basePath = fileScope.existingDirectory(call.params.dir).path
   const started = Date.now()
   let files = 0
   let totalBytes = 0

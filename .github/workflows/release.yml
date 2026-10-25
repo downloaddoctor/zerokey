@@ -3,13 +3,24 @@ name: Release
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - '**.md'
-      - 'test/**'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/PULL_REQUEST_TEMPLATE.md'
-      - '.github/workflows/pages.yml'
+    paths:
+      - 'app.js'
+      - 'server.js'
+      - 'config/**'
+      - 'core/**'
+      - 'engine/**'
+      - 'providers/**'
+      - 'routes/**'
+      - 'surfaces/**'
+      - 'utils/**'
+      - 'openapi.json'
+      - 'scripts/build.mjs'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'zerokey.sh'
+      - 'zerokey.bat'
+      - '.github/workflows/release.yml'
   workflow_dispatch:
 
 permissions:
