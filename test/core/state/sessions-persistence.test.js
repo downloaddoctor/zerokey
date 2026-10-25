@@ -79,6 +79,24 @@ test('rebase on a proxied row persists id reset and stashed conversation', () =>
   }
 })
 
+test('list() returns { rows, total, truncated }', () => {
+  const { db, user } = freshDb()
+  try {
+    sessions.create(db, user.id, { name: 'list-a' })
+    sessions.create(db, user.id, { name: 'list-b' })
+    const result = sessions.list(db, 10)
+    assert.ok(Array.isArray(result.rows))
+    assert.equal(typeof result.total, 'number')
+    assert.equal(typeof result.truncated, 'boolean')
+    assert.ok(result.total >= 2)
+    assert.equal(result.truncated, false)
+    assert.ok(result.rows.some((s) => s.name === 'list-a'))
+  } finally {
+    db.close()
+    cleanup()
+  }
+})
+
 test('non-plain values (Date) pass through the deep proxy untouched', () => {
   const { db } = freshDb()
   try {

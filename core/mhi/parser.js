@@ -29,7 +29,7 @@ const DEFINITIONS = {
   ls: { keys: new Set(['path']), required: [] },
   glob: { keys: new Set(['pattern', 'dir', 'max']), required: ['pattern'] },
   view_image: { keys: new Set(['path']), required: ['path'] },
-  cmd: { keys: new Set(['program', 'args', 'cwd', 'timeout']), required: ['program'] },
+  cmd: { keys: new Set(['run', 'till']), required: ['run'] },
 }
 
 class MhiParseError extends Error {
@@ -51,7 +51,42 @@ function positiveInteger(value, name, minimum, maximum) {
   return parsed
 }
 
-function parseBlock(rawBody) {
+/** Split a command string into argv, honouring single/double quotes. */
+function splitCommandString(command) {
+  const out = []
+  let current = ''
+  let quote = null
+  for (let i = 0; i < command.length; i += 1) {
+    const c = command[i]
+    if (quote !== null) {
+      if (c === quote) quote = null
+      else if (
+        c.charCodeAt(0) === 92 &&
+        quote === '"' &&
+        (command[i + 1] === '"' || command[i + 1] === String.fromCharCode(92))
+      )
+        current += command[++i]
+      else current += c
+      continue
+    }
+    if (c === '"' || c === "'") {
+      quote = c
+      continue
+    }
+    if (/\s/.test(c)) {
+      if (current) {
+        out.push(current)
+        current = ''
+      }
+      continue
+    }
+    current += c
+  }
+  if (current) out.push(current)
+  return out
+}
+
+function parseBlockAll(rawBody) {
   if (rawBody.length > MAX_BLOCK_CHARS) {
     throw new MhiParseError('mhi_block_too_large', 'A block is too large.')
   }
@@ -68,6 +103,7 @@ function parseBlock(rawBody) {
   }
 
   const params = {}
+  const pairs = []
   for (const part of parts) {
     const eq = part.indexOf('=')
     if (eq <= 0) {
@@ -82,11 +118,17 @@ function parseBlock(rawBody) {
         'Unknown parameter "' + key + '" for ' + tool + '. Allowed: ' + allowed + '.',
       )
     }
+    if (tool === 'cmd') {
+      pairs.push([key, value])
+      continue
+    }
     if (Object.prototype.hasOwnProperty.call(params, key)) {
       throw new MhiParseError('mhi_duplicate_parameter', 'Duplicate parameter: ' + key)
     }
     params[key] = value
   }
+
+  if (tool === 'cmd') return buildCmdCalls(pairs)
 
   for (const key of definition.required || []) {
     if (!Object.prototype.hasOwnProperty.call(params, key) || params[key] === '') {
@@ -111,11 +153,39 @@ function parseBlock(rawBody) {
     throw new MhiParseError('mhi_invalid_range', 'to must be >= from')
   }
   if (params.max !== undefined) params.max = positiveInteger(params.max, 'max', 1, 500)
-  if (params.timeout !== undefined) {
-    params.timeout = positiveInteger(params.timeout, 'timeout', 100, 120000)
-  }
 
-  return { tool, params }
+  return [{ tool, params }]
+}
+
+// cmd grammar: (run (till)?)+ — each run is one command, till applies to the
+// run before it. Mapped to the executor's args/timeout.
+function buildCmdCalls(pairs) {
+  const calls = []
+  for (const [key, value] of pairs) {
+    if (key === 'run') {
+      if (value === '') throw new MhiParseError('mhi_missing_parameter', 'run must not be empty.')
+      calls.push({ tool: 'cmd', params: { args: splitCommandString(value) } })
+      continue
+    }
+    const last = calls[calls.length - 1]
+    if (!last) throw new MhiParseError('mhi_missing_parameter', 'till must follow a run.')
+    if (last.params.timeout !== undefined) {
+      throw new MhiParseError('mhi_duplicate_parameter', 'Duplicate parameter: till')
+    }
+    last.params.timeout = positiveInteger(value, 'till', 1, 300) * 1000
+  }
+  if (calls.length === 0) {
+    throw new MhiParseError('mhi_missing_parameter', 'Missing required parameter: run')
+  }
+  return calls
+}
+
+function parseBlock(rawBody) {
+  const calls = parseBlockAll(rawBody)
+  if (calls.length !== 1) {
+    throw new MhiParseError('mhi_parameter_conflict', 'Block holds more than one command.')
+  }
+  return calls[0]
 }
 
 /**
@@ -176,7 +246,7 @@ function parseAssistantText(text) {
   if (blocks.length > MAX_BLOCKS) {
     throw new MhiParseError('mhi_too_many_blocks', 'At most ' + MAX_BLOCKS + ' blocks per turn.')
   }
-  return { kind: 'calls', calls: blocks.map(parseBlock) }
+  return { kind: 'calls', calls: blocks.flatMap(parseBlockAll) }
 }
 
 module.exports = {
@@ -185,4 +255,5 @@ module.exports = {
   MAX_BLOCKS,
   parseAssistantText,
   parseBlock,
+  splitCommandString,
 }

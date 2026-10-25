@@ -286,8 +286,13 @@ class ChatGPTAPI extends BaseAPI {
       model: model || 'auto',
       client_prepare_state: partialQuery ? 'success' : 'none',
       partial_query: partialQuery,
-      timezone_offset_min: 420,
-      timezone: 'America/Los_Angeles',
+      timezone_offset_min:
+        (this._bodyTemplate && this._bodyTemplate.timezone_offset_min) ??
+        -new Date().getTimezoneOffset(),
+      timezone:
+        (this._bodyTemplate && this._bodyTemplate.timezone) ||
+        Intl.DateTimeFormat().resolvedOptions().timeZone ||
+        'UTC',
       conversation_mode: { kind: 'primary_assistant' },
       system_hints: [],
       ...(attachmentMimeTypes.length > 0 && { attachment_mime_types: attachmentMimeTypes }),
@@ -440,7 +445,7 @@ class ChatGPTAPI extends BaseAPI {
     if (typeof this._onCaptureChanged === 'function') {
       try {
         this._onCaptureChanged({
-          url: this._headers.__url || 'https://chatgpt.com/backend-api/f/conversation',
+          url: 'https://chatgpt.com/backend-api/f/conversation',
           method: 'POST',
           headers: { ...this._headers },
           body: this._bodyTemplate,

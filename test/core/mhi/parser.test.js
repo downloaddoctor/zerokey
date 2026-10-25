@@ -70,11 +70,30 @@ test('grep requires exactly one of query or queryR', () => {
   )
 })
 
-test('cmd requires program', () => {
+test('cmd requires run', () => {
   assert.throws(
-    () => parser.parseBlock(body('cmd', { args: '[]' })),
+    () => parser.parseBlock('cmd'),
     (e) => e.code === 'mhi_missing_parameter',
   )
+})
+
+test('cmd rejects non-canonical program/args', () => {
+  assert.throws(
+    () => parser.parseBlock(body('cmd', { program: 'node', args: '[]' })),
+    (e) => e.code === 'mhi_unknown_parameter',
+  )
+})
+
+test('cmd run/till grammar maps to args/timeout', () => {
+  const call = parser.parseBlock(body('cmd', { run: 'node --check server.js', till: 60 }))
+  assert.equal(call.tool, 'cmd')
+  assert.deepEqual(call.params.args, ['node', '--check', 'server.js'])
+  assert.equal(call.params.timeout, 60000)
+})
+
+test('cmd run splits quoted arguments', () => {
+  const call = parser.parseBlock(body('cmd', { run: 'echo "hello world" single' }))
+  assert.deepEqual(call.params.args, ['echo', 'hello world', 'single'])
 })
 
 test('parseAssistantText returns text for no blocks', () => {

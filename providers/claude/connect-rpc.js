@@ -24,6 +24,7 @@ const crypto = require('crypto')
 const { BaseAPI } = require('../base/BaseAPI')
 const { assertOk } = require('../../utils/http-error')
 const { uuid } = require('../../utils/uuid')
+const { resolveOrgId } = require('./org-id')
 
 const RPC_BASE = 'https://claude.ai/claudeai-rpc'
 const SERVICE = 'anthropic.bard.api.v1alpha.ConversationService'
@@ -648,10 +649,7 @@ class ClaudeConnectRpc extends BaseAPI {
         '[Claude] WARNING: no cookie in capture — StreamTimeline will 403 at Cloudflare. Re-copy the request as fetch (includes cookie).',
       )
     }
-    this._orgId =
-      h['x-organization-uuid'] ||
-      (parsedFetch.url || '').match(/\/organizations\/([a-f0-9-]{36})/i)?.[1] ||
-      null
+    this._orgId = resolveOrgId(parsedFetch, h)
     this._deviceId =
       h['anthropic-device-id'] ||
       String(h.cookie || h.Cookie || '').match(/(?:^|;\s*)anthropic-device-id=([^;]+)/)?.[1] ||

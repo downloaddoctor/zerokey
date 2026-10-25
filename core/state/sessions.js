@@ -112,10 +112,12 @@ function listForUser(db, userId) {
 
 function list(db, limit = 500) {
   const bounded = Math.max(1, Math.min(Number(limit) || 500, 2000))
-  return db
+  const rows = db
     .prepare('SELECT ' + SELECT_COLUMNS + ' FROM sessions ORDER BY updated_at DESC LIMIT ?')
     .all(bounded)
     .map((row) => store.wrap(db, rowToSession(row)))
+  const total = db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n
+  return { rows, total, truncated: rows.length < total }
 }
 
 function create(db, userId, fields = {}) {

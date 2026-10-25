@@ -7,8 +7,7 @@ const { resolveTransport, createAPI } = require('./transport')
 const { claudeStreamHandler } = require('./stream-handler')
 const { createRpcEmitter } = require('./rpc-stream-handler')
 const { setClaudeInstructions } = require('./set-instructions')
-const { acquireSlot } = require('../../utils/rate-limiter')
-const retry = require('../../utils/retry')
+const { withRetry: sharedWithRetry } = require('../../utils/with-retry')
 const { runToolLoop } = require('../../core/mhi/loop')
 const { CONFIG } = require('../../config/constants')
 const SYNTAX = require('../../engine/syntax')
@@ -220,27 +219,12 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
   return router
 }
 
-async function withRetry(fn, pipeline) {
-  let attempt = 0
-  while (true) {
-    attempt += 1
-    await acquireSlot('Claude')
-    try {
-      return await fn()
-    } catch (error) {
-      console.error('claude router request failed:', error)
-      if (error && error.status === 429) throw error
-      const policy = retry.classify(error, pipeline && pipeline.signal)
-      if (!policy.retry || attempt >= policy.maxAttempts) throw error
-      retry.discardResponse(error.response)
-      const delay = retry.delayMs(attempt, error.response)
-      console.warn(
-        `[Claude] Retrying after ${policy.kind} (attempt ${attempt + 1}/${policy.maxAttempts}, wait ${delay}ms)`,
-      )
-      await retry.sleep(delay, pipeline && pipeline.signal)
-    }
-  }
-}
+const withRetry = (fn, pipeline) =>
+  sharedWithRetry(fn, {
+    pipeline,
+    label: 'Claude',
+    isTerminal: (e) => e && e.status === 429,
+  })
 
 function limitMessageText(resetTime, mins) {
   return `\n${SYNTAX.OPEN}ask${SYNTAX.SEP}ques=This Claude session has reached its usage limit. It resets at ${resetTime} (~${mins} min). What would you like to do?${SYNTAX.SEP}option=Switch to another Claude user${SYNTAX.SEP}option=Switch to another provider${SYNTAX.SEP}option=Please Continue${SYNTAX.CLOSE}`

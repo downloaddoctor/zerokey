@@ -9,11 +9,20 @@ const { getSharedTransport } = require('./browser-transport')
 
 const { streamHandler, collectReply } = require('./stream-handler')
 const instructions = require('../../engine/instructions')
-const { acquireSlot, setProviderCooldown } = require('../../utils/rate-limiter')
-const retry = require('../../utils/retry')
+const { setProviderCooldown } = require('../../utils/rate-limiter')
+const { withRetry: sharedWithRetry } = require('../../utils/with-retry')
 const { runToolLoop } = require('../../core/mhi/loop')
+
+const withRetry = (fn, pipeline) => sharedWithRetry(fn, { pipeline, label: 'Inception' })
 const { CONFIG } = require('../../config/constants')
-const { reasoning, summaryAt } = require('./config')
+const { reasoning, summaryAt, summaryAtTokens } = require('./config')
+
+// Rough size of the upstream thread (~4 chars per token), used to rotate before the 150k limit.
+function estimateThreadTokens(messages) {
+  let chars = 0
+  for (const m of messages) chars += String((m && m.content) || '').length + 16
+  return Math.ceil(chars / 4)
+}
 const { resolveSessionTransport } = require('../../utils/session-transport')
 
 const MAX_CONTINUES = 3
@@ -42,6 +51,7 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
   session.turnCount = 0
 
   let carriedSummary = null
+  const thread = { messages: [] }
 
   // Ask Mercury for a session summary in the current thread, then drop the
   // thread so the next real turn opens a new chat with base prompt + summary.
@@ -51,7 +61,7 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
       () =>
         browser.chatCompletion({
           prompt: content,
-          messages: [{ role: 'user', content }],
+          messages: [...thread.messages, { role: 'user', content }],
           fresh: false,
           reasoningEffort,
           signal,
@@ -71,7 +81,7 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
   router.post('/', async (req, res) => {
     const pipeline = new StreamPipeline(res, session, 'inception', req.surface, req.isRealSession)
     const active = pipeline.session
-    const ephemeral = pipeline.ephemeralMode
+    if (pipeline.ephemeralMode) return pipeline.sendFinalChunk()
 
     const map = reasoning.map
     const { effort: reasoningEffort, search: webSearch } =
@@ -95,8 +105,11 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
           // Rotation is only checked on real user prompts, never mid tool loop (role 'mhi').
           const lastRole = (payload.messages[payload.messages.length - 1] || {}).role
           let newThread = false
-          if (!ephemeral && lastRole !== 'mhi') {
-            if ((active.turnCount || 0) >= summaryAt) {
+          if (lastRole !== 'mhi') {
+            if (
+              (active.turnCount || 0) >= summaryAt ||
+              estimateThreadTokens(thread.messages) >= summaryAtTokens
+            ) {
               try {
                 await rotateWithSummary(pipeline, reasoningEffort, req.signal)
                 newThread = true
@@ -126,13 +139,17 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
             carriedSummary = null
           }
 
+          const sent = [
+            ...(newThread || active.parentId == null ? [] : thread.messages),
+            { role: 'user', content: sendPrompt },
+          ]
           const stream = await withRetry(
             () =>
               browser.chatCompletion({
                 prompt: sendPrompt,
-                messages: payload.messages,
+                messages: sent,
                 newThread,
-                fresh: ephemeral,
+                fresh: false,
                 reasoningEffort,
                 webSearch,
                 signal: req.signal,
@@ -152,12 +169,12 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
                 browser.chatCompletion({
                   prompt: 'continue',
                   messages: [
-                    ...payload.messages,
+                    ...sent,
                     { role: 'assistant', content: reply },
                     { role: 'user', content: 'continue' },
                   ],
                   newThread: false,
-                  fresh: ephemeral,
+                  fresh: false,
                   reasoningEffort,
                   webSearch,
                   signal: req.signal,
@@ -171,7 +188,10 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
           }
           if (outcome.error) pipeline.emitText('\n\n⚠ Stream error: ' + outcome.error + '\n')
 
-          if (!ephemeral && reply) active.parentId = randomId()
+          if (reply) {
+            active.parentId = randomId()
+            thread.messages = [...sent, { role: 'assistant', content: reply }]
+          }
           return { assistantText: pipeline.assistantText }
         },
       })
@@ -190,27 +210,6 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
   })
 
   return router
-}
-
-async function withRetry(fn, pipeline) {
-  let attempt = 0
-  for (;;) {
-    attempt += 1
-    await acquireSlot('Inception')
-    try {
-      return await fn()
-    } catch (error) {
-      console.error('inception router request failed:', error)
-      const policy = retry.classify(error, pipeline && pipeline.signal)
-      if (!policy.retry || attempt >= policy.maxAttempts) throw error
-      retry.discardResponse(error.response)
-      const delay = retry.delayMs(attempt, error.response)
-      console.warn(
-        `[Inception] Retrying after ${policy.kind} (attempt ${attempt + 1}/${policy.maxAttempts}, wait ${delay}ms)`,
-      )
-      await retry.sleep(delay, pipeline && pipeline.signal)
-    }
-  }
 }
 
 module.exports = { buildInceptionRouter, withRetry }

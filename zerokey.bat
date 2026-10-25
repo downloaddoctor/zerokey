@@ -28,6 +28,8 @@ call :ensure_node
 if errorlevel 1 goto fail
 call :ensure_pnpm
 if errorlevel 1 goto fail
+call :check_node
+if errorlevel 1 goto fail
 call :ok "Toolchain ready"
 
 if exist "%~dp0core\state\db.js" (set "DIR=%~dp0") else (if not exist "%DIR%" mkdir "%DIR%")
@@ -180,6 +182,24 @@ echo.
 call :err "Setup failed. See errors above."
 pause
 exit /b 1
+
+:: -- Verify Node version is new enough for node:sqlite DatabaseSync --
+:check_node
+set "V_MAJOR=0"
+set "V_MINOR=0"
+for /f "tokens=1-3 delims=." %%a in ('node -v 2^>nul') do (
+    set "V_MAJOR=%%a"
+    set "V_MINOR=%%b"
+)
+set "V_MAJOR=!V_MAJOR:v=!"
+set "NODE_OK=0"
+if !V_MAJOR! gtr 22 set "NODE_OK=1"
+if !V_MAJOR! equ 22 if !V_MINOR! geq 13 set "NODE_OK=1"
+if "!NODE_OK!"=="0" (
+    call :err "ZeroKey requires Node.js >=22.13.0 (have !V_MAJOR!.!V_MINOR!). Install Node 22.13+ or allow the portable install."
+    exit /b 1
+)
+exit /b 0
 
 :: -- Ensure Node.js + npm (system PATH or %TOOLS%\node) --
 :ensure_node

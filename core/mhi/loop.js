@@ -113,15 +113,12 @@ function internalToolDescription(name, _config) {
       required: ['path'],
     },
     cmd: {
-      description:
-        'Run an allowlisted program with an argument array. Capability flags gate write/network.',
+      description: 'Run an allowlisted command string. Capability flags gate write/network.',
       properties: {
-        program: { type: 'string' },
-        args: { type: 'string' },
-        cwd: { type: 'string' },
-        timeout: { type: 'integer' },
+        run: { type: 'string' },
+        till: { type: 'integer' },
       },
-      required: ['program'],
+      required: ['run'],
     },
   }
   const shape = schemas[name] || { description: name, properties: {}, required: [] }

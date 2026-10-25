@@ -5,17 +5,14 @@ const express = require('express')
 const { StreamPipeline } = require('../../engine/pipeline')
 const { ChatGPTAPI } = require('./api')
 const { chatgptStreamHandler } = require('./stream-handler')
-const { acquireSlot } = require('../../utils/rate-limiter')
-const retry = require('../../utils/retry')
+const { withRetry: sharedWithRetry } = require('../../utils/with-retry')
 const recovery = require('./recovery')
 const { setChatGPTInstructions } = require('./set-instructions')
 const { runToolLoop } = require('../../core/mhi/loop')
 const { CONFIG } = require('../../config/constants')
 
-const chatgptApi = new ChatGPTAPI()
-chatgptApi._providerKey = 'chatgpt'
-
 async function buildChatGPTRouter(parsedFetch, session, userData = null) {
+  const chatgptApi = new ChatGPTAPI()
   console.debug('[ChatGPT] Initializing from parsed capture JSON')
   await chatgptApi.initializeFromJSON(parsedFetch)
 
@@ -101,25 +98,6 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
  * chatgptApi via the rate-limiter cooldown, and classify as terminal here so
  * the router does not hammer a cooled-down provider.
  */
-async function withRetry(fn, pipeline) {
-  let attempt = 0
-  for (;;) {
-    attempt += 1
-    await acquireSlot('ChatGPT')
-    try {
-      return await fn()
-    } catch (error) {
-      console.error('chatgpt router request failed:', error)
-      const policy = retry.classify(error, pipeline && pipeline.signal)
-      if (!policy.retry || attempt >= policy.maxAttempts) throw error
-      retry.discardResponse(error.response)
-      const delay = retry.delayMs(attempt, error.response)
-      console.warn(
-        `[ChatGPT] Retrying after ${policy.kind} (attempt ${attempt + 1}/${policy.maxAttempts}, wait ${delay}ms)`,
-      )
-      await retry.sleep(delay, pipeline && pipeline.signal)
-    }
-  }
-}
+const withRetry = (fn, pipeline) => sharedWithRetry(fn, { pipeline, label: 'ChatGPT' })
 
 module.exports = { buildChatGPTRouter, withRetry }

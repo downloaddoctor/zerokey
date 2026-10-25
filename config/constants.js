@@ -68,6 +68,8 @@ function envList(name, fallback) {
     .filter((value) => value !== '')
 }
 
+CONFIG.CORS_ALLOWED_ORIGINS = envList('ZEROKEY_ALLOWED_ORIGINS', ['*'])
+
 CONFIG.DB_FILE = path.join(CONFIG.DATA_DIR, 'db', 'zerokey.db')
 CONFIG.LOCK_FILE = path.join(CONFIG.DATA_DIR, 'db', '.start.lock')
 CONFIG.LOG_DIR = path.join(CONFIG.DATA_DIR, 'logs')

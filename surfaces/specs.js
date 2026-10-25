@@ -94,8 +94,8 @@ const specs = {
   },
 
   cmd: {
-    desc: 'Run shell command. ?till=timeout secs (0-300).',
-    grammar: 'run={str}|(till={0-300})?',
+    desc: 'Run shell command. ?till=timeout secs (1-300).',
+    grammar: 'run={str}|(till={1-300})?',
     eg: [{ run: 'npm install' }, { run: 'npm test', till: 60 }],
     repeatable: { run: true, till: true },
   },

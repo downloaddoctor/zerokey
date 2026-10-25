@@ -105,7 +105,7 @@ class InceptionApi {
 
   _ensureClient() {
     if (!this._client) {
-      this._client = new Impit({ browser: this._browser, followRedirects: true })
+      this._client = new Impit({ browser: this._browser, followRedirects: true, timeout: 600_000 })
     }
     return this._client
   }
@@ -127,12 +127,31 @@ class InceptionApi {
       } catch (err) {
         console.error('inception/api: home fetch failed:', err)
       }
-      const sess = await client.fetch(ORIGIN + SESSION_PATH, { method: 'GET' })
+      const sess = await client.fetch(ORIGIN + SESSION_PATH, {
+        method: 'GET',
+        headers: {
+          accept: '*/*',
+          'accept-language': 'en-US,en;q=0.9',
+          origin: ORIGIN,
+          referer: ORIGIN + '/',
+          'user-agent': USER_AGENT,
+          'sec-fetch-dest': 'empty',
+          'sec-fetch-mode': 'cors',
+          'sec-fetch-site': 'same-origin',
+          ...(this._cookie ? { cookie: this._cookie } : {}),
+        },
+      })
       if (sess.status !== 200) {
         const txt = await sess.text()
-        throw new Error(
-          '[Inception/api] /api/session HTTP ' + sess.status + ': ' + txt.slice(0, 200),
+        const sessErr = new Error(
+          '[Inception/api] /api/session HTTP ' +
+            sess.status +
+            ': ' +
+            txt.replace(/\s+/g, ' ').slice(0, 200),
         )
+        sessErr.status = sess.status
+        sessErr.statusCode = sess.status
+        throw sessErr
       }
       const j = await sess.json()
       if (!j || !j.token) throw new Error('[Inception/api] /api/session returned no token')

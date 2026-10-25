@@ -65,6 +65,7 @@ class SessionSelector {
             '\n' + waitPolicy.allMessage(soonest.username, resetsAtSoonest, minsLeft) + '\n',
             1,
           )
+          // Every user is suspended: go back to provider selection so another provider can be picked.
           return this.select(false)
         }
 

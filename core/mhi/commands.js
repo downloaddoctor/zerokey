@@ -469,9 +469,10 @@ function prepareExecution(call, options = {}) {
     throw new MhiCommandError('mhi_cmd_disabled', 'Controlled command execution is not enabled.')
   }
   const fileScope = scope(options)
-  const cwd = fileScope.existingDirectory(call.params.cwd || fileScope.rootPath)
-  const args = parseArguments(call.params.args)
-  const resolved = resolveProgram(call.params.program, fileScope, options)
+  const cwd = fileScope.existingDirectory(fileScope.rootPath)
+  // Grammar: run/till. The parser maps run → args; the first argument is the program.
+  const [program, ...args] = parseArguments(call.params.args)
+  const resolved = resolveProgram(program, fileScope, options)
   const capabilities = classifyCapabilities(resolved.name, args, resolved.project)
   assertCapabilities(capabilities, options)
   const prepared = prepareArguments(resolved, args, fileScope, capabilities, options)

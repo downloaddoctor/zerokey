@@ -3,6 +3,7 @@ const { assertOk } = require('../../utils/http-error')
 const { reasoning } = require('./config')
 const { humanDelay } = require('../../utils/human-delay')
 const { uuid } = require('../../utils/uuid')
+const { resolveOrgId } = require('./org-id')
 
 // O(1) reasoning_effort → { think, tier } lookup.
 // Keys are the exact labels VS Code advertises (utils/sync-ide-config.js).
@@ -39,28 +40,13 @@ class ClaudeAPI extends BaseAPI {
       console.warn('[Claude] WARNING: No cookies in headers! Cloudflare will block.')
     }
 
-    // Organization ID: prefer the URL path (legacy /api/organizations/<uuid>),
-    // else the x-organization-uuid header (present on the RPC StreamTimeline
-    // capture). A modern fetch copied from claude.ai has neither path nor
-    // device-id, so this keeps the legacy client usable with new captures.
-    const url = parsedFetch.url || parsedFetch?.request?.url || ''
-    const orgMatch = url.match(/\/organizations\/([a-f0-9-]{36})/i)
-    if (orgMatch) {
-      this._orgId = orgMatch[1]
-      if (this._log) console.debug(`[Claude] Extracted org ID from URL: ${this._orgId}`)
-    } else {
-      const headerOrg =
-        this._headers['x-organization-uuid'] ||
-        Object.entries(this._headers).find(
-          ([k]) => k.toLowerCase() === 'x-organization-uuid',
-        )?.[1] ||
-        initialCookie.match(/(?:^|;\s*)lastActiveOrg=([a-f0-9-]{36})/i)?.[1]
-      if (headerOrg) {
-        this._orgId = headerOrg
-        if (this._log) console.debug(`[Claude] Extracted org ID from header: ${this._orgId}`)
-      } else if (this._log) {
-        console.warn('[Claude] WARNING: No org ID found in URL or x-organization-uuid header.')
-      }
+    // Organization ID: shared extraction (URL path → x-organization-uuid header
+    // → lastActiveOrg cookie). Keeps legacy REST and RPC captures working.
+    this._orgId = resolveOrgId(parsedFetch, this._headers)
+    if (this._orgId) {
+      if (this._log) console.debug(`[Claude] Extracted org ID: ${this._orgId}`)
+    } else if (this._log) {
+      console.warn('[Claude] WARNING: No org ID found in URL or x-organization-uuid header.')
     }
 
     if (this._log) console.debug('[Claude] Initialized from capture JSON')

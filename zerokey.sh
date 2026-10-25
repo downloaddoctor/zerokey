@@ -75,6 +75,11 @@ if ! command -v pnpm >/dev/null 2>&1; then
     warn "pnpm not found. Installing via npm..."
     npm install -g pnpm || { corepack enable && corepack prepare pnpm@latest --activate; }
 fi
+# ZeroKey requires Node >=22.13.0 (node:sqlite DatabaseSync).
+node -e "const [a,b]=process.versions.node.split('.').map(Number); process.exit(a>22||(a===22&&b>=13)?0:1)" || {
+    err "ZeroKey requires Node.js >=22.13.0 (have $(node -v)). Update Node and re-run."
+    exit 1
+}
 ok "Toolchain ready"
 
 LOCAL=0

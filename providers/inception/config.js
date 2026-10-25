@@ -67,4 +67,14 @@ const setupSteps = {
   instructions: 'No capture needed — the provider is authless and browser-only.',
 }
 
-module.exports = { models, reasoning, promptLimit, summaryAt, setupSteps }
+// Mercury stops at ~150k tokens per chat. Rotate with a summary below that, leaving room for the summary request and its reply.
+const summaryAtTokens = 120_000
+
+module.exports = {
+  models,
+  reasoning,
+  promptLimit,
+  summaryAt,
+  summaryAtTokens,
+  setupSteps,
+}

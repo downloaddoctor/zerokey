@@ -7,8 +7,15 @@ const { DeepSeekAPI } = require('./api')
 const { getSharedTransport } = require('./browser-transport')
 const { streamHandler } = require('./stream-handler')
 const { acquireSlot } = require('../../utils/rate-limiter')
-const retry = require('../../utils/retry')
+const { withRetry: sharedWithRetry } = require('../../utils/with-retry')
 const { runToolLoop } = require('../../core/mhi/loop')
+
+const withRetry = (fn, pipeline, label) =>
+  sharedWithRetry(fn, {
+    pipeline,
+    label: label || 'DeepSeek',
+    isTerminal: (e) => e && e.code === 'account_suspended',
+  })
 const { CONFIG } = require('../../config/constants')
 const { reasoning } = require('./config')
 const { resolveSessionTransport } = require('../../utils/session-transport')
@@ -146,28 +153,6 @@ async function buildDeepSeekRouter(parsedFetch, session, userData) {
   })
 
   return router
-}
-
-async function withRetry(fn, pipeline, label) {
-  let attempt = 0
-  for (;;) {
-    attempt += 1
-    await acquireSlot(label)
-    try {
-      return await fn()
-    } catch (error) {
-      console.error('deepseek router request failed:', error)
-      if (error && error.code === 'account_suspended') throw error
-      const policy = retry.classify(error, pipeline && pipeline.signal)
-      if (!policy.retry || attempt >= policy.maxAttempts) throw error
-      retry.discardResponse(error.response)
-      const delay = retry.delayMs(attempt, error.response)
-      console.warn(
-        `[${label}] Retrying after ${policy.kind} (attempt ${attempt + 1}/${policy.maxAttempts}, wait ${delay}ms)`,
-      )
-      await retry.sleep(delay, pipeline && pipeline.signal)
-    }
-  }
 }
 
 module.exports = { buildDeepSeekRouter, withRetry }

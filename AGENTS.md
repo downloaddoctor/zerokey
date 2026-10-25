@@ -3,7 +3,7 @@
 PROJECT
  ZeroKey — self-hosted, personal-use OpenAI-compatible proxy for DeepSeek, Claude, ChatGPT, Qwen, Inception (Mercury)
  Turns a browser session (captured fetch()) into http://localhost:<port>/v1
- Node >=22 required; pnpm@12.14.0; CommonJS; 'use strict' at top of every module
+ Node >=22.13 required; pnpm@12.14.0; CommonJS; 'use strict' at top of every module
  No telemetry, no hosted service, no shared accounts
 
 DIRECTORY
@@ -36,7 +36,7 @@ MODULES
  core/state/db.js — node:sqlite DatabaseSync; WAL; fail-closed on newer schema_version; additive columns via ADDED_COLUMNS (idempotent ALTER TABLE ADD COLUMN); one-shot legacy import
  core/state/store.js — createStore(cfg): debounced write-through + recursive Proxy (plain objects/arrays only) shared by users/sessions; cfg = table, columnMap, blobKeys, conflict, keyOf, flushMs, label
  core/state/users.js — store config + user domain fns; Proxy row; top-level and nested (parsedFetch.*, state entries) writes schedule a 250 ms debounced flush; list() also returns wrapped rows so wizard-held references persist; flushAll() drains pending writes at shutdown; deepWrap proxies only arrays and plain objects (Date/Buffer pass through)
- core/state/sessions.js — Proxy row; 250 ms debounce; nested (metadata.*, todos, usageTotals) writes also persist; flushAll() drains pending writes at shutdown; compaction via generation bump clears id/parentId
+ core/state/sessions.js — Proxy row; list(db, limit) returns {rows, total, truncated}; 250 ms debounce; nested (metadata.*, todos, usageTotals) writes also persist; flushAll() drains pending writes at shutdown; compaction via generation bump clears id/parentId
  core/mhi/loop.js — runToolLoop: one turn → evaluateAssistant → executeCalls → appendResult (role 'mhi', passed verbatim by compiler._handlers.mhi — no USER: prefix), cap MHI_MAX_ROUNDS; withAssistantTurn records the assistant turn before each mhi result so repair/tool-result rounds send only the new MHI message upstream (uploadAndGetMessages slices after the last assistant message)
  core/mhi/index.js — executor dispatch; every failure returns {ok:false, code, output} — never throws except on abort; evaluateAssistant returns a repair round (mhi_foreign_markup) when the model emits DSML/XML tool tags
  core/mhi/files.js — read/ls/glob/grep/write/replace; write refuses overwrite; replace requires exactly one match
@@ -83,6 +83,8 @@ MODULES
  utils/errors.js — classifyError → toOpenAIError (two calling conventions)
  utils/session-transport.js — resolveSessionTransport(session, envDefault, allowed): session.transport overrides the env default; unknown values fall back to the default, then allowed[0]; used by the Claude, DeepSeek and Inception routers
  utils/uuid.js — uuid() v4 via crypto.randomUUID; the only UUID helper for provider clients
+ utils/with-retry.js — withRetry(fn, {pipeline, label, isTerminal?}): the single bounded-retry wrapper for all provider routers; acquires the rate-limiter slot by label itself; routers only add isTerminal (Claude 429, DeepSeek account_suspended, Qwen RateLimited)
+ providers/claude/org-id.js — resolveOrgId(parsedFetch, headers): URL path → x-organization-uuid → lastActiveOrg cookie; shared by api.js and connect-rpc.js
  utils/http-error.js — assertOk(res, {allow, prefix, limit}) opt-in non-OK guard (reads body slice, throws Error with .status/.statusCode); used by sentinel prepare/finalize, DeepSeek and Claude completion calls; not used where the body is parsed for structure (ChatGPT completion 429 cooldown, Qwen _buildQwenError → code/num/waitMs for RateLimited)
  utils/har-to-capture.js — dev-only HAR → LLM-digest CLI (not a runtime dep); `node utils/har-to-capture.js <file.har>` (all defaults: mask on, body size auto, out=temp/captures/ for temp/*.har); flags: --list|--filter=|--ignore=|--method=|--status=|--hosts=|--max-body=N|auto|--no-mask|--no-redact|--no-headers|--full|--mode=digest|captures|both|--out=|--json; filters noise endpoints, masks secrets, decodes Connect/gRPC proto bodies into readable fields; writes <base>.digest.txt + .digest.json; masking preserves structure — Cookie/Set-Cookie → {count, cookies:{name: fingerprint}} (names + length kept), Authorization keeps its scheme (Bearer <masked:N>), other secrets → first6…<masked:N>; legacy harToCapture()/convertEntry() still exported for core/session-selector.js
  utils/log.js — zerokey.log (rotating, LOG_LEVEL-gated) + temp/logs/sessions/session-<N>.log (one file per process, all levels incl. debug, SESSION marker row first); both use columns (ts,pid,level,tag,msg,where,error,code,status,context,stack) separated by engine/syntax.js SEP (not a comma), one line per record; pid in the same column for plain and error rows; console.* rewired (colour + auto [FILE] tag + redact + mirror); console.error('msg', err[, ctx]) fills all columns — the ONE entry point; O(1) per call (cached tag, in-memory size, depth-capped causes); formatError renders Error → Name/msg|code|status + frames + caused-by
@@ -111,6 +113,7 @@ ENV
  ZEROKEY_PORT_RANGE (default 100)
  ZEROKEY_EXACT_PORT=1 — refuse a busy start port instead of moving
  ZEROKEY_DATA_DIR — default <repo>/temp
+ ZEROKEY_ALLOWED_ORIGINS — comma-separated CORS allowlist (default '*'); enforced by corsMiddleware in app.js
  ZEROKEY_LOG_LEVEL, ZEROKEY_LOG_MAX_BYTES, ZEROKEY_LOG_KEEP
  ZEROKEY_WORKSPACE_ROOTS — path.delimiter separated; default [process.cwd()]
  ZEROKEY_MHI_FILE_TOOLS (default true), ZEROKEY_MHI_CMD_TOOLS (default false), ZEROKEY_MHI_VIEW_IMAGE (default true)

@@ -53,7 +53,7 @@ test('executeCalls dispatches a read', async () => {
 test('executeCalls refuses cmd when disabled', async () => {
   reset()
   const results = await mhi.executeCalls(
-    [{ tool: 'cmd', params: { program: 'node', args: '[]' } }],
+    [{ tool: 'cmd', params: { args: ['node', '--version'] } }],
     { context: { rootPath: SCRATCH }, fileTools: true, cmdTools: false, viewImage: true },
   )
   assert.equal(results[0].ok, false)

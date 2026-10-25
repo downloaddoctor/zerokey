@@ -26,6 +26,35 @@ const { StreamPipeline } = require('./engine/pipeline')
 let httpServer = null
 
 const app = express()
+
+// CORS: default allows any origin (local IDE clients). Set
+// ZEROKEY_ALLOWED_ORIGINS to a comma-separated list to restrict.
+const corsAllowed = CONFIG.CORS_ALLOWED_ORIGINS
+function corsMiddleware(req, res, next) {
+  const origin = req.headers.origin
+  if (corsAllowed.includes('*')) {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    return next()
+  }
+  if (!origin || corsAllowed.includes(origin)) {
+    if (origin) res.setHeader('Access-Control-Allow-Origin', origin)
+    if (req.method === 'OPTIONS') {
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        req.headers['access-control-request-headers'] || 'content-type,authorization',
+      )
+      res.setHeader('Access-Control-Max-Age', '86400')
+      return res.sendStatus(204)
+    }
+    return next()
+  }
+  return res.status(403).json({
+    error: { message: 'Origin not allowed.', type: 'cors_error', status: 403 },
+  })
+}
+
+app.use(corsMiddleware)
 app.use(express.json({ limit: '50mb' }))
 
 const prepareChatRequest = (req, res, next) => {
@@ -111,7 +140,8 @@ async function start({ db: store, preSelected, port }) {
     const status = openaiErr.error?.status || err.statusCode || err.status || 500
     let body = null
     try {
-      const { tools: _, ...rest } = req.body || {}
+      const rest = { ...(req.body || {}) }
+      delete rest.tools
       body = rest
     } catch (caughtErr) {
       console.error('error handler could not serialize req.body:', caughtErr)
