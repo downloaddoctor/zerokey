@@ -146,6 +146,23 @@ fi
 if [ "$UPDATE" = "1" ]; then
     fetch pnpm-lock.yaml pnpm-lock.yaml.new || rm -f pnpm-lock.yaml.new
     fetch pnpm-workspace.yaml pnpm-workspace.yaml.new || rm -f pnpm-workspace.yaml.new
+    if fetch SHA256SUMS SHA256SUMS.new; then
+        for f in server.js package.json; do
+            want=$(grep " $f\$" SHA256SUMS.new | cut -d' ' -f1)
+            got=$(sha256sum "$f.new" 2>/dev/null || shasum -a 256 "$f.new")
+            got=${got%% *}
+            if [ -z "$want" ] || [ "$want" != "$got" ]; then
+                err "Checksum mismatch for $f - update aborted"
+                rm -f server.js.new package.json.new pnpm-lock.yaml.new pnpm-workspace.yaml.new version.new SHA256SUMS.new
+                exit 1
+            fi
+        done
+        rm -f SHA256SUMS.new
+        ok "Checksums verified"
+    else
+        rm -f SHA256SUMS.new
+        warn "No checksum file - skipping verification"
+    fi
     NEED=0
     { [ -d node_modules ] && [ -f package.json ] && cmp -s package.json package.json.new; } || NEED=1
     mv -f server.js.new server.js

@@ -3,12 +3,17 @@ name: Release
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'test/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: release
@@ -17,9 +22,6 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,30 +29,31 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Resolve esbuild version
+        id: esb
+        run: echo "v=$(node -p "require('./package.json').devDependencies.esbuild.replace(/^[^0-9]*/, '')")" >> "$GITHUB_OUTPUT"
       - name: Cache npm (esbuild)
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: esbuild-0.25.9
+          key: esbuild-${{ steps.esb.outputs.v }}
       - name: Install esbuild
-        run: npm i --prefix .. esbuild@0.25.9
+        run: npm i --prefix .. esbuild@${{ steps.esb.outputs.v }}
       - name: Build dist
         run: node scripts/build.mjs
+      - name: Smoke test dist
+        run: |
+          for f in server.js package.json version.txt pnpm-lock.yaml pnpm-workspace.yaml; do
+            test -s "dist/$f" || { echo "missing dist/$f"; exit 1; }
+          done
+          node --check dist/server.js
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          (cd dist && sha256sum server.js package.json version.txt pnpm-lock.yaml pnpm-workspace.yaml > SHA256SUMS)
           VERSION=$(cat dist/version.txt)
-          gh release create "v${VERSION/+/-}" dist/* \
-            --title "ZeroKey ${VERSION}" \
+          gh release create "v${VERSION/+/-}" dist/* zerokey.bat zerokey.sh \
+            --title "v${VERSION}" \
             --generate-notes \
             --latest
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-      - name: Upload docs
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs
-      - name: Deploy docs to Pages
-        id: deployment
-        uses: actions/deploy-pages@v4

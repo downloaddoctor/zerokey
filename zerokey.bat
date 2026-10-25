@@ -83,6 +83,13 @@ call :download "%RAW%/pnpm-lock.yaml" "pnpm-lock.yaml.new"
 if errorlevel 1 del "pnpm-lock.yaml.new" >nul 2>nul
 call :download "%RAW%/pnpm-workspace.yaml" "pnpm-workspace.yaml.new"
 if errorlevel 1 del "pnpm-workspace.yaml.new" >nul 2>nul
+call :download "%RAW%/SHA256SUMS" "SHA256SUMS.new"
+if errorlevel 1 del "SHA256SUMS.new" >nul 2>nul
+call :verify server.js
+if errorlevel 1 goto updfail
+call :verify package.json
+if errorlevel 1 goto updfail
+del "SHA256SUMS.new" >nul 2>nul
 
 set "NEED=0"
 if not exist "node_modules\" set "NEED=1"
@@ -111,7 +118,7 @@ call :ok "Update applied"
 goto start
 
 :updfail
-del "server.js.new" "package.json.new" "pnpm-lock.yaml.new" "pnpm-workspace.yaml.new" "version.new" >nul 2>nul
+del "server.js.new" "package.json.new" "pnpm-lock.yaml.new" "pnpm-workspace.yaml.new" "version.new" "SHA256SUMS.new" >nul 2>nul
 if exist "server.js" (
     call :warn "Update download failed - using existing files"
     goto start
@@ -124,6 +131,20 @@ call :section "Start - node server.js"
 node server.js
 pause
 endlocal
+exit /b 0
+
+:: -- Verify a downloaded <file>.new against SHA256SUMS.new (skipped when the sums file is absent) --
+:verify
+if not exist "SHA256SUMS.new" exit /b 0
+set "WANT="
+for /f "tokens=1" %%a in ('findstr /e /c:" %~1" "SHA256SUMS.new"') do set "WANT=%%a"
+set "GOT="
+for /f "delims=" %%h in ('certutil -hashfile "%~1.new" SHA256 ^| findstr /v ":"') do if not defined GOT set "GOT=%%h"
+set "GOT=!GOT: =!"
+if /i not "!WANT!"=="!GOT!" (
+    call :err "Checksum mismatch for %~1"
+    exit /b 1
+)
 exit /b 0
 
 :: -- UI helpers --
