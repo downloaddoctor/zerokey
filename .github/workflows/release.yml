@@ -1,4 +1,4 @@
-name: Publish dist
+name: Release
 
 on:
   push:
@@ -7,29 +7,50 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
-  group: publish-dist
+  group: release
   cancel-in-progress: true
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - name: Push dist to the dist branch
+      - name: Cache npm (esbuild)
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: esbuild-0.25.9
+      - name: Install esbuild
+        run: npm i --prefix .. esbuild@0.25.9
+      - name: Build dist
+        run: node scripts/build.mjs
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd dist
-          git init -b dist
-          git config user.name 'github-actions'
-          git config user.email 'github-actions@users.noreply.github.com'
-          git add -A
-          git commit -m "dist ${GITHUB_SHA::8}"
-          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" dist:dist
+          VERSION=$(cat dist/version.txt)
+          gh release create "v${VERSION/+/-}" dist/* \
+            --title "ZeroKey ${VERSION}" \
+            --generate-notes \
+            --latest
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload docs
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - name: Deploy docs to Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

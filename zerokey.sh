@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-RAW="https://raw.githubusercontent.com/downloaddoctor/zerokey/dist"
+RAW="https://github.com/downloaddoctor/zerokey/releases/latest/download"
 DIR="$(cd "$(dirname "$0")" && pwd)/zerokey"
 
 # -- Colors (only when stdout is a tty) --

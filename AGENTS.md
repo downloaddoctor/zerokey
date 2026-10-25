@@ -150,7 +150,7 @@ CONFIG
 BUILD
  pnpm build — scripts/build.mjs: esbuild bundles own code to dist/server.js (npm packages external, define process.env.ZK_BUNDLED=1); virtual modules zk-assets (openapi.json, schema.sql, deepseek wasm, engine/extra/*.md as base64) and zk-modules (providers/surfaces static lists); dist/ also gets slim package.json + pnpm-lock.yaml + pnpm-workspace.yaml + version.txt (<pkg.version>+<GITHUB_SHA first 8 or local>; launchers compare it); bundle is whitespace/syntax-minified with a linked sourcemap
  utils/bundle.js — seam: ROOT, readAsset, listAssets, bundled; disk-backed from source, bundle-backed when ZK_BUNDLED=1; new runtime file reads must go through it
- .github/workflows/release.yml — on push to main builds and force-pushes dist/ to the dist branch (what the launchers download)
+ .github/workflows/release.yml — on push to main: npm i --prefix .. esbuild@0.25.9 (esbuild only, no lockfile, ~/.npm cached via actions/cache key esbuild-0.25.9; bump version and key together, keep in sync with devDependencies) + node scripts/build.mjs; local/launchers use pnpm, publishes dist/* as a GitHub Release (tag build-<sha8>, --latest; launchers download from https://github.com/downloaddoctor/zerokey/releases/latest/download), deploys docs/ to GitHub Pages (https://downloaddoctor.github.io/zerokey)
  pnpm install → postinstall sets core.hooksPath=.githooks
  pnpm start — server; pnpm test — node --test test/**/*.test.js
  pnpm lint (eslint), pnpm format (prettier check), pnpm format:fix

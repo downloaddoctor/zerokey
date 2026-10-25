@@ -14,7 +14,7 @@ set "C_YELLOW=!ESC![33m"
 set "C_RED=!ESC![31m"
 set "C_GRAY=!ESC![90m"
 
-set "RAW=https://raw.githubusercontent.com/downloaddoctor/zerokey/dist"
+set "RAW=https://github.com/downloaddoctor/zerokey/releases/latest/download"
 set "DIR=%~dp0zerokey"
 set "TOOLS=%~dp0.zerokey-tools"
 set "NODE_VER=v22.14.0"
