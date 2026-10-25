@@ -10,7 +10,7 @@ const MAX_BUFFER_SIZE = 1024 * 1024 // 1MB cap on single-line buffer growth
  * @param {(err: Error) => void}     options.onError - called on read error
  * @param {(n: number) => void}     [options.onBytes] - called with byte count per chunk
  */
-async function readSSE(stream, { onData, onDone, onError, onBytes }) {
+async function readSSE(stream, { onData, onDone, onError, onBytes, onRawLine }) {
   let buffer = ''
   let settled = false
 
@@ -21,6 +21,16 @@ async function readSSE(stream, { onData, onDone, onError, onBytes }) {
   }
 
   const processLine = (line) => {
+    // Optional raw-line observer: sees every non-blank line verbatim (event:
+    // and data: prefixes included) before any filtering/parsing. A throwing
+    // observer must never break stream reading.
+    if (typeof onRawLine === 'function' && line.trim() !== '') {
+      try {
+        onRawLine(line)
+      } catch (caughtErr) {
+        console.warn('[SSE] onRawLine failed:', caughtErr)
+      }
+    }
     if (line.startsWith('event:')) return
     if (!line.startsWith('data:')) return
 

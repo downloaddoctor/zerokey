@@ -98,20 +98,19 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
             return { assistantText: pipeline.assistantText }
           }
 
-          const { stream, chatSessionId } = await withRetry(
-            () =>
-              claudeApi.chatCompletion(
-                prompt,
-                activeSession.id,
-                activeSession.parentId,
-                model,
-                [],
-                fileIds,
-                reasoningEffort,
-                pipeline.ephemeralMode,
-              ),
-            pipeline,
-          )
+          const runChatCompletion = () =>
+            claudeApi.chatCompletion(
+              prompt,
+              activeSession.id,
+              activeSession.parentId,
+              model,
+              [],
+              fileIds,
+              reasoningEffort,
+              pipeline.ephemeralMode,
+            )
+
+          const { stream, chatSessionId } = await withRetry(runChatCompletion, pipeline)
 
           if (chatSessionId && !activeSession.id) {
             activeSession.id = chatSessionId
@@ -121,50 +120,60 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
           // onFinalChunk: that fires at stream end, before the summary request
           // runs, so the loop would flushFinish and close the stream first.
           let limitHandled = false
-          await claudeStreamHandler(stream, activeSession, pipeline, async (limitReached) => {
-            if (!limitReached?.resets_at) return
-            limitHandled = true
-            userData.waitUntil = limitReached.resets_at * 1000
-            userData.waitReason = 'Claude rate limit'
+          await claudeStreamHandler(
+            stream,
+            activeSession,
+            pipeline,
+            async (limitReached) => {
+              if (!limitReached?.resets_at) return
+              limitHandled = true
+              userData.waitUntil = limitReached.resets_at * 1000
+              userData.waitReason = 'Claude rate limit'
 
-            const resetTime = new Date(userData.waitUntil).toLocaleTimeString()
-            const mins = Math.max(1, Math.ceil((userData.waitUntil - Date.now()) / 60000))
-            const overUtilized = limitReached.util >= 1.0
+              const resetTime = new Date(userData.waitUntil).toLocaleTimeString()
+              const mins = Math.max(1, Math.ceil((userData.waitUntil - Date.now()) / 60000))
+              const overUtilized = limitReached.util >= 1.0
 
-            if (overUtilized) {
-              console.warn(`[Claude] ⚠ Usage at ${limitReached.pct} — over limit, skipping summary`)
-              return emitLimitResponse(
-                pipeline,
-                userData.waitUntil,
-                `This user's usage quota has already been reached (${limitReached.pct})`,
-              )
-            }
+              if (overUtilized) {
+                console.warn(
+                  `[Claude] ⚠ Usage at ${limitReached.pct} — over limit, skipping summary`,
+                )
+                return emitLimitResponse(
+                  pipeline,
+                  userData.waitUntil,
+                  `This user's usage quota has already been reached (${limitReached.pct})`,
+                )
+              }
 
-            console.warn(`[Claude] ⚠ Usage at ${limitReached.pct} — requesting summary`)
+              console.warn(`[Claude] ⚠ Usage at ${limitReached.pct} — requesting summary`)
 
-            try {
-              const { stream: summaryStream } = await claudeApi.chatCompletion(
-                instructions.getExtra('summary').content.trim(),
-                activeSession.id,
-                activeSession.parentId,
-                model,
-                [],
-              )
+              try {
+                const { stream: summaryStream } = await claudeApi.chatCompletion(
+                  instructions.getExtra('summary').content.trim(),
+                  activeSession.id,
+                  activeSession.parentId,
+                  model,
+                  [],
+                )
 
-              pipeline.scan('\n\n````text\n')
-              await claudeStreamHandler(summaryStream, activeSession, pipeline)
-              pipeline.scan('\n````')
-              pipeline.scan(limitMessageText(resetTime, mins))
-            } catch (summaryErr) {
-              console.error('claudeApi.chatCompletion() failed:', summaryErr)
-              console.error(`[Claude] Summary failed: ${summaryErr.message}`)
-              emitLimitResponse(
-                pipeline,
-                userData.waitUntil,
-                `Could not generate a conversation summary - usage is already over the limit (${limitReached.pct}), so this request was rejected too`,
-              )
-            }
-          })
+                pipeline.scan('\n\n````text\n')
+                await claudeStreamHandler(summaryStream, activeSession, pipeline)
+                pipeline.scan('\n````')
+                pipeline.scan(limitMessageText(resetTime, mins))
+              } catch (summaryErr) {
+                console.error('claudeApi.chatCompletion() failed:', summaryErr)
+                console.error(`[Claude] Summary failed: ${summaryErr.message}`)
+                emitLimitResponse(
+                  pipeline,
+                  userData.waitUntil,
+                  `Could not generate a conversation summary - usage is already over the limit (${limitReached.pct}), so this request was rejected too`,
+                )
+              }
+            },
+            {
+              refetch: () => withRetry(runChatCompletion, pipeline),
+            },
+          )
           // The summary/limit text already went to the client; hand the loop an
           // empty turn so it cannot parse it as a mixed block and start a repair
           // round against a rate-limited account.
