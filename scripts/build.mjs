@@ -92,7 +92,7 @@ await build({
   packages: 'external',
   minifyWhitespace: true,
   minifySyntax: true,
-  sourcemap: 'linked',
+  sourcemap: false,
   keepNames: true,
   define: { 'process.env.ZK_BUNDLED': '"1"' },
   legalComments: 'none',
