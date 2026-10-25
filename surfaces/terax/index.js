@@ -18,13 +18,7 @@ module.exports = (t) => {
     split: true,
     params: { path: 'path', old: 'old_string', new: 'new_string' },
   })
-  // t.tool('ask', 'bash_run', {
-  //   params: { run: 'command' },
-  //   default: { command: 'echo "User question:"' },
-  //   transform: (values, internal) => {
-  //     values.command = `echo "[ASK] ${internal.ques || ''}"`
-  //   },
-  // })
+
   t.tool('ls', 'list_directory', { params: { path: 'path' }, default: { path: true } })
   t.tool('mkdir', 'create_directory', { params: { path: 'path' }, default: { path: ' ' } })
   t.tool('glob', 'glob', {

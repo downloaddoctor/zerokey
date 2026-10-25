@@ -3,10 +3,11 @@
 
 const SYNTAX = require('./syntax')
 
-const MAX_BATCH = 6
+const { LIMITS } = require('../core/mhi/limits')
+const MAX_BATCH = LIMITS.MAX_BATCH
 
 // Signature history cap across turns / rounds.
-const MAX_HISTORY = 24
+const MAX_HISTORY = LIMITS.MAX_HISTORY
 
 // Only pure-read tools are compared — a repeated command may be intentional.
 const READ_ONLY = new Set(['read', 'ls', 'glob', 'grep', 'view_image'])

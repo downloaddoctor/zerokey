@@ -13,7 +13,8 @@ const fs = require('fs')
 const path = require('path')
 const { MhiFileError, scope } = require('./path-policy')
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const { LIMITS } = require('./limits')
+const MAX_IMAGE_BYTES = LIMITS.MAX_IMAGE_BYTES
 
 const MIME_EXTENSIONS = new Map([
   ['.png', 'image/png'],

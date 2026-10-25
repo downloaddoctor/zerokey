@@ -7,7 +7,7 @@ const { readSSE } = require('../../utils/sse-reader')
  * Frames: reasoning-start/delta/end, text-start/delta/end, error, then [DONE].
  * Resolves with the full assistant text once the stream has ended.
  */
-async function streamHandler(stream, session, parser) {
+async function streamHandler(stream, session, parser, outcome = null) {
   let reply = ''
   let hasSentReasoningRole = false
   let finalized = false
@@ -77,6 +77,10 @@ async function streamHandler(stream, session, parser) {
     if (data.type === 'error') {
       const reason = data.errorText || data.message || 'unknown error'
       console.error('[INCEPTION] provider error — ' + reason, new Error(reason), { raw: data })
+      if (outcome) {
+        outcome.error = reason
+        return
+      }
       parser.emitText('\n\n⚠ Stream error: ' + reason + '\n')
     }
   }

@@ -12,7 +12,8 @@
 const fs = require('fs')
 const path = require('path')
 
-const MAX_PATH_CHARS = 4096
+const { LIMITS } = require('./limits')
+const MAX_PATH_CHARS = LIMITS.MAX_PATH_CHARS
 const RESERVED = /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i
 
 class MhiFileError extends Error {

@@ -16,6 +16,7 @@ const { CONFIG } = require('../../config/constants')
 const { reasoning, summaryAt } = require('./config')
 const { resolveSessionTransport } = require('../../utils/session-transport')
 
+const MAX_CONTINUES = 3
 const DEFAULT_TRANSPORT = (process.env.INCEPTION_TRANSPORT || 'browser').toLowerCase()
 
 function randomId() {
@@ -147,7 +148,34 @@ async function buildInceptionRouter(parsedFetch, session, userData = null) {
             pipeline,
           )
 
-          const reply = await streamHandler(stream, active, pipeline)
+          let outcome = {}
+          let reply = await streamHandler(stream, active, pipeline, outcome)
+          // Upstream 'Something went wrong' frame: keep the thread and send 'continue'.
+          for (let n = 0; outcome.error && n < MAX_CONTINUES; n += 1) {
+            console.warn(
+              `[Inception] stream error "${outcome.error}" - sending continue (${n + 1}/${MAX_CONTINUES})`,
+            )
+            const next = await withRetry(
+              () =>
+                browser.chatCompletion({
+                  prompt: 'continue',
+                  messages: [
+                    ...payload.messages,
+                    { role: 'assistant', content: reply },
+                    { role: 'user', content: 'continue' },
+                  ],
+                  newThread: false,
+                  fresh: ephemeral,
+                  reasoningEffort,
+                  webSearch,
+                  signal: req.signal,
+                }),
+              pipeline,
+            )
+            outcome = {}
+            reply += await streamHandler(next, active, pipeline, outcome)
+          }
+          if (outcome.error) pipeline.emitText('\n\n⚠ Stream error: ' + outcome.error + '\n')
 
           if (!ephemeral && reply) active.parentId = randomId()
           return { assistantText: pipeline.assistantText }

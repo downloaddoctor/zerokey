@@ -20,9 +20,10 @@ const OPEN = SYNTAX.OPEN
 const CLOSE = SYNTAX.CLOSE
 const SEP = SYNTAX.SEP
 
-const MAX_TOOLS = 128
-const MAX_CALLS = 12
-const MAX_DESCRIPTION_CHARS = 240
+const { LIMITS } = require('../core/mhi/limits')
+const MAX_TOOLS = LIMITS.MAX_TOOLS
+const MAX_CALLS = LIMITS.MAX_CALLS
+const MAX_DESCRIPTION_CHARS = LIMITS.MAX_DESCRIPTION_CHARS
 
 function rawName(tool) {
   if (!tool || typeof tool !== 'object') return null

@@ -13,9 +13,10 @@ const SYNTAX = require('../../engine/syntax')
 
 const OPEN = SYNTAX.OPEN
 
-const MAX_BLOCKS = 12
-const MAX_BLOCK_CHARS = 1024 * 1024
-const MAX_TOTAL_CHARS = 2 * 1024 * 1024
+const { LIMITS } = require('./limits')
+const MAX_BLOCKS = LIMITS.MAX_BLOCKS
+const MAX_BLOCK_CHARS = LIMITS.MAX_BLOCK_CHARS
+const MAX_TOTAL_CHARS = LIMITS.MAX_TOTAL_CHARS
 
 const DEFINITIONS = {
   read: { keys: new Set(['path', 'from', 'to']), required: ['path'] },

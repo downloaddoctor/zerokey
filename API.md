@@ -4,7 +4,7 @@
 
 ZeroKey is an OpenAI-compatible AI proxy server that routes chat completion requests to real browser sessions for **DeepSeek**, **Claude**, **ChatGPT**, **Qwen**, and **Inception (Mercury)** — without requiring API keys. It presents an OpenAI-compatible `/v1/chat/completions` endpoint that IDE plugins (VS Code, Terax, Opencode) can use as a drop-in replacement.
 
-**Version:** 0.3.0
+**Version:** 0.5.0
 **Base URL:** `http://localhost:{PORT}` (default port: 7250, auto-increments if occupied)
 
 ---

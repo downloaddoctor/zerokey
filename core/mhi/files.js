@@ -16,11 +16,12 @@ const fs = require('fs')
 const path = require('path')
 const { MhiFileError, scope } = require('./path-policy')
 
-const MAX_FILE_BYTES = 1024 * 1024
-const MAX_OUTPUT_BYTES = 64 * 1024
-const MAX_GREP_FILES = 2000
-const MAX_GREP_TOTAL_BYTES = 16 * 1024 * 1024
-const GREP_TIMEOUT_MS = 10000
+const { LIMITS } = require('./limits')
+const MAX_FILE_BYTES = LIMITS.MAX_FILE_BYTES
+const MAX_OUTPUT_BYTES = LIMITS.MAX_OUTPUT_BYTES
+const MAX_GREP_FILES = LIMITS.MAX_GREP_FILES
+const MAX_GREP_TOTAL_BYTES = LIMITS.MAX_GREP_TOTAL_BYTES
+const GREP_TIMEOUT_MS = LIMITS.GREP_TIMEOUT_MS
 
 function abortError() {
   const error = new Error('MHI file operation aborted.')

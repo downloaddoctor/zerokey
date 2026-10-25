@@ -16,7 +16,6 @@ const viewImage = require('./view-image')
 const SYNTAX = require('../../engine/syntax')
 
 const FILE_TOOLS = new Set(['read', 'ls', 'glob', 'grep', 'write', 'replace'])
-const MAX_ROUNDS = 8
 
 function normalizeEnablement(value) {
   if (value && typeof value === 'object') {
@@ -204,7 +203,6 @@ function appendResult(payload, resultText, attachments = []) {
 
 module.exports = {
   FILE_TOOLS,
-  MAX_ROUNDS,
   appendResult,
   commands,
   evaluateAssistant,
