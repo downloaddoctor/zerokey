@@ -453,7 +453,11 @@ function toRecord(level, call) {
 // Session number: every process start claims the next number (+1, never reused,
 // claimed atomically with an exclusive create so parallel processes get distinct
 // numbers). Skipped in `node --test` children (SESSION_NO 0, no files touched).
-const DIGEST_ON = !process.env.NODE_TEST_CONTEXT
+// Only the real server process (server.js, source or bundled) claims a session; check/lint/scripts
+// that merely require this module do not. ZEROKEY_SESSION_LOG=1 opts in (used by the logger test).
+const DIGEST_ON =
+  !process.env.NODE_TEST_CONTEXT &&
+  (process.env.ZEROKEY_SESSION_LOG === '1' || path.basename(process.argv[1] || '') === 'server.js')
 const SESSIONS_DIR = path.join(CONFIG.LOG_DIR, 'sessions')
 const SESSION_KEEP = 300
 
@@ -494,29 +498,9 @@ function claimSession() {
 
 const SESSION_NO = DIGEST_ON ? claimSession() : 0
 
-// Append-only history: every level (debug included) from every run, never
-// rotated or pruned. Each process start writes a SESSION marker row, so
-// "last N sessions" = the text after the Nth-from-last marker.
-const historySink = new LogSaver({
-  name: 'zerokey-history',
-  dir: CONFIG.LOG_DIR,
-  maxSize: Infinity,
-  header: CSV_HEADER,
-})
-
-historySink.log(
-  [
-    csvField(new Date().toISOString()),
-    PID,
-    'SESSION',
-    'SESSION',
-    csvField('START #' + pad(SESSION_NO) + ' node=' + process.version + ' cwd=' + process.cwd()),
-  ].join(SEP) + CSV_EMPTY_TAIL,
-)
-
-// Per-session digest (temp/logs/sessions/session-<N>.log) for LLM reading: WARN/ERROR
-// rows plus SERVER lifecycle rows, each capped. One file per process start, so
-// parallel processes never mix and any run can be pointed to by its number.
+// Per-session log (temp/logs/sessions/session-<N>.log): every level (debug included)
+// of ONE process run. Replaces the old global history file. WARN/ERROR rows keep
+// their full stack; other rows are capped so one huge prompt/body cannot bloat it.
 const DIGEST_MAX_LINE = 700
 const digestSink = new LogSaver({
   name: 'session-' + pad(SESSION_NO),
@@ -542,9 +526,11 @@ function record(level, call) {
   try {
     const line = toRecord(level, call)
     if (LEVELS[level] <= THRESHOLD) sink.log(line)
-    historySink.log(line)
-    if (DIGEST_ACTIVE && (level === 'error' || level === 'warn' || call.tag === 'SERVER')) {
-      digestSink.log(line.length > DIGEST_MAX_LINE ? line.slice(0, DIGEST_MAX_LINE) + '…' : line)
+    if (DIGEST_ACTIVE) {
+      const keepFull = level === 'error' || level === 'warn'
+      digestSink.log(
+        keepFull || line.length <= DIGEST_MAX_LINE ? line : line.slice(0, DIGEST_MAX_LINE) + '…',
+      )
     }
   } catch (caughtErr) {
     reportLoggerError(caughtErr)
@@ -662,7 +648,7 @@ console.debug.mix = function mix(...args) {
 }
 
 if (DIGEST_ACTIVE) {
-  console.info(
+  _log(
     '[SERVER] log session #' +
       pad(SESSION_NO) +
       ' → temp/logs/sessions/session-' +

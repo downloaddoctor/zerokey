@@ -128,10 +128,8 @@ goto fail
 
 :start
 call :section "Start - node server.js"
-node server.js
-pause
-endlocal
-exit /b 0
+:: Ctrl+C means the user wants to close: leave on the same line as node so cmd never resumes the script (Y or N at the prompt both exit)
+node server.js & endlocal & exit
 
 :: -- Verify a downloaded <file>.new against SHA256SUMS.new (skipped when the sums file is absent) --
 :verify

@@ -30,16 +30,26 @@ function runLogger(statements, level = 'log') {
   try {
     const script = ['require(' + JSON.stringify(LOG_MODULE) + ')', ...statements].join(';')
     const res = spawnSync(process.execPath, ['-e', script], {
-      env: { ...process.env, ZEROKEY_DATA_DIR: dir, ZEROKEY_LOG_LEVEL: level },
+      // NODE_TEST_CONTEXT is inherited from `node --test` and would switch the per-session log off.
+      env: {
+        ...process.env,
+        NODE_TEST_CONTEXT: '',
+        ZEROKEY_SESSION_LOG: '1',
+        ZEROKEY_DATA_DIR: dir,
+        ZEROKEY_LOG_LEVEL: level,
+      },
       encoding: 'utf8',
     })
     const file = path.join(dir, 'logs', 'zerokey.log')
     const lines = fs.existsSync(file)
       ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean)
       : []
-    const hfile = path.join(dir, 'logs', 'zerokey-history.log')
-    const history = fs.existsSync(hfile)
-      ? fs.readFileSync(hfile, 'utf8').split('\n').filter(Boolean)
+    const sdir = path.join(dir, 'logs', 'sessions')
+    const sfile = fs.existsSync(sdir)
+      ? fs.readdirSync(sdir).find((f) => /^session-\d+\.log$/.test(f))
+      : null
+    const history = sfile
+      ? fs.readFileSync(path.join(sdir, sfile), 'utf8').split('\n').filter(Boolean)
       : []
     return { status: res.status, lines, history, stderr: res.stderr }
   } finally {
@@ -92,7 +102,7 @@ test('plain and error rows both carry the pid in the same column', () => {
   }
 })
 
-test('history log keeps every level and marks each session start', () => {
+test('session log keeps every level and marks the session start', () => {
   const { lines, history } = runLogger(['console.debug("[T] fine detail")'], 'info')
   assert.ok(!lines.some((l) => l.includes('fine detail')))
   assert.ok(history.some((l) => l.includes('fine detail')))
