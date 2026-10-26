@@ -191,7 +191,10 @@ class ClaudeAPI extends BaseAPI {
     )
 
     // assertOk carries .status so withRetry/retry.classify can tell 401/429 from transient errors.
-    await assertOk(res, { limit: 500 })
+    // limit: 0 keeps the whole body — a 429's usage-limit JSON (resetsAt,
+    // windows.5h.resets_at) is longer than 500 chars and must stay parseable
+    // so the router can persist user.waitUntil.
+    await assertOk(res, { limit: 0 })
 
     this._captureResponseHeaders(res)
 

@@ -188,19 +188,37 @@ async function buildClaudeRouter(parsedFetch, session, userData = null) {
 
       try {
         const text = String(error.message || '')
-        const raw = text.startsWith('{') ? JSON.parse(text) : null
+        // assertOk wraps the body as 'HTTP <status>: <body>'. Strip everything
+        // up to the first '{' so a 429 usage-limit JSON is parsed regardless of
+        // the status prefix.
+        const jsonStart = text.indexOf('{')
+        const raw = jsonStart >= 0 ? JSON.parse(text.slice(jsonStart)) : null
         const inner = raw?.error?.message
-        const payload =
-          typeof inner === 'string' && inner.startsWith('{') ? JSON.parse(inner) : null
+        const innerStart = typeof inner === 'string' ? inner.indexOf('{') : -1
+        const payload = innerStart >= 0 ? JSON.parse(inner.slice(innerStart)) : null
         const limit = payload?.resolved?.limit
-        const reset = limit?.resets_at || payload?.windows?.['5h']?.resets_at || payload?.resetsAt
+        const reset =
+          limit?.resets_at ||
+          payload?.windows?.['5h']?.resets_at ||
+          payload?.windows?.['7d']?.resets_at ||
+          payload?.resetsAt ||
+          raw?.error?.resetsAt
 
+        // Persist the block even when only a raw error.resetsAt is present — the
+        // session must be marked so the next request short-circuits instead of
+        // hammering a rate-limited account.
+        let limitParsed = false
         if (reset) {
           userData.waitUntil = typeof reset === 'number' ? reset * 1000 : new Date(reset).getTime()
           userData.waitReason = limit?.title || payload?.notice?.title || 'Claude rate limit'
+          limitParsed = true
         }
 
-        if (payload?.resolved?.status === 'exceeded') {
+        if (
+          limitParsed ||
+          payload?.resolved?.status === 'exceeded' ||
+          payload?.type === 'exceeded_limit'
+        ) {
           return emitLimitResponse(
             pipeline,
             userData.waitUntil,

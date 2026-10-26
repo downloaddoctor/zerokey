@@ -174,8 +174,10 @@ Manages HTTP requests to `claude.ai/api` using browser-identical headers in **ex
 
 When either the 5h or 7d usage window reaches >= 90% utilization, the stream handler
 delegates to the route callback. The route requests a conversation summary from Claude,
-emits an ask MHI with provider-switch options, sets `waitUntil` on userData, then calls
-`process.exit(0)`. On hard exceeded errors (caught in the catch block), the route emits
-an ask MHI directly in the SSE stream and exits. `userData.waitUntil` / `waitReason` are
-consulted at startup in `SessionSelector.select()` — blocked users show "(limit reached)"
-suffix and auto-switch to available users is offered.
+emits an ask MHI with provider-switch options, and sets `waitUntil` on userData. On hard
+exceeded errors (a 429 whose body carries the usage-limit JSON), the route catch parses
+the body — `assertOk` is called with `limit: 0` so the JSON is never truncated — writes
+`userData.waitUntil` / `waitReason`, and emits the ask MHI directly. `userData.waitUntil` /
+`waitReason` are consulted at startup in `SessionSelector.select()` (blocked users show
+"(limit reached)" and auto-switch is offered) and at the top of the route, which
+short-circuits a still-blocked user with `emitLimitResponse` instead of hitting upstream.

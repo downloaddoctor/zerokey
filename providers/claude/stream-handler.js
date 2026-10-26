@@ -60,6 +60,10 @@ async function claudeStreamHandler(stream, session, parser, cb, options = {}) {
       let lastEventType = null
       let overloadRetryPending = false
       let hasSentReasoningRole = false
+      // Accumulated thinking-summary text. Claude streams cumulative summaries
+      // in `thinking_summary_delta.summary.summary`; we emit only the new tail
+      // so the client sees each summary line exactly once.
+      let summaryText = ''
 
       const emitReasoning = (delta) => {
         if (!delta) return
@@ -137,8 +141,17 @@ async function claudeStreamHandler(stream, session, parser, cb, options = {}) {
             }
             case 'content_block_start': {
               const block = parsed.content_block || {}
-              if (block.type === 'thinking' && block.thinking) {
-                emitReasoning(block.thinking)
+              if (block.type === 'thinking') {
+                // Some streams deliver the initial reasoning text inline.
+                if (block.thinking) emitReasoning(block.thinking)
+                // Others deliver summaries upfront as an array of strings.
+                if (Array.isArray(block.summaries) && block.summaries.length > 0) {
+                  const seed = block.summaries.filter((s) => typeof s === 'string').join('\n')
+                  if (seed && seed.length > summaryText.length) {
+                    emitReasoning(seed.substring(summaryText.length))
+                    summaryText = seed
+                  }
+                }
               }
               break
             }
@@ -149,6 +162,13 @@ async function claudeStreamHandler(stream, session, parser, cb, options = {}) {
                 parser.scan(delta.text)
               } else if (delta.type === 'thinking_delta' && delta.thinking) {
                 emitReasoning(delta.thinking)
+              } else if (delta.type === 'thinking_summary_delta') {
+                // `summary.summary` is cumulative — emit only the new tail.
+                const next = delta.summary?.summary
+                if (typeof next === 'string' && next.length > summaryText.length) {
+                  emitReasoning(next.substring(summaryText.length))
+                  summaryText = next
+                }
               }
               break
             }

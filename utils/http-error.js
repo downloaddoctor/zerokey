@@ -16,7 +16,7 @@ async function assertOk(res, { allow = [], prefix = '', limit = 200 } = {}) {
     console.error('res.text() failed:', caughtErr)
     return ''
   })
-  const error = new Error(`${prefix}HTTP ${res.status}: ${text.slice(0, limit)}`)
+  const error = new Error(`${prefix}HTTP ${res.status}: ${limit > 0 ? text.slice(0, limit) : text}`)
   error.status = res.status
   error.statusCode = res.status
   throw error
