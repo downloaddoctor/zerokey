@@ -3,128 +3,111 @@
 /**
  * Users: identity, credentials, and the rate-limit/instructions fields.
  *
- * Persistence and the recursive Proxy live in core/state/store.js; this module
+ * Persistence and the recursive Proxy live in sqlite-pro; this module
  * supplies the table config and the user-specific domain functions. Assigning
  * to any field (nested plain objects and arrays included, e.g.
  * `user.parsedFetch.headers.cookie = x`) schedules a debounced 250 ms flush.
+ *
+ * parsedFetch is a virtual field: it has no column. Its static part (url,
+ * method, body, bodyBase64, any other key) is projected onto users.capture_*
+ * and its headers onto one user_headers row each, so a refreshed cookie
+ * rewrites one row. JS callers still see a single parsedFetch object.
  */
 
 const { randomUUID } = require('crypto')
-const { createStore, parseBlob } = require('./store')
+const { createStore } = require('sqlite-pro')
 
-const COLUMN_MAP = {
-  id: 'id',
-  provider: 'provider',
-  username: 'username',
-  parsedFetch: 'parsed_fetch',
-  instructionsHash: 'instructions_hash',
-  instructionsAppliedAt: 'instructions_applied_at',
-  waitUntil: 'wait_until',
-  waitReason: 'wait_reason',
-  createdAt: 'created_at',
-  updatedAt: 'updated_at',
+const SCHEMA = {
+  columns: {
+    id: 'text primary',
+    provider: 'text required',
+    username: 'text required',
+    captureUrl: 'text',
+    captureMethod: 'text',
+    captureBody: { type: 'json', column: 'capture_body' },
+    captureBodyBase64: 'text',
+    captureExtra: { type: 'json', column: 'capture_extra' },
+    instructionsHash: 'text',
+    instructionsAppliedAt: 'integer',
+    waitUntil: 'integer',
+    waitReason: 'text',
+    createdAt: 'integer required',
+    updatedAt: 'integer required',
+  },
+  unique: ['provider+username'],
+  virtual: {
+    parsedFetch: {
+      fields: {
+        url: 'captureUrl',
+        method: 'captureMethod',
+        body: 'captureBody',
+        bodyBase64: 'captureBodyBase64',
+      },
+      extra: 'captureExtra',
+      children: {
+        headers: {
+          table: 'user_headers',
+          parent: 'userId',
+          key: 'name',
+          value: 'value',
+          order: 'pos',
+        },
+      },
+    },
+  },
+  children: [
+    {
+      table: 'user_headers',
+      schema: {
+        columns: {
+          userId: 'text required ->users.id:cascade',
+          name: 'text required',
+          value: 'text required',
+          pos: 'integer required',
+        },
+        primaryKey: 'userId+name',
+        withoutRowid: true,
+      },
+    },
+  ],
 }
 
-const BLOB_KEYS = new Set(['parsedFetch'])
-const SELECT_COLUMNS =
-  'id, provider, username, parsed_fetch, instructions_hash, ' +
-  'instructions_applied_at, wait_until, wait_reason, state_json, created_at, updated_at'
-
 const store = createStore({
+  schema: SCHEMA,
   table: 'users',
-  columnMap: COLUMN_MAP,
-  blobKeys: BLOB_KEYS,
   conflict: ['id'],
   keyOf: (user) => user.id,
   flushMs: 250,
   label: 'users',
+  stateColumn: null,
+  beforeCreate: prepareUser,
 })
 
-function rowToUser(row) {
-  if (!row) return null
-  const state = parseBlob(row.state_json, {})
-  const user = {
-    id: row.id,
-    provider: row.provider,
-    username: row.username,
-    parsedFetch: parseBlob(row.parsed_fetch, {}),
-    instructionsHash: row.instructions_hash ?? null,
-    instructionsAppliedAt: row.instructions_applied_at ?? null,
-    waitUntil: row.wait_until ?? null,
-    waitReason: row.wait_reason ?? null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+// create() hook: id, lowercase provider, empty capture, explicit nulls.
+function prepareUser(user) {
+  user.id = user.id || randomUUID()
+  user.provider = String(user.provider).toLowerCase()
+  user.username = String(user.username)
+  user.parsedFetch = user.parsedFetch || {}
+  for (const key of ['instructionsHash', 'instructionsAppliedAt', 'waitUntil', 'waitReason']) {
+    if (user[key] === undefined) user[key] = null
   }
-  for (const [key, value] of Object.entries(state)) {
-    if (!(key in user)) user[key] = value
-  }
-  return user
 }
 
-function get(db, provider, username) {
-  const row = db
-    .prepare('SELECT ' + SELECT_COLUMNS + ' FROM users WHERE provider = ? AND username = ?')
-    .get(String(provider).toLowerCase(), String(username))
-  if (!row) return null
-  return store.wrap(db, rowToUser(row))
+// Persist a refreshed capture from a provider client. Merges onto the stored
+// capture (keeps keys the client does not resend, e.g. bodyBase64) and skips
+// the write when no key in next differs. Returns true when a write was queued.
+function updateCapture(db, id, next) {
+  if (!next || typeof next !== 'object') return false
+  const user = db.table('users').get(id)
+  if (!user) return false
+  const current = JSON.parse(JSON.stringify(user.parsedFetch || {}))
+  const unchanged = Object.keys(next).every(
+    (key) => JSON.stringify(current[key] ?? null) === JSON.stringify(next[key] ?? null),
+  )
+  if (unchanged) return false
+  user.parsedFetch = { ...current, ...next }
+  return true
 }
 
-function getById(db, id) {
-  const row = db.prepare('SELECT ' + SELECT_COLUMNS + ' FROM users WHERE id = ?').get(id)
-  if (!row) return null
-  return store.wrap(db, rowToUser(row))
-}
-
-function list(db) {
-  return db
-    .prepare('SELECT ' + SELECT_COLUMNS + ' FROM users ORDER BY provider, username')
-    .all()
-    .map((row) => store.wrap(db, rowToUser(row)))
-}
-
-function create(db, provider, username, fields = {}) {
-  const now = Date.now()
-  const user = {
-    id: randomUUID(),
-    provider: String(provider).toLowerCase(),
-    username: String(username),
-    parsedFetch: fields.parsedFetch || {},
-    instructionsHash: fields.instructionsHash ?? null,
-    instructionsAppliedAt: fields.instructionsAppliedAt ?? null,
-    waitUntil: fields.waitUntil ?? null,
-    waitReason: fields.waitReason ?? null,
-    createdAt: fields.createdAt ?? now,
-    updatedAt: now,
-  }
-  store.flush(db, user)
-  return store.wrap(db, user)
-}
-
-function upsert(db, provider, username, fields = {}) {
-  const existing = get(db, provider, username)
-  if (existing) {
-    for (const [key, value] of Object.entries(fields)) existing[key] = value
-    return existing
-  }
-  return create(db, provider, username, fields)
-}
-
-function remove(db, id) {
-  store.cancel(id)
-  return db.prepare('DELETE FROM users WHERE id = ?').run(id).changes
-}
-
-module.exports = {
-  BLOB_KEYS,
-  COLUMN_MAP,
-  create,
-  flush: store.flush,
-  flushAll: store.flushAll,
-  flushNow: store.flushNow,
-  get,
-  getById,
-  list,
-  remove,
-  rowToUser,
-  upsert,
-}
+module.exports = Object.assign(store, { SCHEMA, updateCapture })

@@ -6,6 +6,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { spawnSync } = require('node:child_process')
 const { DatabaseSync } = require('node:sqlite')
+const { createUser, createSession } = require('./core/state/model-helpers')
 
 const ROOT = path.resolve(__dirname, '..')
 
@@ -70,23 +71,21 @@ test('SQLite schema_version gate refuses a newer version', () => {
   }
 })
 
-test('sessions.create then get round-trips a row', () => {
+test('sessions add then get round-trips a row', () => {
   const dbModule = require('../core/state/db')
-  const users = require('../core/state/users')
-  const sessions = require('../core/state/sessions')
   const file = path.join(ROOT, 'temp', 'test', 'sessions-roundtrip.db')
   fs.mkdirSync(path.dirname(file), { recursive: true })
   try {
     if (fs.existsSync(file)) fs.unlinkSync(file)
     const db = dbModule.open({ file })
-    const user = users.create(db, 'chatgpt', 'roundtrip-user', { parsedFetch: {} })
-    const created = sessions.create(db, user.id, {
+    const user = createUser(db, 'chatgpt', 'roundtrip-user', { parsedFetch: {} })
+    const created = createSession(db, user.id, {
       name: 'sess-1',
       id: 'conv-1',
       parentId: 'msg-1',
     })
-    sessions.flushNow(db, created)
-    const loaded = sessions.get(db, user.id, 'sess-1')
+    db.table('sessions').save(created)
+    const loaded = db.table('sessions').get(user.id, 'sess-1')
     assert.equal(loaded.id, 'conv-1')
     assert.equal(loaded.parentId, 'msg-1')
     db.close()
@@ -100,14 +99,13 @@ test('sessions.create then get round-trips a row', () => {
 
 test('sessions.resolve creates a row for a new (userId, name)', () => {
   const dbModule = require('../core/state/db')
-  const users = require('../core/state/users')
   const sessions = require('../core/state/sessions')
   const file = path.join(ROOT, 'temp', 'test', 'sessions-resolve.db')
   fs.mkdirSync(path.dirname(file), { recursive: true })
   try {
     if (fs.existsSync(file)) fs.unlinkSync(file)
     const db = dbModule.open({ file })
-    const user = users.create(db, 'deepseek', 'resolve-user', { parsedFetch: {} })
+    const user = createUser(db, 'deepseek', 'resolve-user', { parsedFetch: {} })
     const fresh = sessions.resolve(db, user.id, 'sess-2')
     assert.equal(fresh.userId, user.id)
     assert.equal(fresh.persistent, true)

@@ -12,7 +12,7 @@
     "build": "node scripts/build.mjs",
     "lint": "eslint .",
     "format": "prettier --check .",
-    "format:fix": "prettier --write .",
+    "format:fix": "prettier --write --list-different .",
     "check": "node scripts/check-modules.js",
     "check:prefixes": "node scripts/check-prefix-drift.js",
     "test": "node --test --test-reporter=dot \"test/**/*.test.js\"",
@@ -23,7 +23,8 @@
     "express": "^5.2.1",
     "impit": "^0.14.7",
     "playwright": "^1.63.0",
-    "prompts": "^2.4.2"
+    "prompts": "^2.4.2",
+    "sqlite-pro": "^0.1.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

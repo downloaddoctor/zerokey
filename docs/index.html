@@ -586,6 +586,46 @@
         color: var(--accent);
       }
 
+      /* floating machine/human switch */
+      .floating-switch {
+        position: fixed;
+        bottom: 32px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        display: inline-flex;
+        align-items: center;
+        padding: 3px;
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        background: rgba(13, 13, 18, 0.85);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        box-shadow: 0 8px 32px -8px #000;
+      }
+      .floating-switch a {
+        padding: 6px 14px;
+        border-radius: 999px;
+        color: var(--ink-muted);
+        text-decoration: none;
+        transition:
+          color 0.15s,
+          background 0.15s;
+      }
+      .floating-switch a:hover {
+        color: var(--ink);
+      }
+      .floating-switch a.on {
+        color: var(--accent);
+        background: var(--accent-soft);
+        box-shadow: 0 0 14px -4px var(--accent-glow);
+      }
+
       /* ---------- Page frame (content borders + corner squares) ---------- */
       .page-frame {
         position: relative;
@@ -2009,6 +2049,10 @@
           </div>
         </div>
       </footer>
+    </div>
+    <div class="floating-switch">
+      <a href="index.html" class="on">Human</a>
+      <a href="machine.html">Machine</a>
     </div>
 
     <script>

@@ -9,11 +9,7 @@ const OUT = path.join(ROOT, 'dist')
 const posix = (p) => p.split(path.sep).join('/')
 
 // Files read from disk at runtime; embedded so server.js stands alone.
-const ASSET_FILES = [
-  'openapi.json',
-  'core/state/schema.sql',
-  'providers/deepseek/wasm/sha3_wasm_bg.7b9ca65ddd.wasm',
-]
+const ASSET_FILES = ['openapi.json', 'providers/deepseek/wasm/sha3_wasm_bg.7b9ca65ddd.wasm']
 const ASSET_DIRS = [['engine/extra', '.md']]
 
 async function subdirs(dir) {

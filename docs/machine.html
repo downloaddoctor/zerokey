@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ZeroKey :: Machine-Readable Index</title>
+    <meta
+      name="description"
+      content="Plain-text mirror of ZeroKey for AI agents, crawlers, and humans who prefer it raw."
+    />
+    <meta name="theme-color" content="#050507" />
+    <link rel="canonical" href="https://downloaddoctor.github.io/zerokey/machine.html" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #050507;
+        --ink: #f4f4f6;
+        --ink-dim: #9a9aa6;
+        --ink-muted: #5e5e6b;
+        --accent: #a78bfa;
+        --accent-hot: #c4b5fd;
+        --accent-dim: #7c6cf0;
+        --line: rgba(167, 139, 250, 0.22);
+        --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        line-height: 1.75;
+        -webkit-font-smoothing: antialiased;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      ::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+        display: none;
+      }
+
+      body {
+        position: relative;
+        padding: 40px 20px 80px;
+        overflow-x: hidden;
+        line-height: 1.75;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      /* subtle squares + scanlines + glow, terminal feel */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(167, 139, 250, 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(167, 139, 250, 0.04) 1px, transparent 1px),
+          repeating-linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.01) 0px,
+            rgba(255, 255, 255, 0.01) 1px,
+            transparent 1px,
+            transparent 3px
+          );
+        background-size:
+          40px 40px,
+          40px 40px,
+          100% 3px;
+        background-position: center top;
+      }
+      body::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse 70% 45% at 50% 0%,
+          rgba(139, 92, 246, 0.12),
+          transparent 70%
+        );
+      }
+
+      .shell {
+        position: relative;
+        z-index: 1;
+        max-width: 900px;
+        width: 100%;
+        margin: 0 auto;
+      }
+
+      /* ---------- ASCII banner (block font) ---------- */
+      .banner {
+        position: relative;
+        margin: 20px 0 18px;
+        overflow: hidden;
+      }
+      .banner pre {
+        display: inline-block;
+        font-family: var(--font-mono);
+        white-space: pre;
+        font-weight: 700;
+        font-size: clamp(8px, 1.3vw, 14px);
+        line-height: 1.15;
+        color: var(--accent);
+        text-shadow: 0 0 16px rgba(167, 139, 250, 0.3);
+      }
+
+      /* ---------- Tab nav ---------- */
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0 10px;
+        margin: 26px 0 30px;
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .tabs .sep {
+        color: var(--ink-muted);
+      }
+      .tabs a {
+        position: relative;
+        color: var(--accent);
+        text-decoration: none;
+        padding: 2px 0;
+        transition: color 0.15s;
+      }
+      .tabs a:hover {
+        color: var(--accent-hot);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      .tabs a.active {
+        color: #fff;
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-underline-offset: 4px;
+      }
+      .tabs a.arrow::after {
+        content: ' ↗';
+        font-size: 10px;
+      }
+
+      /* view switch */
+      .floating-switch {
+        position: fixed;
+        bottom: 32px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        display: inline-flex;
+        align-items: center;
+        padding: 3px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(13, 13, 18, 0.85);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        box-shadow: 0 8px 32px -8px #000;
+      }
+      .floating-switch a {
+        padding: 6px 14px;
+        border-radius: 999px;
+        color: var(--ink-muted);
+        text-decoration: none;
+        transition:
+          color 0.15s,
+          background 0.15s;
+      }
+      .floating-switch a:hover {
+        color: var(--ink);
+      }
+      .floating-switch a.on {
+        color: var(--accent);
+        background: var(--accent-soft);
+        box-shadow: 0 0 14px -4px var(--accent-glow);
+      }
+
+      /* ---------- Headings ---------- */
+      .title {
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin: 0 0 6px;
+      }
+      .tagline {
+        color: var(--ink-dim);
+        font-size: 12.5px;
+        margin-bottom: 26px;
+      }
+      .tagline em {
+        color: var(--ink-muted);
+        font-style: normal;
+      }
+
+      h2 {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 40px 0 18px;
+        color: var(--accent);
+        font-size: 12.5px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      h2 .dash {
+        color: var(--line);
+        letter-spacing: -1px;
+        overflow: hidden;
+        flex: 1;
+        min-width: 0;
+        user-select: none;
+      }
+      h2 .dash::before {
+        content: '────────────────────────────────────────────────────────────────────────────────────────────';
+      }
+
+      h3 {
+        margin: 26px 0 8px;
+        color: var(--accent);
+        font-size: 12.5px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      h3::before {
+        content: '* ';
+        color: var(--ink-muted);
+      }
+      .ans {
+        color: var(--accent);
+      }
+
+      p {
+        color: var(--ink-dim);
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+      }
+      p.raw {
+        text-transform: none;
+        letter-spacing: 0;
+      }
+
+      /* ---------- Definition rows (dotted leaders) ---------- */
+      dl {
+        display: grid;
+        gap: 2px;
+        margin-bottom: 20px;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 148px 1fr;
+        gap: 4px;
+        align-items: baseline;
+      }
+      .row dt {
+        color: var(--ink);
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        overflow: hidden;
+        display: flex;
+        justify-content: space-between;
+      }
+      .row dt::after {
+        content: '................................................................................';
+        color: var(--ink-muted);
+        font-weight: 400;
+        flex: 1;
+        overflow: hidden;
+        margin-left: 6px;
+        letter-spacing: 0;
+      }
+      .row dd {
+        color: var(--accent-hot);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        word-break: break-word;
+      }
+      .row dd a {
+        color: inherit;
+      }
+      .row dd a:hover {
+        color: #fff;
+      }
+
+      /* ---------- Lists ---------- */
+      ul.raw-list {
+        list-style: none;
+        display: grid;
+        gap: 4px;
+        margin-bottom: 18px;
+      }
+      ul.raw-list li {
+        color: var(--ink-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        padding-left: 14px;
+        position: relative;
+      }
+      ul.raw-list li::before {
+        content: '-';
+        position: absolute;
+        left: 0;
+        color: var(--accent-dim);
+      }
+      ul.raw-list li b {
+        color: var(--ink);
+        font-weight: 700;
+      }
+      ul.raw-list li a {
+        color: var(--accent-hot);
+        text-decoration: none;
+      }
+      ul.raw-list li a:hover {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      code {
+        font-family: var(--font-mono);
+        color: var(--accent-hot);
+      }
+
+      /* ---------- Endpoint table ---------- */
+      .endpoints {
+        display: grid;
+        gap: 2px;
+        margin-bottom: 18px;
+      }
+      .endpoints .ep {
+        display: grid;
+        grid-template-columns: 60px 240px 1fr;
+        gap: 12px;
+        align-items: baseline;
+        border-bottom: 1px dashed rgba(167, 139, 250, 0.1);
+        padding: 6px 0;
+      }
+      .endpoints .ep:last-child {
+        border-bottom: none;
+      }
+      .endpoints .verb {
+        color: var(--accent);
+        font-weight: 700;
+        font-size: 11.5px;
+        letter-spacing: 0.1em;
+      }
+      .endpoints .path {
+        color: var(--ink);
+        text-transform: none;
+      }
+      .endpoints .what {
+        color: var(--ink-muted);
+        text-transform: uppercase;
+        font-size: 11.5px;
+        letter-spacing: 0.03em;
+      }
+      @media (max-width: 768px) {
+        .endpoints .ep {
+          grid-template-columns: 60px 1fr;
+        }
+        .endpoints .what {
+          grid-column: 2;
+        }
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      .footer {
+        margin-top: 56px;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+        color: var(--ink-muted);
+        font-size: 11.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: space-between;
+      }
+      .footer a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      .footer a:hover {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      @media (max-width: 620px) {
+        .row {
+          grid-template-columns: 118px 1fr;
+        }
+        body {
+          padding: 24px 14px 64px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="banner" aria-label="ZEROKEY">
+        <pre>
+ ______             _  __
+|__  /___ _ __ ___ | |/ /___ _   _
+  / // _ \ '__/ _ \| ' // _ \ | | |
+ / /|  __/ | | (_) | . \  __/ |_| |
+/____\___|_|  \___/|_|\_\___|\__, |
+                             |___/ </pre>
+      </div>
+
+      <nav class="tabs">
+        <a href="machine.html" class="active">/HOME</a>
+        <span class="sep">/</span>
+        <a href="https://github.com/downloaddoctor/zerokey">/SOURCE</a>
+        <span class="sep">/</span>
+        <a href="llms.txt">/LLMS.TXT</a>
+        <span class="sep">/</span>
+        <a href="https://github.com/downloaddoctor/zerokey/blob/main/README.md">/README</a>
+        <span class="sep">/</span>
+        <a href="https://github.com/downloaddoctor/zerokey/blob/main/API.md">/API</a>
+        <span class="sep">/</span>
+        <a href="https://github.com/downloaddoctor/zerokey/releases/latest">/RELEASES</a>
+        <span class="sep">/</span>
+        <a href="https://github.com/downloaddoctor/zerokey/issues">/ISSUES</a>
+      </nav>
+
+      <div class="title">ZEROKEY :: MACHINE-READABLE INDEX</div>
+      <div class="tagline">
+        <em>#</em> PLAIN-TEXT MIRROR OF ZEROKEY FOR AI AGENTS, CRAWLERS, AND HUMANS WHO PREFER IT
+        RAW.
+      </div>
+
+      <h2><span>ABOUT</span><span class="dash"></span></h2>
+
+      <div class="row">
+        <dt>NAME</dt>
+        <dd>ZEROKEY</dd>
+      </div>
+      <div class="row">
+        <dt>AKA</dt>
+        <dd>ZK, ZERO KEY</dd>
+      </div>
+      <div class="row">
+        <dt>TYPE</dt>
+        <dd>SELF-HOSTED AI PROXY (OPENAI-COMPATIBLE)</dd>
+      </div>
+      <div class="row">
+        <dt>VERSION</dt>
+        <dd>0.4.0</dd>
+      </div>
+      <div class="row">
+        <dt>LICENSE</dt>
+        <dd>NON-COMMERCIAL — PERSONAL USE ONLY</dd>
+      </div>
+      <div class="row">
+        <dt>RUNTIME</dt>
+        <dd>NODE.JS &gt;= 22.13 · PNPM</dd>
+      </div>
+      <div class="row">
+        <dt>STACK</dt>
+        <dd>COMMONJS · EXPRESS 5 · NODE:SQLITE · PLAYWRIGHT · IMPIT</dd>
+      </div>
+      <div class="row">
+        <dt>SELF_HOSTED</dt>
+        <dd>YES</dd>
+      </div>
+      <div class="row">
+        <dt>HOSTED</dt>
+        <dd>NO — NO SAAS, NO RELAY, NO SHARED ACCOUNTS</dd>
+      </div>
+      <div class="row">
+        <dt>TELEMETRY</dt>
+        <dd>NONE</dd>
+      </div>
+      <div class="row">
+        <dt>AUTH</dt>
+        <dd>NONE — ANY NON-EMPTY KEY PLACEHOLDER (LOOPBACK ONLY)</dd>
+      </div>
+      <div class="row">
+        <dt>ENDPOINT</dt>
+        <dd>HTTP://LOCALHOST:7250/V1</dd>
+      </div>
+      <div class="row">
+        <dt>PROVIDERS</dt>
+        <dd>DEEPSEEK · CLAUDE · CHATGPT · QWEN · INCEPTION (MERCURY)</dd>
+      </div>
+      <div class="row">
+        <dt>KNOWS_ABOUT</dt>
+        <dd>
+          OPENAI-COMPATIBLE APIS, SSE STREAMING, TOOL CALLING, MCP, IDE SURFACE DETECTION, BROWSER
+          SESSION TRANSPORTS, SQLITE PERSISTENCE
+        </dd>
+      </div>
+
+      <p>
+        ZEROKEY TURNS A BROWSER SESSION YOU ALREADY OWN INTO AN OPENAI-COMPATIBLE ENDPOINT. YOU
+        PASTE A FETCH() COPIED FROM YOUR OWN DEVTOOLS; ZEROKEY REUSES THAT SESSION COOKIE AND NEVER
+        LEAVES YOUR MACHINE.
+      </p>
+      <p>
+        ONE SERVER PROCESS IS PINNED TO ONE PROVIDER, ONE USER, AND ONE SESSION. SWITCHING SESSIONS
+        OR OPENING A NEW IDE CHAT DOES NOT RE-TARGET THE PROXY — RESTART THE SERVER TO SWITCH.
+      </p>
+      <p>
+        THE DEEPSEEK TRANSPORT RUNS A REAL CHROMIUM PROFILE VIA PLAYWRIGHT (TEMP/PROFILES/DEEPSEEK/
+        &lt;USER&gt;/) BECAUSE THE DIRECT HTTP API IS AGGRESSIVELY FLAGGED. THE BROWSER IS WHAT
+        MAKES THE SESSION SURVIVE.
+      </p>
+
+      <h2><span>PROVIDERS</span><span class="dash"></span></h2>
+      <ul class="raw-list">
+        <li><b>DEEPSEEK</b> — BROWSER TRANSPORT (CHROMIUM + POW), API OPT-IN</li>
+        <li><b>CLAUDE</b> — COMPLETION SSE (CONNECT-RPC OPT-IN)</li>
+        <li><b>CHATGPT</b> — SENTINEL REFRESH + 401 RE-DECODE RECOVERY</li>
+        <li><b>QWEN</b> — COOKIE TOKEN OR BEARER, PERSONALIZATION</li>
+        <li><b>INCEPTION (MERCURY)</b> — AUTHLESS BROWSER TRANSPORT</li>
+      </ul>
+
+      <h2><span>IDES_SUPPORTED</span><span class="dash"></span></h2>
+      <ul class="raw-list">
+        <li>VS CODE (BUILT-IN CHAT)</li>
+        <li>TERAX</li>
+        <li>OPENCODE</li>
+        <li>ANY OPENAI-COMPATIBLE CLIENT (PLAIN-OPENAI SURFACE)</li>
+      </ul>
+      <p>
+        THE TOOL SURFACE IS AUTO-DETECTED PER REQUEST FROM THE IDE SYSTEM PROMPT — NEVER FROM A
+        HEADER OR CLIENT CLAIM.
+      </p>
+
+      <h2><span>ENDPOINTS</span><span class="dash"></span></h2>
+      <div class="endpoints">
+        <div class="ep">
+          <span class="verb">GET</span><span class="path">/</span>
+          <span class="what">API INFO</span>
+        </div>
+        <div class="ep">
+          <span class="verb">GET</span><span class="path">/health</span>
+          <span class="what">HEALTH + PERSISTENCE SNAPSHOT</span>
+        </div>
+        <div class="ep">
+          <span class="verb">GET</span><span class="path">/v1/models</span>
+          <span class="what">LIST MODELS</span>
+        </div>
+        <div class="ep">
+          <span class="verb">GET</span><span class="path">/v1/models/:model</span>
+          <span class="what">MODEL DETAIL</span>
+        </div>
+        <div class="ep">
+          <span class="verb">POST</span><span class="path">/v1/chat/completions</span>
+          <span class="what">CHAT — SSE STREAM</span>
+        </div>
+        <div class="ep">
+          <span class="verb">GET</span><span class="path">/docs</span>
+          <span class="what">SWAGGER UI</span>
+        </div>
+        <div class="ep">
+          <span class="verb">GET</span><span class="path">/openapi.json</span>
+          <span class="what">OPENAPI SPEC</span>
+        </div>
+        <div class="ep">
+          <span class="verb">GET</span><span class="path">/v1/diagnostics</span>
+          <span class="what">LOOPBACK-ONLY REDACTED SNAPSHOT</span>
+        </div>
+      </div>
+
+      <h2><span>CAPABILITIES</span><span class="dash"></span></h2>
+      <ul class="raw-list">
+        <li><b>OPENAI-COMPATIBLE</b> — DROP-IN /V1/MODELS AND /V1/CHAT/COMPLETIONS</li>
+        <li><b>STREAMING</b> — SSE FOR EVERY PROVIDER, SINGLE [DONE]</li>
+        <li><b>MULTI-IDE</b> — SURFACE AUTO-DETECTED FROM THE SYSTEM PROMPT</li>
+        <li><b>SESSION PERSISTENCE</b> — SNAPSHOT TO TEMP/DB/ZEROKEY.DB</li>
+        <li><b>TOOL CALLS</b> — OPENAI TOOLS[] TRANSLATED TO MHI GRAMMAR</li>
+        <li>
+          <b>MCP AUTO-TOOLS</b> — MCP_&lt;SERVER&gt;_&lt;TOOL&gt; REGISTERS AS $&lt;SERVER&gt;
+        </li>
+        <li><b>COMPACTION</b> — X-ZEROKEY-COMPACTION-GENERATION RESETS IDS</li>
+        <li><b>EPHEMERAL UTILITIES</b> — IDE INTERNAL PROMPTS NEVER WRITE STATE</li>
+      </ul>
+
+      <h2><span>HOW_IT_WORKS</span><span class="dash"></span></h2>
+      <ul class="raw-list">
+        <li>1. GIT CLONE THE REPO, PNPM INSTALL, PNPM START</li>
+        <li>2. WIZARD: PICK A PROVIDER, PASTE A FETCH() FROM DEVTOOLS, PICK A SESSION</li>
+        <li>3. POINT YOUR IDE AT HTTP://LOCALHOST:7250/V1</li>
+      </ul>
+      <p class="raw">
+        git clone https://github.com/downloaddoctor/zerokey.git &amp;&amp; cd zerokey &amp;&amp;
+        pnpm install &amp;&amp; pnpm start
+      </p>
+
+      <h2><span>SAFETY</span><span class="dash"></span></h2>
+      <ul class="raw-list">
+        <li>NO PASSWORD STORED — ONLY THE SESSION COOKIE YOU PASTE</li>
+        <li>NOTHING LEAVES YOUR MACHINE — STATE LIVES IN TEMP/DB/ZEROKEY.DB</li>
+        <li>NO SHARED ACCOUNTS, NO RELAY, NO BYPASSED AUTHENTICATION</li>
+        <li>YOU ARE RESPONSIBLE FOR THE PROVIDER TERMS OF SERVICE YOU USE</li>
+        <li>SOURCE IS OPEN AND INSPECTABLE</li>
+      </ul>
+
+      <h2><span>FAQ</span><span class="dash"></span></h2>
+
+      <h3>DOES ZEROKEY COST ANYTHING?</h3>
+      <p>
+        <span class="ans">A:</span> NO. ZEROKEY ITSELF IS FREE AND OPEN SOURCE; YOU STILL NEED YOUR
+        OWN PROVIDER ACCOUNT.
+      </p>
+
+      <h3>DOES ZEROKEY SEE MY PASSWORD OR API KEY?</h3>
+      <p>
+        <span class="ans">A:</span> NO. NO API KEY IS INVOLVED — ONLY THE SESSION COOKIE YOU CHOOSE
+        TO SHARE, AND IT STAYS ON YOUR MACHINE.
+      </p>
+
+      <h3>WHAT HAPPENS IF MY SESSION EXPIRES?</h3>
+      <p>
+        <span class="ans">A:</span> RE-PASTE A FRESH FETCH() IN THE SETUP WIZARD. SESSIONS OTHERWISE
+        PERSIST ACROSS RESTARTS.
+      </p>
+
+      <h3>CAN I SWITCH PROVIDERS LATER?</h3>
+      <p>
+        <span class="ans">A:</span> YES. RESTART THE WIZARD AND PICK A DIFFERENT PROVIDER; NO IDE
+        RECONFIGURATION NEEDED.
+      </p>
+
+      <h3>IS USING ZEROKEY AGAINST A PROVIDER TERMS OF SERVICE?</h3>
+      <p>
+        <span class="ans">A:</span> YOU USE YOUR OWN ACCOUNT THROUGH YOUR OWN BROWSER SESSION, BUT
+        YOU ARE RESPONSIBLE FOR READING AND COMPLYING WITH EACH PROVIDER TERMS OF SERVICE. ZEROKEY
+        CREATES NO ACCESS AND BYPASSES NO AUTHENTICATION.
+      </p>
+
+      <h2><span>FOR_AGENTS</span><span class="dash"></span></h2>
+      <ul class="raw-list">
+        <li><b>LLMS.TXT</b> — <a href="llms.txt">/LLMS.TXT</a></li>
+        <li><b>MACHINE.HTML</b> — <a href="machine.html">/MACHINE.HTML</a></li>
+        <li>
+          <b>AGENTS.MD</b> —
+          <a href="https://github.com/downloaddoctor/zerokey/blob/main/AGENTS.md">/AGENTS.MD</a>
+        </li>
+        <li>
+          <b>OPENAPI.JSON</b> —
+          <a href="https://github.com/downloaddoctor/zerokey/blob/main/openapi.json"
+            >/OPENAPI.JSON</a
+          >
+        </li>
+      </ul>
+
+      <h2><span>CONTACT</span><span class="dash"></span></h2>
+      <ul class="raw-list">
+        <li>
+          <b>SOURCE</b> —
+          <a href="https://github.com/downloaddoctor/zerokey">GITHUB.COM/DOWNLOADDOCTOR/ZEROKEY</a>
+        </li>
+        <li>
+          <b>ISSUES</b> —
+          <a href="https://github.com/downloaddoctor/zerokey/issues"
+            >GITHUB.COM/DOWNLOADDOCTOR/ZEROKEY/ISSUES</a
+          >
+        </li>
+        <li>
+          <b>RELEASES</b> —
+          <a href="https://github.com/downloaddoctor/zerokey/releases/latest">LATEST LAUNCHERS</a>
+        </li>
+        <li>
+          <b>LICENSE</b> —
+          <a href="https://github.com/downloaddoctor/zerokey/blob/main/LICENSE">NON-COMMERCIAL</a>
+        </li>
+      </ul>
+
+      <div class="footer">
+        <span>© 2026 ZEROKEY — PERSONAL USE ONLY</span>
+        <a href="index.html">[BACK TO HUMAN SITE]</a>
+      </div>
+    </div>
+    <div class="floating-switch">
+      <a href="index.html">Human</a>
+      <a href="machine.html" class="on">Machine</a>
+    </div>
+  </body>
+</html>

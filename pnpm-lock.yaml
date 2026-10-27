@@ -206,6 +206,9 @@ importers:
       prompts:
         specifier: ^2.4.2
         version: 2.4.2
+      sqlite-pro:
+        specifier: ^0.1.2
+        version: 0.1.2
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -979,6 +982,10 @@ packages:
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
 
+  sqlite-pro@0.1.2:
+    resolution: {integrity: sha512-ON5AuPzGw2g/89DjbB+FKX7yiwGWKiqXQcmkU2zW9gwggOxEqlePEvBDGnf42IMhpZWlittJIoul3Y4eAU+kcw==}
+    engines: {node: '>=22.13.0'}
+
   statuses@2.0.2:
     resolution: {integrity: sha512-DvEy55V3DB7uknRo+4iOGT5fP1slR8wQohVdknigZPMpMstaKJQWhwiYBACJE3Ul2pTnATihhBYnRhZQHGBiRw==}
     engines: {node: '>= 0.8'}
@@ -1743,6 +1750,8 @@ snapshots:
       side-channel-weakmap: 1.0.2
 
   sisteransi@1.0.5: {}
+
+  sqlite-pro@0.1.2: {}
 
   statuses@2.0.2: {}
 

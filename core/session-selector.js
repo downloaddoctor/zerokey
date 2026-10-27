@@ -7,8 +7,6 @@ const { spawn } = require('child_process')
 
 const SYNTAX = require('../engine/syntax')
 const registry = require('../providers/registry')
-const usersState = require('./state/users')
-const sessionsState = require('./state/sessions')
 
 const { text } = require('../utils/log')
 
@@ -95,7 +93,12 @@ class SessionSelector {
     const resolved = []
 
     for (const user of all) {
-      const list = sessionsState.listForUser(this._db, user.id)
+      const list = this._db
+        .table('sessions')
+        .where({ userId: user.id })
+        .orderBy('updatedAt')
+        .reverse()
+        .toArray()
       for (const session of list) {
         if (session.lastUsed) {
           resolved.push({
@@ -227,7 +230,7 @@ class SessionSelector {
   }
 
   _listAllUsers() {
-    return usersState.list(this._db)
+    return this._db.table('users').orderBy('updatedAt').reverse().toArray()
   }
 
   _listUsersForProvider(provider) {
@@ -277,13 +280,13 @@ class SessionSelector {
 
     const providerDef = registry.get(this.provider)
     if (providerDef && providerDef.requiresCapture === false) {
-      return usersState.create(this._db, this.provider, username, {})
+      return this._db.table('users').add({ provider: this.provider, username })
     }
 
     const parsedFetch = await this._captureFetch(username)
     if (!parsedFetch) return null
 
-    return usersState.create(this._db, this.provider, username, { parsedFetch })
+    return this._db.table('users').add({ provider: this.provider, username, parsedFetch })
   }
 
   async _updateUser(providerUsers) {
@@ -452,7 +455,12 @@ class SessionSelector {
 
   _listSessionsForCurrentUser() {
     if (!this.user || !this.user.id) return []
-    return sessionsState.listForUser(this._db, this.user.id)
+    return this._db
+      .table('sessions')
+      .where({ userId: this.user.id })
+      .orderBy('updatedAt')
+      .reverse()
+      .toArray()
   }
 
   async _createNewSession() {
@@ -538,7 +546,8 @@ class SessionSelector {
       }
     }
 
-    return sessionsState.create(this._db, this.user.id, {
+    return this._db.table('sessions').add({
+      userId: this.user.id,
       transport: answers.transport,
       name: answers.name || defaultName,
       toolCalling: answers.toolCalling ?? true,
@@ -567,7 +576,9 @@ class SessionSelector {
     const targetUser = providerUsers.find((u) => u.username === target)
     if (!targetUser) return this._stepUserLogin()
 
-    const sessionCount = this._db ? sessionsState.listForUser(this._db, targetUser.id).length : 0
+    const sessionCount = this._db
+      ? this._db.table('sessions').where({ userId: targetUser.id }).count()
+      : 0
     const { confirmed } = await prompts(
       {
         type: 'confirm',
@@ -603,7 +614,7 @@ class SessionSelector {
     this.provider = savedProvider
 
     if (this._db) {
-      usersState.remove(this._db, targetUser.id)
+      this._db.table('users').where({ id: targetUser.id }).delete()
     }
     try {
       fs.rmSync(this._profileDirFor(target.toLowerCase()), { recursive: true, force: true })
@@ -634,7 +645,7 @@ class SessionSelector {
       process.stdout.write('\r  ' + text.green('√ Done.') + '                  \n\n')
 
       if (this._db && this.user && this.user.id) {
-        sessionsState.removeAllForUser(this._db, this.user.id)
+        this._db.table('sessions').where({ userId: this.user.id }).delete()
       }
     }
 

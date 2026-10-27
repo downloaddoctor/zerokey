@@ -17,9 +17,17 @@ const { CONFIG } = require('./config/constants')
 
 require('./utils/log')
 
+// Set once the DB is open; drains debounced writes before a fatal exit.
+let drainWrites = () => {}
+
 // Nothing may fail silently: log the full stack of every stray error.
 process.on('uncaughtException', (err, origin) => {
   console.error(`[PROCESS] ${origin}:`, err)
+  try {
+    drainWrites()
+  } catch {
+    // Best-effort drain before a fatal exit; ignore.
+  }
   process.exit(1)
 })
 process.on('unhandledRejection', (reason) => {
@@ -39,6 +47,10 @@ async function run() {
   await startup.postClaim(port)
 
   const store = db.open()
+  drainWrites = () => {
+    store.table('users').flush()
+    store.table('sessions').flush()
+  }
 
   const { SessionSelector } = require('./core/session-selector')
   const selector = new SessionSelector(store)
@@ -50,8 +62,8 @@ async function run() {
   const cleanup = () => {
     startup.release(port)
     try {
-      require('./core/state/users').flushAll()
-      require('./core/state/sessions').flushAll()
+      store.table('users').flush()
+      store.table('sessions').flush()
     } catch {
       // Best-effort drain of debounced writes; ignore.
     }

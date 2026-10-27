@@ -70,8 +70,7 @@ async function withConversationRecovery(session, fn) {
 
 /**
  * Force-re-apply the persisted browser capture from the SQLite user row.
- * State now lives in SQLite (temp/users.json was migrated away); the live
- * user row is the source of truth for headers/cookies.
+ * The live SQLite user row is the source of truth for headers/cookies.
  */
 async function forceReloadCapture(api, userData) {
   if (!userData || typeof userData !== 'object' || !userData.parsedFetch) {

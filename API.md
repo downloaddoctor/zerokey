@@ -168,13 +168,14 @@ Singleton that loads and caches system prompts:
 
 ## User Data Schema (SQLite)
 
-Users and sessions persist in `temp/db/zerokey.db` (SQLite). Column names are snake_case; JS objects are camelCase (mapped in `core/state/users.js` and `core/state/sessions.js`). The authoritative schema is `core/state/schema.sql`.
+Users and sessions persist in `temp/db/zerokey.db` (SQLite). Column names are snake_case; JS objects are camelCase (mapped in `core/state/users.js` and `core/state/sessions.js`). The authoritative schema is declared in JS next to each store (`SCHEMA` in `core/state/users.js` and `core/state/sessions.js`); sqlite-pro generates the DDL.
 
-| Table      | Key                          | Holds                                                                                                                                                                                                      |
-| ---------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `users`    | `UNIQUE(provider, username)` | `parsed_fetch` (headers/body/url), `instructions_hash`, `instructions_applied_at`, `wait_until`, `wait_reason`, `state_json`                                                                               |
-| `sessions` | `PK(user_id, name)`          | `id`, `parent_id`, `generation`, `tool_calling`, `vision`, `model`, `todos_json`, `turn_count`, `dynamic_tools_hash`, `mcp_injected_json`, `metadata_json`, `usage_totals_json`, `last_used`, `created_at` |
-| `meta`     | `key`                        | `schema_version`, `users_json_migrated`                                                                                                                                                                    |
+| Table          | Key                          | Holds                                                                                                                                                                                                      |
+| -------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`        | `UNIQUE(provider, username)` | `capture_url`, `capture_method`, `capture_body`, `capture_body_base64`, `capture_extra`, `instructions_hash`, `instructions_applied_at`, `wait_until`, `wait_reason`                                       |
+| `sessions`     | `PK(user_id, name)`          | `id`, `parent_id`, `generation`, `tool_calling`, `vision`, `model`, `todos_json`, `turn_count`, `dynamic_tools_hash`, `mcp_injected_json`, `metadata_json`, `usage_totals_json`, `last_used`, `created_at` |
+| `user_headers` | `PK(user_id, name)`          | one row per captured request header (`value`, `pos`); cascades on user delete                                                                                                                              |
+| `meta`         | `key`                        | `schema_version`                                                                                                                                                                                           |
 
 **Claude-specific user fields:**
 

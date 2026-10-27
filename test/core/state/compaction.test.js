@@ -7,8 +7,8 @@ const path = require('node:path')
 
 const ROOT = path.resolve(__dirname, '..', '..', '..')
 const dbModule = require('../../../core/state/db')
-const users = require('../../../core/state/users')
 const sessions = require('../../../core/state/sessions')
+const { createUser, createSession } = require('./model-helpers')
 
 const scratch = path.join(ROOT, 'temp', 'test', 'compaction-test.db')
 
@@ -26,7 +26,7 @@ function freshDb() {
   cleanup()
   fs.mkdirSync(path.dirname(scratch), { recursive: true })
   const db = dbModule.open({ file: scratch })
-  const user = users.create(db, 'chatgpt', 'compaction-user', {
+  const user = createUser(db, 'chatgpt', 'compaction-user', {
     parsedFetch: { url: 'x', method: 'POST', headers: {}, body: '{}' },
   })
   return { db, user }
@@ -35,7 +35,7 @@ function freshDb() {
 test('generation 0 keeps the existing conversation', () => {
   const { db, user } = freshDb()
   try {
-    const created = sessions.create(db, user.id, {
+    const created = createSession(db, user.id, {
       name: 'sess-keep',
       id: 'conv-1',
       parentId: 'msg-1',
@@ -54,7 +54,7 @@ test('generation 0 keeps the existing conversation', () => {
 test('higher generation rebinds and stashes the previous conversation', () => {
   const { db, user } = freshDb()
   try {
-    const created = sessions.create(db, user.id, {
+    const created = createSession(db, user.id, {
       name: 'sess-rebind',
       id: 'conv-old',
       parentId: 'msg-old',
@@ -76,7 +76,7 @@ test('higher generation rebinds and stashes the previous conversation', () => {
 test('lower generation is ignored', () => {
   const { db, user } = freshDb()
   try {
-    const created = sessions.create(db, user.id, {
+    const created = createSession(db, user.id, {
       name: 'sess-lower',
       id: 'conv-2',
       generation: 2,
@@ -94,7 +94,7 @@ test('lower generation is ignored', () => {
 test('successive bumps accumulate pending conversation ids', () => {
   const { db, user } = freshDb()
   try {
-    const first = sessions.create(db, user.id, {
+    const first = createSession(db, user.id, {
       name: 'sess-accum',
       id: 'conv-a',
       generation: 0,
@@ -102,7 +102,7 @@ test('successive bumps accumulate pending conversation ids', () => {
     sessions.flushNow(db, first)
     sessions.resolve(db, user.id, 'sess-accum', { generation: 1 })
 
-    const second = sessions.get(db, user.id, 'sess-accum')
+    const second = db.table('sessions').get(user.id, 'sess-accum')
     second.id = 'conv-b'
     second.metadata = { pendingPreviousConversationIds: ['conv-a'] }
     sessions.flushNow(db, second)

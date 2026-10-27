@@ -3,7 +3,6 @@
 const express = require('express')
 const registry = require('../providers/registry')
 const db = require('../core/state/db')
-const sessions = require('../core/state/sessions')
 
 function buildHealthRouter(preSelected, context = {}) {
   const router = express.Router()
@@ -19,32 +18,34 @@ function buildHealthRouter(preSelected, context = {}) {
     let persistence = null
     if (store) {
       try {
-        const count = store.prepare('SELECT COUNT(*) AS n FROM sessions').get().n
+        const count = store.table('sessions').count()
         persistence = {
           schema_version: db.getMeta(store, 'schema_version'),
           sessions: count,
-          users_json_migrated: Boolean(db.getMeta(store, 'users_json_migrated')),
+          pending_writes: store.table('users').pending() + store.table('sessions').pending(),
         }
       } catch (error) {
-        console.error('store.prepare() failed:', error)
+        console.error('persistence stats failed:', error)
         persistence = { error: error.message }
       }
     }
 
     let sessionRow = null
-    if (store && preSelected?.sessionName) {
+    const userId = preSelected?.userData?.id || preSelected?.session?.userId || null
+    if (store && userId && preSelected?.sessionName) {
       try {
-        const row = sessions.get(store, preSelected.provider, preSelected.sessionName)
+        const row = store.table('sessions').get(userId, preSelected.sessionName)
         if (row) {
           sessionRow = {
-            upstream_conversation_id: row.upstreamConversationId,
-            upstream_parent_message_id: row.upstreamParentMessageId,
+            upstream_conversation_id: row.id,
+            upstream_parent_message_id: row.parentId,
             state: row.state,
+            transport: row.transport,
             updated_at: row.updatedAt,
           }
         }
       } catch (caughtErr) {
-        console.error('sessions.get() failed:', caughtErr)
+        console.error('sessions table get() failed:', caughtErr)
         sessionRow = null
       }
     }

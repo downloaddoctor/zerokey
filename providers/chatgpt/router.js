@@ -15,6 +15,11 @@ async function buildChatGPTRouter(parsedFetch, session, userData = null) {
   const chatgptApi = new ChatGPTAPI()
   console.debug('[ChatGPT] Initializing from parsed capture JSON')
   await chatgptApi.initializeFromJSON(parsedFetch)
+  // Persist refreshed cookies and tokens: core/chat-router.js sets
+  // session.onCaptureChanged for persistent sessions; the API calls it per response.
+  if (session && typeof session.onCaptureChanged === 'function') {
+    chatgptApi._onCaptureChanged = session.onCaptureChanged
+  }
 
   const router = express.Router()
 

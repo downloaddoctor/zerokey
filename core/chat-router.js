@@ -12,7 +12,7 @@
  * Contract:
  *   - caller passes `sessionContext` = { db, userId, sessionName }
  *   - without a db or userId, a transient in-memory session is used
- *   - after the response finishes, sessions.flushNow guarantees the write
+ *   - after the response finishes, table('sessions').save guarantees the write
  */
 
 const registry = require('../providers/registry')
@@ -22,7 +22,9 @@ const headers = require('../utils/headers')
 
 function adoptSession(selected, sessionContext) {
   const provider = selected.provider
-  const userId = sessionContext?.userId || null
+  // The row carries its own userId (table('sessions').add stamps it); fall back to it
+  // when the caller's context omits userId so persistence never writes a NULL key.
+  const userId = sessionContext?.userId || selected.session?.userId || selected.userData?.id || null
   const sessionName = sessionContext?.sessionName || selected.sessionName || null
   const persistent = Boolean(sessionContext?.db && userId && sessionName && selected.session)
 
@@ -44,13 +46,13 @@ function adoptSession(selected, sessionContext) {
 }
 
 function persistAfterTurn(db, session) {
-  if (!db || !session || !session.persistent) return
+  if (!db || !session || !session.persistent || !session.userId) return
   try {
     session.lastUsed = Date.now()
     session.state = session.id ? 'idle' : 'unbound'
     session.usageTotals = session._usageTotals ?? session.usageTotals
     // Guarantee the write: the Proxy debounce may not have fired yet.
-    sessions.flushNow(db, session)
+    db.table('sessions').save(session)
   } catch (error) {
     console.error('sessions flush failed:', error)
     console.warn('Session persistence failed: ' + (error.message || error))
@@ -68,8 +70,7 @@ async function buildRouter(selected, sessionContext) {
   if (userId && db) {
     session.onCaptureChanged = (nextCapture) => {
       try {
-        const user = users.getById(db, userId)
-        if (user) user.parsedFetch = nextCapture
+        users.updateCapture(db, userId, nextCapture)
       } catch (error) {
         console.error('users.getById() failed for id ' + userId + ':', error)
         console.warn('Credential persistence failed: ' + (error.message || error))

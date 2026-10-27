@@ -1,113 +1,110 @@
-# AGENTS.md
-
 PROJECT
  ZeroKey — self-hosted, personal-use OpenAI-compatible proxy for DeepSeek, Claude, ChatGPT, Qwen, Inception (Mercury)
  Turns a browser session (captured fetch()) into http://localhost:<port>/v1
  Node >=22.13 required; pnpm@12.14.0; CommonJS; 'use strict' at top of every module
  No telemetry, no hosted service, no shared accounts
+ One server process = one preSelected provider+user+session; restart to switch
 
 DIRECTORY
+ server.js — only supported entrypoint; port lock, db open, session select, start/stop
  app.js — express app factory: pure module, no side effects; start({db,preSelected,port}) binds listeners
- server.js — only supported entrypoint; port claim → SessionSelector wizard → app.start
- config/ — CONFIG constants read once at require-time
- core/ — provider seam + MHI executor
-  state/ — SQLite access (users, sessions, migrate, schema.sql)
-  mhi/ — internal tool loop executors (files, commands, parser, path-policy, view-image)
- engine/ — prompt pipeline, compiler, tool bridge, triggers, MCP, extra/*.md fragments
- providers/ — one folder per provider; base/BaseAPI.js shared HTTP/cookie layer
- surfaces/ — one folder per IDE tool surface (surfaces/<name>/index.js + template.json)
- routes/ — health, models, info, docs, diagnostics
- utils/ — SSE writer/reader, rate limiter, errors, headers, log, startup, cookie-jar
- test/ — node:test suites; test/invariants.test.js and test/modules.test.js enforce repo rules
- docs/ — llms.txt, landing page; openapi.json is the machine contract
-
-ENTRY-POINTS
- node server.js — interactive wizard
- ZEROKEY_PROVIDER=… ZEROKEY_USER=… ZEROKEY_SESSION=… node server.js — headless
- zerokey.bat / zerokey.sh — launcher: portable Node → if core/state/db.js sits next to the launcher it runs that local project (pnpm install only when node_modules is missing, no update check) → else compares dist version.txt with local .version; newer → .update marker + [y/N] prompt (no timeout, default N) → downloads server.js + package.json + version.txt (+ lock/workspace) → pnpm install --prod only when package.json changed → node server.js; offline or failed download keeps existing files; no git, no clone
- pnpm start / pnpm test / pnpm lint / pnpm format / pnpm check
+ config/constants.js — CONFIG, env parsed once at require; envInt/envBool/envList/envPaths helpers
+ core/ — chat-router, session-selector, state/*, mhi/*
+ engine/ — compiler, pipeline, triggers, syntax, instructions, usage, loop-guard, tool-bridge, mcp/*
+ providers/ — one folder per provider + base/BaseAPI.js + registry.js
+ surfaces/ — IDE tool surfaces + base.js + specs.js + registry.js
+ routes/ — info, health, models, docs, diagnostics
+ utils/ — SSE, errors, retry, cookies, log, bundle, classifier, startup
+ scripts/ — build.mjs, check-modules.js, check-prefix-drift.js
+ test/ — node:test suite
+ temp/ — runtime only, gitignored: db/ logs/ profiles/ captures/ overflow/
 
 MODULES
- app.js — express wiring; classifySession per request; mounts health/models/diagnostics/chat router
- server.js — claimFirstFree → postClaim → db.open → SessionSelector → app.start → signal shutdown
- config/constants.js — CONFIG: PORT, PORT_RANGE, EXACT_PORT, DATA_DIR, DB_FILE, LOG_*, MHI_* capability flags
- core/chat-router.js — provider seam: adoptSession annotates the selector's Proxy row (no re-resolve, no copy); sessions.rebase runs on the per-request generation header; persistAfterTurn runs sessions.flushNow at res finish/close; server.js cleanup drains users/sessions.flushAll before store.close
- core/session-selector.js — interactive prompts: provider → user (create/update auth/delete; fetch capture) → session; headless preselection; _createNewSession asks 'Transport' only when providerDef.transports has more than one entry (Claude, DeepSeek, Inception; browser is the default for DeepSeek/Inception and the API option is labelled as ban-risky; env INCEPTION_TRANSPORT/DEEPSEEK_TRANSPORT remains the default) → stored as session.transport (state_json)
- core/state/db.js — node:sqlite DatabaseSync; WAL; fail-closed on newer schema_version; additive columns via ADDED_COLUMNS (idempotent ALTER TABLE ADD COLUMN); one-shot legacy import
- core/state/store.js — createStore(cfg): debounced write-through + recursive Proxy (plain objects/arrays only) shared by users/sessions; cfg = table, columnMap, blobKeys, conflict, keyOf, flushMs, label
- core/state/users.js — store config + user domain fns; Proxy row; top-level and nested (parsedFetch.*, state entries) writes schedule a 250 ms debounced flush; list() also returns wrapped rows so wizard-held references persist; flushAll() drains pending writes at shutdown; deepWrap proxies only arrays and plain objects (Date/Buffer pass through)
- core/state/sessions.js — Proxy row; list(db, limit) returns {rows, total, truncated}; 250 ms debounce; nested (metadata.*, todos, usageTotals) writes also persist; flushAll() drains pending writes at shutdown; compaction via generation bump clears id/parentId
- core/mhi/loop.js — runToolLoop: one turn → evaluateAssistant → executeCalls → appendResult (role 'mhi', passed verbatim by compiler._handlers.mhi — no USER: prefix), cap MHI_MAX_ROUNDS; withAssistantTurn records the assistant turn before each mhi result so repair/tool-result rounds send only the new MHI message upstream (uploadAndGetMessages slices after the last assistant message)
- core/mhi/index.js — executor dispatch; every failure returns {ok:false, code, output} — never throws except on abort; evaluateAssistant returns a repair round (mhi_foreign_markup) when the model emits DSML/XML tool tags
- core/mhi/files.js — read/ls/glob/grep/write/replace; write refuses overwrite; replace requires exactly one match
- core/mhi/limits.js — LIMITS (frozen): single source for byte/char/count/timeout caps used by files, commands, parser, view-image, engine/loop-guard, engine/tool-bridge; never hardcode these elsewhere (round cap is CONFIG.MHI_MAX_ROUNDS)
- core/mhi/commands.js — allowlisted programs; write/network gated by capability flags
- core/mhi/parser.js — block parser for internal executors; throws MhiParseError {code,message}; mirrors StreamPipeline.scan: isToolCall counts a block only when its name is in parser.DEFINITIONS, an open bracket right after a backtick is plain text, close found via SYNTAX.findClose
- core/mhi/path-policy.js — workspace confinement: realpath, UNC/ADS/reserved-name refusal
- core/mhi/view-image.js — falls back to context.imageRoots when the path is outside the first workspace root; other file tools stay confined to the first root
- core/mhi/loop.js imageRoots — every ZEROKEY_WORKSPACE_ROOTS entry (default process.cwd()) plus its direct parent dir (one level max, never higher); built in internalWorkspaceContext
- engine/pipeline.js — StreamPipeline: per-request SSE lifecycle, scan() FSM, deferFinish for tool loops; flush() dedupes via loop-guard and records read signatures to session._toolHistory, injecting $loop-break when a whole batch repeats prior reads
- engine/loop-guard.js — signature/inspectBatch (single-response dedup + drift), pushHistory/detectLoop (cross-turn ABAB/ABA/AA via session._toolHistory)
- engine/extra/loop-break.md — loop-break reminder text, injected live via pipeline._loopBreakText() on single-response drift or cross-turn repetition (not a $-trigger)
- engine/compiler.js — ToolCompiler singleton per ide×provider; parse/emit generic→native tool mapping; limitPrompt delegates to utils/overflow.js: prompt over provider promptLimit keeps its head inline (cut on a line break) and only the leftover is written to ONE file DATA_DIR/overflow/<id>/prompt.txt; the text starts with a '[TRUNCATED: N chars left, read them from <path>]' header (lastPrompt.spilled = N); no part splitting; hard [TRUNCATED] cut (truncatePrompt) when the files cannot be written or the note would not fit; overflow dirs older than 24 h are pruned on each spill
- engine/tool-bridge.js — grammar injection + block parsing for providers with no native tool channel
- engine/triggers.js — $skill registry; auto-registers one passthrough per engine/extra/*.md
- engine/instructions.js — caches base prompt + extra/*.md fragments (SHA-256)
- engine/syntax.js — OPEN/CLOSE/SEP/ESC constants and findClose/splitPayload
- engine/mcp/inject.js — inject MCP alias map into compiler.tools
- engine/mcp/auto.js — build alias maps from mcp_<server>_<tool> names in req.body.tools[]
- providers/registry.js — auto-discovers providers/<name>/index.js; getModels() passes the paid flag (set in providers/claude/config.js) through to /v1/models so the selector groups free and paid
- providers/<name>/index.js — {name, displayName, models, promptLimit, setupSteps, validateFetch, validateCredentials, buildRouter}
- providers/<name>/router.js — express router; runToolLoop wraps one upstream turn per round; userData is a Proxy row, mutate fields directly (persistence is automatic)
- providers/inception/api.js — impit HTTPS transport (INCEPTION_TRANSPORT=api): GET / mints _vcrr cookie, GET /api/session mints x-session-token (both authless, no browser, no Vercel checkpoint); token cached 20 min, refreshed on 401; buildBody() encodes {messages, prompt} to the site's parts[] shape; chatCompletion() accepts the same option bag as browser-transport and prefers messages over prompt
- providers/inception/router.js — TRANSPORT = INCEPTION_TRANSPORT || 'browser' (DeepSeek pattern: new InceptionApi() : getSharedTransport()); both transports share the option-bag contract, so router code is identical in both modes; on an upstream stream error frame (stream-handler outcome.error) it sends 'continue' in the same thread up to MAX_CONTINUES (3), then emits '⚠ Stream error' text
- providers/<name>/stream-handler.js — provider SSE → OpenAI chunk deltas; providers/inception/ = chat.inceptionlabs.ai (authless: index.js requiresCapture:false → core/session-selector.js creates/updates the user without a fetch paste; browser-transport.js is the ONLY transport: Playwright persistent profile at temp/profiles/inception/<user>, drives the real UI like DeepSeek: CDP Input.insertText into the composer + Enter, web search toggled per request (reasoning label '<Effort> Search' → opts.webSearch) and thinking mode picked from the listbox, the 'Enjoying Mercury 3?' signup-nudge modal (Continue Chatting) and the cookie banner are closed before New Chat, settings and send, an init-script fetch tee copies the app's own POST /api/chat SSE to Node; the UI keeps the thread and resends its own history so only the new prompt is typed; New Chat on first turn, ephemeral requests and after any failure; one request at a time (gate); closing the stream early clicks Stop generating; relaunch if the browser dies; INCEPTION_HEADLESS=1 runs headless), stateless (no server chat id): router keeps no message history (the browser UI keeps the thread), stream = AI-SDK UI frames (reasoning-delta, text-delta, error, [DONE]), plain HTTP is unsupported (Vercel Security Checkpoint 429), one model 'mercury', reasoning Instant|Low|Medium|High plus '<Effort> Search' variants (config reasoning.map → {effort, search}; effort sent lowercase as reasoningEffort, search drives the Web search toggle; default Medium); summary rotation: router checks session.turnCount (pipeline.sendFinalChunk adds 1 per finished upstream round (deferred MHI rounds) and _finishStream adds 1 for non-deferred finishes, so MHI tool-loop rounds and 'continue' retries both count (HTTP errors open no stream, so they never count); pipeline.setup's reinjectEvery check reads the same turnCount; rotation is only checked on non-ephemeral real user prompts, role != 'mhi'; reset to 0 on process start and after each rotation; a failed rotation backs off to summaryAt-5); at config.summaryAt (47) it sends engine/extra/summary.md in the current thread, collects the reply silently via stream-handler.collectReply, clears parentId, and the same turn opens a new chat (chatCompletion opts.newThread) whose prompt = base instructions + <previous_session_summary> + the user prompt; summary has no length cap (carried verbatim); summary failure is logged and the thread continues
- providers/claude/connect-rpc.js — CURRENT claude.ai Connect-RPC transport (gRPC framing + schema-less protobuf); ClaudeConnectRpc extends BaseAPI (StreamTimeline/PerformAction/GetNewConversationDefaults); org id from x-organization-uuid
-  makeReplyCollector — stateful StreamTimeline decoder: assistant-role filter, per-block dedup, session id/seq/cursor, done on usage frame
-  buildPromptlessAction — byte-exact vs HAR; buildPromptAction — full layout, f15 = PerformAction.header.deviceSigning (32-byte device signature over a server deviceSignatureAsk, produced by a key the web bundle doesn't hold; client resends the action after signing) → actionSignature() THROWS unless ZEROKEY_CLAUDE_F15_PROBE=zero|random; RPC sending stays opt-in (CLAUDE_TRANSPORT=rpc) until a signer exists
-  sendMessage — GetNewConversationDefaults → promptless PerformAction → StreamTimeline → wait session id → prompt PerformAction; streams deltas via onText/onReasoning
- providers/claude/stream-handler.js — completion-transport SSE → parser.scan/emit; forwards thinking (content_block_start text, thinking_delta) AND cumulative thinking_summary_delta (emits only the growing tail via summaryText); first reasoning frame sends the role-only {role:assistant,reasoning_content:''}; overloaded_error retries with refetch backoff; message_limit fills parser.tokenUsage (5h/7d windows)\n providers/claude/rpc-stream-handler.js — createRpcEmitter(pipeline): incremental text/reasoning → pipeline.scan/emit, finish() → sendFinalChunk
- providers/claude/transport.js — TRANSPORT {name, IS_RPC, IS_COMPLETION} from CONFIG.CLAUDE_TRANSPORT ('completion' default, 'rpc' opt-in); resolveTransport(parsedFetch, session) forces completion for legacy captures (org id in URL path), else session.transport || CONFIG.CLAUDE_TRANSPORT; createAPI(options, parsedFetch, session) picks the client (avoids the index↔router cycle)
- providers/claude/api.js — LEGACY REST SSE transport (/organizations/.../completion); kept as fallback for stale captures
- providers/base/BaseAPI.js — shared base for all four *API classes: https agent, cookie jar, initializeFromJSON cookie seeding, _captureResponseHeaders (cookie header), _fetch with timeout; _seedCookies(); _timeoutError(ms) returns a plain message unless the subclass sets static JSON_TIMEOUT = true (ChatGPT/Qwen: JSON request_timeout body); subclasses add only provider-specific headers/endpoints
- surfaces/registry.js — auto-discovers surfaces/<name>/index.js; resolveSurface(messages) by realSessionPrefix; resolveUtility(messages) by utilityPrefixes
- surfaces/base.js — IDEToolSurface: tool()/format() registrar + resolve(); realSessionPrefix (real IDE fingerprint) + utilityPrefixes (IDE-internal utility calls)
- surfaces/specs.js — generic tool specs (grammar, keys, repeatable) merged by IDEToolSurface#tool()
- surfaces/openai/index.js — DEFAULT_SURFACE (realSessionPrefix null); identity-mapped tools for plain OpenAI clients; raw mode when no tools[]
- surfaces/<name>/index.js — IDE surface config fn (t) => {...}; declares ideName + realSessionPrefix + utilityPrefixes
- surfaces/<name>/template.json — captured system-prompt fingerprint for that IDE (docs/reference)
- routes/health.js — includes pid, provider, session, persistence, promptLimit
- utils/overflow.js — limitPrompt(compiler, prompt): under limit passes through; over → spillOverflow part files + note, else truncatePrompt; sets compiler.lastPrompt {chars, limit, headroom, spilled?, dropped, truncated} read by engine/usage.js
- utils/sse-writer.js — serialized SSE frames with backpressure; finish()/fail() idempotent
- utils/rate-limiter.js — sliding window 15/60s per label; setProviderCooldown on 429
- utils/startup.js — per-port lock file temp/db/.start.<port>.lock; probeHealth/postClaim; claimFirstFree releases a won lock and skips the port (or throws EADDRINUSE when exact) if isPortActive finds a foreign listener
- utils/errors.js — classifyError → toOpenAIError (two calling conventions)
- utils/session-transport.js — resolveSessionTransport(session, envDefault, allowed): session.transport overrides the env default; unknown values fall back to the default, then allowed[0]; used by the Claude, DeepSeek and Inception routers
- utils/uuid.js — uuid() v4 via crypto.randomUUID; the only UUID helper for provider clients
- utils/with-retry.js — withRetry(fn, {pipeline, label, isTerminal?}): the single bounded-retry wrapper for all provider routers; acquires the rate-limiter slot by label itself; routers only add isTerminal (Claude 429, DeepSeek account_suspended, Qwen RateLimited)
- providers/claude/org-id.js — resolveOrgId(parsedFetch, headers): URL path → x-organization-uuid → lastActiveOrg cookie; shared by api.js and connect-rpc.js
- utils/http-error.js — assertOk(res, {allow, prefix, limit}) opt-in non-OK guard (reads body slice, throws Error with .status/.statusCode); limit > 0 truncates, limit: 0 keeps the whole body (Claude completion uses 0 so a 429 usage-limit JSON stays parseable for user.waitUntil); used by sentinel prepare/finalize, DeepSeek and Claude completion calls; not used where the body is parsed for structure (ChatGPT completion 429 cooldown, Qwen _buildQwenError → code/num/waitMs for RateLimited)
- utils/har-to-capture.js — dev-only HAR → LLM-digest CLI (not a runtime dep); `node utils/har-to-capture.js <file.har>` (all defaults: mask on, body size auto, out=temp/captures/ for temp/*.har); flags: --list|--filter=|--ignore=|--method=|--status=|--hosts=|--max-body=N|auto|--no-mask|--no-redact|--no-headers|--full|--mode=digest|captures|both|--out=|--json; filters noise endpoints, masks secrets, decodes Connect/gRPC proto bodies into readable fields; writes <base>.digest.txt + .digest.json; masking preserves structure — Cookie/Set-Cookie → {count, cookies:{name: fingerprint}} (names + length kept), Authorization keeps its scheme (Bearer <masked:N>), other secrets → first6…<masked:N>; legacy harToCapture()/convertEntry() still exported for core/session-selector.js
- utils/log.js — zerokey.log (rotating, LOG_LEVEL-gated) + temp/logs/sessions/session-<N>.log (one file per process, all levels incl. debug, SESSION marker row first); both use columns (ts,pid,level,tag,msg,where,error,code,status,context,stack) separated by engine/syntax.js SEP (not a comma), one line per record; pid in the same column for plain and error rows; console.* rewired (colour + auto [FILE] tag + redact + mirror); console.error('msg', err[, ctx]) fills all columns — the ONE entry point; O(1) per call (cached tag, in-memory size, depth-capped causes); formatError renders Error → Name/msg|code|status + frames + caused-by
+ server.js — startup.claimFirstFree → postClaim → db.open → SessionSelector.select → app.start; uncaughtException/unhandledRejection handlers; SIGINT/SIGTERM/SIGHUP → selector.flush → app.stop → db flush+close → release lock
+ app.js — corsMiddleware rejects non-loopback Host (DNS rebinding) and enforces CONFIG.CORS_ALLOWED_ORIGINS; express.json 50mb; prepareChatRequest (validateMessages → StreamPipeline.setSSEHeaders → classifySession → req.surface/isRealSession/matchedSurface); request middleware attaches req.signal (AbortController on res.close); error handler via toOpenAIError; app.use('/v1/chat/completions', sequentialQueue(), prepareChatRequest, router)
+ core/chat-router.js — buildRouter(selected, sessionContext): registry.get(provider) → adoptSession (no re-resolve, no copy) → wires session.onCaptureChanged → users.updateCapture → provider.buildRouter; per-request rebase when headers.generation > session.generation; persistAfterTurn on res finish/close
+ core/session-selector.js — wizard: recent-session continue → provider → user (paste fetch, live validate) → session; waitPolicy loop for rate-limited users; _parseFetchDirect brace-scanner keeps latin1 body as bodyBase64; profile dir temp/profiles/<provider>/<user>/; delete user also deletes provider-side sessions
+ core/state/db.js — sqlite-pro openDatabase; BASE_SCHEMA_VERSION=4; .version(4,'v3->v4').beforeDefine().upgrade(upgradeV3ToV4); fail-closed on newer schema
+ core/state/users.js — SCHEMA; parsedFetch virtual → capture_* + user_headers rows; updateCapture(db,id,next) merges and skips unchanged headers; 250 ms debounce
+ core/state/sessions.js — SCHEMA PK(userId,name); rebase() clears id/parentId and appends metadata.pendingPreviousConversationIds; resolve(); list()
+ core/state/migrate-v3-v4.js — isLegacyV3 probe; rename-aside → store.define → ctx.copy → ctx.drop inside a savepoint
+ core/mhi/index.js — executeCalls, evaluateAssistant (final | calls | continue), formatResults, appendResult; FILE_TOOLS set; normalizeEnablement
+ core/mhi/parser.js — DEFINITIONS (read/grep/write/replace/ls/glob/view_image/cmd); parseAssistantText; parseBlock; splitCommandString; isToolCall head check; throws MhiParseError
+ core/mhi/commands.js — resolveProgram (named under trusted roots via where.exe; project EXE/COM relative); classifyCapabilities (write/network per program + git subcommand); safeEnvironment; runProcess with timeout/abort/output cap; terminatePidTree via taskkill
+ core/mhi/files.js — read (UTF-8 <=1 MiB, line range), ls, glob (globRegex, no symlinks, skip .git/node_modules), grep (safeSearch rejects backrefs and quantified groups; file/byte/time caps), write (new files only, atomic temp+link), replace (exactly one match, atomic rename)
+ core/mhi/path-policy.js — scope(options); rejects UNC/device/ADS/reserved names/trailing dot-space; realpath escape check; existingDirectory/existingFile/newFile
+ core/mhi/loop.js — runToolLoop({payload, pipeline, config, turn}); collectGrammarTools (client tools win; built-ins seeded only when client sent none); <mhi_tools> injected only on openai + new session; withAssistantTurn; round cap CONFIG.MHI_MAX_ROUNDS
+ core/mhi/view-image.js — PNG/GIF/JPEG/WebP MIME + dimension sniffing; <=5 MiB; returns attachment descriptor
+ core/mhi/limits.js — LIMITS single source of truth for every cap
+ engine/pipeline.js — StreamPipeline: SSE lifecycle via utils/sse-writer; setup() (ephemeral/raw → registerAutoMcpServers → restoreMcpInjections → reinjectEvery → reinjectAt token thresholds → drift/loop-break fragments → uploadAndFormatPrompt → skill → buildPrompt); scan() 3-state FSM; flush() (inspectBatch, cross-turn loop break, emitToolCalls); beginTurn/sendFinalChunk/flushFinish/_finishStream (usage fold + turnCount)
+ engine/compiler.js — per ide:provider singleton in ToolCompiler.objects; role handlers (system/agent/assistant/internal/instructions/live_instructions/mhi/user/tool); uploadAndGetMessages slices after the last assistant and decodes data-URI uploads; parse (keys/repeatable/anchor groups/$array); emit (transformers, todo merge, split, array); inferType; matchSkill (O(1) trigger map + matchMcpTrigger + positional #{name}# params)
+ engine/triggers.js — static triggers ($req, $browser/$b, $mcp, $mcp-dump, $test, $C) + auto engine/extra/*.md passthroughs with EXTRA_OVERRIDES; MCP_ALIAS_MAPS ($browser, $playwright, auto $<server>); registerAutoMcpServers, restoreMcpInjections, matchMcpTrigger, showAvailableMcpTags, handleSkill
+ engine/syntax.js — MHI OPEN/CLOSE/SEP/ESC; findClose (escape-aware); splitPayload (honours backslash escapes)
+ engine/instructions.js — getExtra(name) cached per file; getFull()/getUnlimited() (instructions.md with <memory> stub replaced by agent.md); list(); SHA-256 hashes
+ engine/loop-guard.js — signature() for read-only tools (ignores max/limit/till/timeout); inspectBatch; pushHistory; detectLoop; MAX_BATCH/MAX_HISTORY
+ engine/usage.js — normalizeUsage/mergeUsage/usageOfEvent; buildUsage returns {source: upstream|mixed|estimated}; applyTurnUsage (upstream SETs totals, estimated ADDs)
+ engine/tool-bridge.js — for surfaces with no native tool channel: preparePayload prepends <mhi_tools>; evaluateAssistant parses back to OpenAI tool_calls; coerceArguments
+ engine/mcp/auto.js — groupToolsByServer (mcp_<server>_<tool>, else $native with native_ prefix); buildParamSyntax; buildAutoAliasMaps; hashTools
+ engine/mcp/inject.js — injectMcpAliases(aliasMap, compilerTools, nameMap) registers _passthrough tools and returns grammar lines; extractValidKeys
+ engine/mcp/browser.js, engine/mcp/playwright.js — alias maps for IDE browser tools and Playwright MCP
+ engine/extra/*.md — instructions.md (full agent system prompt incl. <mhi_list>), agent.md (memory workflow), instructions-1500.md, loop-break.md, reminder.md, summary.md, test.md (17-step tool smoke test)
+ providers/registry.js — auto-discovers providers/<name>/index.js; keys by providerDef.name; get/getAll/getModels
+ providers/base/BaseAPI.js — impit Chrome client, CookieJar, _fetch, _buildHeaders, _timeoutError, _nodeStream
+ providers/deepseek/ — default browser transport (real Chromium, temp/profiles/deepseek/<user>/), api opt-in; POW via WASM in pow.js; reinjectAt 250K/50K; waitPolicy suspension
+ providers/claude/ — TRANSPORT frozen from CLAUDE_TRANSPORT (default completion); resolveTransport forces completion for legacy URL-org captures; connect-rpc.js is a self-contained protobuf/Connect codec; setClaudeInstructions PUTs account_profile; waitPolicy limit
+ providers/chatgpt/ — sentinel refresh + recovery.js (401 one-shot re-decode, conversation-deleted handling); reinjectEvery 10
+ providers/qwen/ — cookie token= JWT or Bearer; setQwenInstructions personalization; reinjectEvery 15; waitPolicy daily limit; no uploadFile
+ providers/inception/ — authless browser transport; requiresCapture false; summaryAt 47; INCEPTION_HEADLESS; reinjectEvery 50
+ surfaces/registry.js — get(ide); resolveSurface(messages) by real fingerprint; resolveUtility(messages) by utilityPrefixes; getSurface(name) for flags only
+ surfaces/base.js — IDEToolSurface: realSessionPrefix, realSessionPrefixAliases, utilityPrefixes, browserTools, browserNameMap, tool(), format(), isRealSession, isUtilityPrompt, resolve(); getAllTags, filterAttachments
+ surfaces/specs.js — generic specs (desc/grammar/eg/keys/repeatable/transformer/arrayFields); TODO_ARRAY_FIELDS
+ surfaces/vscode/ — view/create/edit/ask/listDirectory/runCommand; editToolOutputFormatter normalizes tool messages
+ surfaces/copilot/ — Copilot SDK surface; newSessionStartLength 2; strips <current_datetime>/<system_reminder>; browserNameMap camelCase; 3 utility prefixes
+ surfaces/terax/ — read_file/write_file/edit/list_directory/create_directory/glob/grep/bash_run/bash_background/bash_logs/bash_kill; fetch becomes Invoke-WebRequest; no utility prefixes
+ surfaces/opencode/ — read/write/edit/question/glob/grep/bash; aliases 'You are opencode', 'You are an AI agent running in OpenCode'; 5 utility prefixes
+ surfaces/openai/ — default surface, realSessionPrefix null; identity mapping for all generic tools
+ routes/info.js — GET / metadata + model ids
+ routes/health.js — uptime, session, sessionRow, persistence (schema_version, sessions, pending writes), promptLimit, reinjectEvery
+ routes/models.js — GET /v1/models, /v1/models/:model (404 via toOpenAIError)
+ routes/docs.js — GET /docs (Swagger UI), /openapi.json via bundle.readAsset
+ routes/diagnostics.js — GET /v1/diagnostics loopback-only redacted snapshot
+ utils/sse-reader.js — readSSE(stream, {onData,onDone,onError,onBytes,onRawLine}); 1 MiB line cap
+ utils/sse-writer.js — createWriter(res,{id,model}); backpressure drain; reasoning/text/toolCalls/finish/fail; joinMessages
+ utils/errors.js — classifyError (session_expired, account_suspended, cloudflare_block, device_flagged, CHAT_NOT_FOUND, ...); toOpenAIError two signatures
+ utils/retry.js — bounded classification (MAX_ATTEMPTS 3; 401/429 never retried; network codes); utils/with-retry.js is the single router retry wrapper + acquireSlot
+ utils/rate-limiter.js — sliding 15/60s per label; setProviderCooldown, acquireSlot
+ utils/sequential-queue.js — one-request-at-a-time middleware
+ utils/overflow.js — limitPrompt head-keep + spill file under temp/overflow/<id>/
+ utils/log.js — single SEP-delimited CSV (temp/logs/zerokey.log); rewires console.*; redact, isSecretKey, tickWait, scheduleDailyReset
+ utils/diagnostics.js — depth/array/string caps + log.redact
+ utils/bundle.js — ROOT, readAsset, listAssets, bundled(kind); ZK_BUNDLED=1 uses zk-assets/zk-modules
+ utils/session-classifier.js — classifySession returns {isReal, surface, matched}; default openai
+ utils/session-transport.js — resolveSessionTransport(session, envDefault, allowed)
+ utils/headers.js — reads x-zerokey-*/x-opencode-* (session, rootSession, messageId, partId, generation)
+ utils/ephemeral-session.js — clone with cleared id/parentId and deep-copied usage/history
+ utils/cookie-jar.js, utils/extract-files.js (data-URI → uploads), utils/http-error.js (assertOk), utils/capture-request.js ($req), utils/har-to-capture.js, utils/human-delay.js, utils/uuid.js, utils/startup.js, utils/sync-ide-config.js, utils/route-helpers.js (validateMessages)
 
 ARCHITECTURE
- Request flow: app.js middleware → sequentialQueue → prepareChatRequest → buildRouter(preSelected)
- classifySession(messages) resolves the IDE surface from the system prompt; no fingerprint + no utility → openai (real turn; pipeline decides tools via session.toolCalling)
- StreamPipeline.setup → restoreMcpInjections → compiler.uploadAndFormatPrompt → buildPrompt
- Provider router calls runToolLoop with a per-turn closure that streams via the pipeline
+ Request flow: app.js middleware → sequentialQueue → prepareChatRequest → chat-router
+ classifySession(messages) resolves the surface from the system prompt; no fingerprint and no utility → openai (real turn; pipeline decides tools via session.toolCalling)
+ StreamPipeline.setup → registerAutoMcpServers → restoreMcpInjections → uploadAndFormatPrompt → buildPrompt
+ Provider router calls runToolLoop with a per-turn closure that streams through the pipeline
  One upstream turn per round; intermediate assistant text is invisible to the client (deferFinish)
  SSE [DONE] written once by pipeline.flushFinish() after the loop resolves
- Persistence: users.parsedFetch + sessions.id/parentId written through Proxy set traps, flushed on res finish/close
+ Persistence: users.parsedFetch and sessions.id/parentId written through Proxy set traps, flushed on res finish/close
  Compaction: incoming x-zerokey-compaction-generation > row.generation → id/parentId cleared, old id appended to metadata.pendingPreviousConversationIds
- Fail-closed schema: db.open refuses a DB whose meta.schema_version exceeds SCHEMA_VERSION (3)
- DeepSeek uses a real Chromium profile (providers/deepseek/browser-transport.js) — not a lightweight HTTP path; new chat opens with a random arithmetic warmup (_warmupPrompt); instructions ride in the first buildPrompt; viewport null + --start-maximized (real window)
+ Fail-closed schema: db.open refuses a DB whose meta.schema_version exceeds BASE_SCHEMA_VERSION (4); older DBs upgraded in place by migrate-v3-v4
+ Provider is fixed for the process lifetime; no runtime switching; registry.get() is the seam
+ Bundled build replaces filesystem scans via utils/bundle.bundled()
 
 SCHEMA
- users(id PK, provider, username, parsed_fetch, instructions_hash, instructions_applied_at, wait_until, wait_reason, state_json, created_at, updated_at, UNIQUE(provider, username))
- sessions(user_id FK→users.id CASCADE, name, id, parent_id, generation, tool_calling, vision, model, todos_json, turn_count, dynamic_tools_hash, mcp_injected_json, state, metadata_json, last_token_usage, usage_totals_json, last_used, created_at, state_json, updated_at, PK(user_id,name))
- meta(key PK, value) — holds schema_version and users_json_migrated
+ users(id PK, provider, username, capture_url, capture_method, capture_body, capture_body_base64, capture_extra, instructions_hash, instructions_applied_at, wait_until, wait_reason, created_at, updated_at, UNIQUE(provider, username))
+ user_headers(user_id FK→users.id CASCADE, name, value, pos, PK(user_id,name), WITHOUT ROWID) — one row per captured request header; name keeps captured case, pos keeps order
+ sessions(user_id FK→users.id CASCADE, name, id, parent_id, generation, tool_calling, vision, model, transport, todos_json, turn_count, dynamic_tools_hash, mcp_injected_json, state, metadata_json, last_token_usage, usage_totals_json, last_used, created_at, updated_at, PK(user_id,name)); index idx_sessions_user: userId,-lastUsed
+ meta(key PK, value) — holds schema_version only
  Column map is snake_case; JS objects camelCase via core/state/users.js and core/state/sessions.js
  Rule: lifecycle data only — never prompt or response content
+ Proxy writes are debounced 250 ms; nested plain objects/arrays (parsedFetch.*, metadata.*, todos) ARE intercepted (recursive wrap)
 
 ENV
  PORT (default 7250, 1..65535)
@@ -118,16 +115,17 @@ ENV
  ZEROKEY_LOG_LEVEL, ZEROKEY_LOG_MAX_BYTES, ZEROKEY_LOG_KEEP
  ZEROKEY_WORKSPACE_ROOTS — path.delimiter separated; default [process.cwd()]
  ZEROKEY_MHI_FILE_TOOLS (default true), ZEROKEY_MHI_CMD_TOOLS (default false), ZEROKEY_MHI_VIEW_IMAGE (default true)
- INCEPTION_TRANSPORT — 'browser' (default; Playwright UI driver) or 'api' (impit direct HTTPS to /api/chat, no browser)
  ZEROKEY_MHI_CMD_PROGRAMS (default node,git), ZEROKEY_MHI_CMD_PROJECT_PROGRAMS
- ZEROKEY_MHI_CMD_ALLOW_WRITE, ZEROKEY_MHI_CMD_ALLOW_NETWORK, ZEROKEY_MHI_CMD_TIMEOUT_MS, ZEROKEY_MHI_MAX_ROUNDS
+ ZEROKEY_MHI_CMD_ALLOW_WRITE, ZEROKEY_MHI_CMD_ALLOW_NETWORK, ZEROKEY_MHI_CMD_TIMEOUT_MS, ZEROKEY_MHI_MAX_ROUNDS (8)
  DEEPSEEK_TRANSPORT — 'browser' (default) or 'api'
- INCEPTION_HEADLESS — 1|true runs the Inception browser headless (default: visible window)
- CLAUDE_TRANSPORT — 'completion' (default; REST SSE, works with old and new captures) or 'rpc' (opt-in; claude.ai Connect/proto, blocked on f15 signer)
- ZEROKEY_CLAUDE_F15_PROBE — 'zero'|'random': debug only, sends that 32-byte f15 to test whether the server validates it; unset → actionSignature() throws
+ INCEPTION_TRANSPORT — 'browser' (default) or 'api'; INCEPTION_HEADLESS — 1|true runs headless
+ CLAUDE_TRANSPORT — 'completion' (default) or 'rpc' (opt-in; blocked on f15 signer)
+ ZEROKEY_CLAUDE_F15_PROBE — 'zero'|'random': debug only; unset → actionSignature() throws
+ ZEROKEY_PROVIDER / ZEROKEY_USER / ZEROKEY_SESSION — headless boot
+ ZK_BUNDLED=1 — dist bundle, uses virtual modules
 
 DEPENDENCIES
- express@^5, impit@^0.14 (all provider HTTP via BaseAPI._client: Chrome TLS/HTTP2 fingerprint; _nodeStream(res) wraps the WHATWG body as a Node Readable)
+ express@^5, impit@^0.14 (all provider HTTP via BaseAPI._client: Chrome TLS/HTTP2 fingerprint; _nodeStream wraps the WHATWG body as a Node Readable)
  playwright@^1 — DeepSeek + Inception browser transports
  prompts@^2 — startup wizard
  Runtime: node:sqlite (built-in), node:test, node:crypto
@@ -138,61 +136,66 @@ API
  GET /health — status, uptime, pid, provider, session, persistence, promptLimit
  GET /v1/models — OpenAI list shape + activeModel
  GET /v1/models/:model
+ GET /v1/diagnostics — loopback-only redacted snapshot
  POST /v1/chat/completions — SSE stream; OpenAI-compatible
  GET /docs — Swagger UI; GET /openapi.json — raw spec
- Auth: none — any non-empty API key placeholder works
+ Auth: none — any non-empty API key placeholder works; loopback Host only
  OpenCode-flavoured headers recognised: x-zerokey-session, -root-session, -message-id, -part-id, -compaction-generation (aliases x-opencode-*)
+ openapi.json is hand-maintained (no generator script); keep x-reasoning-labels and x-prompt-limits in sync with providers/<name>/config.js
 
 CONFIG
  Surfaces auto-discovered from surfaces/<name>/index.js (skip registry.js, base.js, specs.js); keyed by declared ideName
  Providers auto-discovered from providers/<name>/index.js; skip providers/base/
+ classifySession(messages) → {isReal, surface, matched}: real IDE fingerprint wins; else utility prompt (surface utilityPrefixes) is ephemeral; else openai — a real turn; ephemeral utility requests answered locally with an empty [DONE], never sent upstream
  pnpm check runs scripts/check-modules.js
- pnpm check:prefixes runs scripts/check-prefix-drift.js — verifies watched upstream prompt prefixes (sources in prefixes.sources.json) still exist; network needed, not part of precommit
- openapi.json is hand-maintained (no generator script); keep x-reasoning-labels and x-prompt-limits in sync with providers/<name>/config.js
- classifySession(messages) → { isReal, surface, matched }:
-  real IDE fingerprint wins; else utility prompt (surface-declared utilityPrefixes, matched via registry.resolveUtility) is ephemeral; else openai — a real turn (raw mode still skips instructions/skills/MCP; cloned session; real chatSessionId/parentId untouched); ephemeral utility requests are answered locally with an empty [DONE] and never sent upstream — uniform across all providers
+ pnpm check:prefixes runs scripts/check-prefix-drift.js — verifies watched upstream prompt prefixes (sources in prefixes.sources.json); network needed, not in precommit
 
 BUILD
- pnpm build — scripts/build.mjs: esbuild bundles own code to dist/server.js (npm packages external, define process.env.ZK_BUNDLED=1); virtual modules zk-assets (openapi.json, schema.sql, deepseek wasm, engine/extra/*.md as base64) and zk-modules (providers/surfaces static lists); dist/ also gets slim package.json + pnpm-lock.yaml + pnpm-workspace.yaml + version.txt (<pkg.version>+<GITHUB_SHA first 8 or local>; launchers compare it); bundle is whitespace/syntax-minified with a linked sourcemap
+ pnpm build — scripts/build.mjs: esbuild bundles own code to dist/server.js (npm packages external, define process.env.ZK_BUNDLED=1); virtual modules zk-assets (openapi.json, deepseek wasm, engine/extra/*.md as base64) and zk-modules (providers/surfaces static lists); dist/ also gets slim package.json + pnpm-lock.yaml + pnpm-workspace.yaml + version.txt; bundle is minified with a linked sourcemap
  utils/bundle.js — seam: ROOT, readAsset, listAssets, bundled; disk-backed from source, bundle-backed when ZK_BUNDLED=1; new runtime file reads must go through it
- .github/workflows/release.yml — on push to main: npm i --prefix .. esbuild@<devDependencies.esbuild> (version read from package.json, single source; no lockfile, ~/.npm cached under key esbuild-<version>) + smoke test (dist files exist, node --check dist/server.js) + node scripts/build.mjs; local/launchers use pnpm; runs only when runtime-relevant paths change (positive paths allowlist — dotfiles/docs/md/test-only pushes skip; manual workflow_dispatch still works); publishes dist/* + SHA256SUMS (server.js, package.json, version.txt, lock files; launchers verify server.js and package.json, skip with a warning when absent) as a GitHub Release (tag v<version>-<sha8>, --latest, plus zerokey.bat/zerokey.sh; launchers download from https://github.com/downloaddoctor/zerokey/releases/latest/download)
- .github/workflows/pages.yml — on docs/** changes: deploys docs/ to GitHub Pages (https://downloaddoctor.github.io/zerokey)
+ .github/workflows/release.yml — on push to main when runtime-relevant paths change: esbuild (version from package.json, single source) + smoke test (dist files exist, node --check dist/server.js) + node scripts/build.mjs; publishes dist/* + SHA256SUMS as a GitHub Release (tag v<version>-<sha8>)
+ .github/workflows/pages.yml — on docs/** changes: deploys docs/ to GitHub Pages
  pnpm install → postinstall sets core.hooksPath=.githooks
  pnpm start — server; pnpm test — node --test test/**/*.test.js
  pnpm lint (eslint), pnpm format (prettier check), pnpm format:fix
  pnpm precommit = format && lint && check && test — the gate .githooks/pre-commit runs
- pnpm test uses --test-reporter=dot — dots plus failure details; run `node --test` directly for the full per-test list
 
 TESTING
- HAR in temp/ workflow: when the user references a HAR in temp/ (or asks to inspect a capture), run `node utils/har-to-capture.js temp/<file>.har --out=temp/captures` (add `--filter=`/`--method=`/`--status=` to narrow), read the generated `.digest.txt`, then read the digest before implementing
  Framework: node:test with assert
  test/invariants.test.js — repo-wide invariants (naming, forbidden patterns)
  test/modules.test.js — module boundary rules; runs scripts/check-modules.js
  test/surfaces/prefixes.test.js + prefixes.snapshot.json — append-only ledger: every shipped real/utility prefix must stay declared
- test/core/mhi/* — parser, files, path-policy, view-image
- test/providers/chatgpt-recovery.test.js, test/providers/claude-stream-handler.test.js, test/providers/inception.test.js, test/providers/inception-transport.test.js, test/providers/inception-summary.test.js, test/providers/inception-reasoning.test.js, test/surfaces/*, test/engine/*
+ test/core/mhi/* — parser, files, path-policy, view_image, commands, cmd-multi, index
+ test/core/state/* — users, sessions, compaction, migrations, schema round-trips
+ test/providers/* — chatgpt-recovery, claude-connect-rpc, claude-org-id, claude-stream-handler, inception*
+ test/surfaces/*, test/engine/*, test/utils/*
  New executors must add a matching test/core/mhi/*.test.js
  Adding a surface prefix → declare in surfaces/<name>/index.js AND append to test/surfaces/prefixes.snapshot.json (same commit); never remove a shipped prefix
+ pnpm test uses --test-reporter=dot; run `node --test` directly for the full per-test list
 
 INVARIANTS
- One server process = one preSelected session; restart to switch session/user
  No API keys, cookies, or credential values in logs or commit messages
- Errors go through console.error('msg', err[, context]) — log.js turns that into one CSV row in zerokey.log; never stringify an Error by hand, never instantiate a LogSaver for errors
- No errors.log — errors share zerokey.log; temp/logs/sessions/session-<N>.log is the only other log (per process, never mixed) — the error block sits right after the lines that led to it, so the preceding context travels with it
- temp/logs/sessions/session-<N>.log — per-process log (all levels incl. debug), N zero-padded to 3 digits (session-001, session-100); every process start claims the next N (+1, atomic exclusive create, never reused; counter in temp/logs/session-counter.txt; last 300 kept; not written under node --test); WARN/ERROR rows keep the full stack, other rows capped at 700 chars; N is in the SESSION marker ('START #N') and printed at startup ('[SERVER] log session #N'); when the user says 'session-100', read temp/logs/sessions/session-100.log FIRST via `read`/`grep` (UTF-8; PowerShell needs Get-Content -Encoding UTF8); columns ts¦pid¦level¦tag¦msg¦where¦error¦code¦status¦context¦stack
+ Errors go through console.error('msg', err[, context]) — log.js turns that into one CSV row in zerokey.log; never stringify an Error by hand
+ temp/logs/sessions/session-<N>.log — per-process log (all levels incl. debug), N zero-padded to 3 digits; read it FIRST when the user names a session
  Internal executors never throw on normal failure — they return {ok:false, code, output}
  Path policy: all MHI file/cmd paths confined to the resolved workspace root (realpath-checked)
- Proxy writes are debounced 250 ms; nested plain objects/arrays (parsedFetch.*, metadata.*, todos) ARE intercepted (recursive wrap) — reassignment is not required
+ cmd/view_image gated by CONFIG flags; commands restricted to the configured program allowlists plus write/network capability gates
  StreamPipeline.emit is the only path to the SSE writer
  engine/syntax.js is the single source of truth for OPEN/CLOSE/SEP/ESC — never restate the literal bytes
  No prose around tool blocks in MHI responses — mixed output triggers a repair round
+ app.js has no side effects on require; only start() binds a port
+ Surface identity comes only from the system-prompt fingerprint — no header or client claim
+ IDE-internal utilities are always ephemeral and never write into a session
+ _finishStream is the single stream exit; finish/fail are idempotent
+ Tool-loop [DONE] deferred until the loop resolves (deferFinish)
 
 EXTENSIONS
- New provider → providers/<name>/index.js exporting {name, displayName, models, promptLimit, setupSteps, validateFetch, validateCredentials, buildRouter, requiresCapture?}; registry auto-discovers; requiresCapture=false (e.g. inception) skips fetch capture and validateCredentials always passes
- Claude capture shape → transport.js#resolveTransport; legacy captures have /organizations/<uuid>/.../completion (org id from URL path); RPC captures carry x-organization-uuid (no org path in URL) and content-type application/connect+proto; completion transport (api.js) org id order: URL path → x-organization-uuid → lastActiveOrg cookie; device id falls back to anthropic-device-id cookie
- New IDE surface → surfaces/<name>/index.js exporting (t) => {...}; set ideName + realSessionPrefix (+ realSessionPrefixAliases for older prompts) + utilityPrefixes; registry auto-discovers; test/surfaces/prefixes.test.js is append-only — never delete a shipped prefix
-  Plain-OpenAI clients → surfaces/openai/index.js identity mapping; classifySession routes tools[]-bearing requests here when no IDE fingerprint matches
- New MHI executor → core/mhi/<name>.js + wire into core/mhi/index.js + test/core/mhi/<name>.test.js
+ New provider → providers/<name>/index.js exporting {name, displayName, models, reasoning, promptLimit, setupSteps, createAPI, validateFetch, validateCredentials, buildRouter} (+ optional transports, waitPolicy, reinjectEvery, reinjectAt, requiresCapture, defaultVision); registry auto-discovers; requiresCapture=false skips fetch capture and validateCredentials always passes
+ New IDE surface → surfaces/<name>/index.js exporting (t) => {...}; set ideName + realSessionPrefix (+ realSessionPrefixAliases for older prompts) + utilityPrefixes; registry auto-discovers; prefixes ledger is append-only
+ Plain-OpenAI clients → surfaces/openai/index.js identity mapping; classifySession routes tools[]-bearing requests here when no IDE fingerprint matches
+ New MHI tool → spec in surfaces/specs.js, executor in core/mhi/, dispatch in core/mhi/index.js, DEFINITIONS in core/mhi/parser.js, test in test/core/mhi/
  New skill → engine/triggers.js entry OR a new engine/extra/<name>.md (auto-registers as $<basename>)
  New MCP server → expose tools named mcp_<server>_<tool> in req.body.tools[]; auto-registers as $<server>
- Token-threshold reinjection → provider index.js exports reinjectAt: [{tokens, fragment}]; pipeline re-injects $<fragment> on each crossing; pipeline sets session.lastTokenUsage after every finished turn; _turnUsage() builds the usage frame for all finish paths and falls back to session.lastTokenUsage (source 'retained') when a turn computes zero; usage.applyTurnUsage folds each turn into session._usageTotals (upstream source sets the total; estimated adds; retained turns skipped); ephemeral clones deep-copy usageTotals so utility calls never touch the real row; only Claude and DeepSeek set parser.tokenUsage (ChatGPT/Qwen use the chars/4 estimate); Qwen image upload = QwenAPI.uploadFile: POST /api/v2/files/getstsToken → OSS4-HMAC-SHA256 signed PUT to the bucket → descriptor pushed into message.files[] (chatCompletion options.files); pipeline.bindUploader skips with a notice if a provider lacks uploadFile
+ Token-threshold reinjection → provider index.js exports reinjectAt: [{tokens, fragment}]; pipeline re-injects $<fragment> on each crossing
+ New env var → parse in config/constants.js (envInt/envBool/envList/envPaths) and document here
+ New schema column → additive is free (no version bump); destructive needs a new .version(n) ladder step in core/state/db.js

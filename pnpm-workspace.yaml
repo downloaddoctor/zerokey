@@ -1,4 +1,7 @@
 allowBuilds:
   esbuild: true
+  sqlite-pro: false
+minimumReleaseAgeExclude:
+  - sqlite-pro@0.1.2
 overrides:
   qs: '>=6.16.0'
