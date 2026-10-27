@@ -64,7 +64,7 @@
         align-items: center;
       }
 
-      /* subtle squares + scanlines + glow, terminal feel */
+      /* subtle squares grid */
       body::before {
         content: '';
         position: fixed;
@@ -73,19 +73,11 @@
         pointer-events: none;
         background-image:
           linear-gradient(rgba(167, 139, 250, 0.04) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(167, 139, 250, 0.04) 1px, transparent 1px),
-          repeating-linear-gradient(
-            180deg,
-            rgba(255, 255, 255, 0.01) 0px,
-            rgba(255, 255, 255, 0.01) 1px,
-            transparent 1px,
-            transparent 3px
-          );
-        background-size:
-          40px 40px,
-          40px 40px,
-          100% 3px;
+          linear-gradient(90deg, rgba(167, 139, 250, 0.04) 1px, transparent 1px);
+        background-size: 40px 40px;
         background-position: center top;
+        mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 40%, transparent 100%);
+        -webkit-mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 40%, transparent 100%);
       }
       body::after {
         content: '';
@@ -111,18 +103,26 @@
       /* ---------- ASCII banner (block font) ---------- */
       .banner {
         position: relative;
-        margin: 20px 0 18px;
+        margin: 8px 0 18px;
         overflow: hidden;
+        color: var(--accent-hot);
+        font-weight: 700;
+        line-height: 0.9;
+        letter-spacing: 0;
+        font-size: clamp(6px, 1.55vw, 15px);
+        text-shadow:
+          0 1px 0 #8b5cf6,
+          0 2px 0 #7c3aed,
+          0 3px 0 #6d28d9,
+          0 4px 0 #5b21b6,
+          0 5px 0 #4c1d95,
+          0 6px 24px rgba(139, 92, 246, 0.45);
       }
       .banner pre {
         display: inline-block;
         font-family: var(--font-mono);
         white-space: pre;
-        font-weight: 700;
-        font-size: clamp(8px, 1.3vw, 14px);
-        line-height: 1.15;
-        color: var(--accent);
-        text-shadow: 0 0 16px rgba(167, 139, 250, 0.3);
+        font-weight: 800;
       }
 
       /* ---------- Tab nav ---------- */
@@ -432,18 +432,25 @@
           padding: 24px 14px 64px;
         }
       }
+      /* Banner gradient */
+      .banner pre {
+        background: linear-gradient(180deg, #fff, var(--accent));
+        -webkit-background-clip: text;
+        color: transparent;
+        text-shadow: none;
+      }
     </style>
   </head>
   <body>
     <div class="shell">
       <div class="banner" aria-label="ZEROKEY">
         <pre>
- ______             _  __
-|__  /___ _ __ ___ | |/ /___ _   _
-  / // _ \ '__/ _ \| ' // _ \ | | |
- / /|  __/ | | (_) | . \  __/ |_| |
-/____\___|_|  \___/|_|\_\___|\__, |
-                             |___/ </pre>
+███████╗███████╗██████╗  ██████╗ ██╗  ██╗███████╗██╗   ██╗
+╚══███╔╝██╔════╝██╔══██╗██╔═══██╗██║ ██╔╝██╔════╝╚██╗ ██╔╝
+  ███╔╝ █████╗  ██████╔╝██║   ██║█████╔╝ █████╗   ╚████╔╝
+ ███╔╝  ██╔══╝  ██╔══██╗██║   ██║██╔═██╗ ██╔══╝    ╚██╔╝
+███████╗███████╗██║  ██║╚██████╔╝██║  ██╗███████╗   ██║
+╚══════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝   ╚═╝</pre>
       </div>
 
       <nav class="tabs">
@@ -484,7 +491,7 @@
       </div>
       <div class="row">
         <dt>VERSION</dt>
-        <dd>0.4.0</dd>
+        <dd>0.5.0</dd>
       </div>
       <div class="row">
         <dt>LICENSE</dt>
@@ -492,11 +499,11 @@
       </div>
       <div class="row">
         <dt>RUNTIME</dt>
-        <dd>NODE.JS &gt;= 22.13 · PNPM</dd>
+        <dd>NODE.JS &gt;= 22.13.0 · PNPM 12.14.0</dd>
       </div>
       <div class="row">
         <dt>STACK</dt>
-        <dd>COMMONJS · EXPRESS 5 · NODE:SQLITE · PLAYWRIGHT · IMPIT</dd>
+        <dd>COMMONJS · EXPRESS 5 · SQLITE-PRO · PLAYWRIGHT · IMPIT</dd>
       </div>
       <div class="row">
         <dt>SELF_HOSTED</dt>

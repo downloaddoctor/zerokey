@@ -5,7 +5,7 @@
 ZeroKey is an OpenAI-compatible AI proxy server that routes chat completion requests to real browser sessions for **DeepSeek**, **Claude**, **ChatGPT**, **Qwen**, and **Inception (Mercury)** — without requiring API keys. It presents an OpenAI-compatible `/v1/chat/completions` endpoint that IDE plugins (VS Code, Terax, Opencode) can use as a drop-in replacement.
 
 **Version:** 0.5.0
-**Base URL:** `http://localhost:{PORT}` (default port: 7250, auto-increments if occupied)
+**Base URL:** `http://127.0.0.1:{PORT}` — loopback only (DNS-rebinding guard). Default port 7250; each instance claims the first free port in `[PORT, PORT+PORT_RANGE)`, or refuses with `ZEROKEY_EXACT_PORT=1`. Multiple instances share `temp/db/zerokey.db`, one port each.
 
 ---
 
@@ -20,20 +20,20 @@ The machine-readable contract is **[`openapi.json`](./openapi.json)** (OpenAPI 3
 
 **Public endpoints:**
 
-| Method | Path                   | Purpose                                           |
-| ------ | ---------------------- | ------------------------------------------------- |
-| GET    | `/`                    | API metadata + available models                   |
-| GET    | `/health`              | Health check (uptime, active user/provider/model) |
-| GET    | `/v1/models`           | List all models (OpenAI-compatible)               |
-| GET    | `/v1/models/:model`    | Get a specific model by ID                        |
-| POST   | `/v1/chat/completions` | Chat completions (SSE stream)                     |
+| Method | Path                   | Purpose                                                         |
+| ------ | ---------------------- | --------------------------------------------------------------- |
+| GET    | `/`                    | API metadata + available models                                 |
+| GET    | `/health`              | Health + persistence snapshot (uptime, session, schema_version) |
+| GET    | `/v1/models`           | List all models (OpenAI-compatible)                             |
+| GET    | `/v1/models/:model`    | Get a specific model by ID                                      |
+| POST   | `/v1/chat/completions` | Chat completions (SSE stream)                                   |
 
 ### Plain OpenAI clients (no IDE)
 
 When the request has no recognizable IDE system prompt and is not a known IDE
 utility call, ZeroKey routes to the built-in `openai` surface:
 
-- Generic tool names are passed through unchanged (identity mapping).
+- Generic tool names pass through unchanged (identity mapping).
 - The internal MHI grammar is inlined into the system prompt.
 - Whether a tool loop runs is decided by the session's `toolCalling` flag (set
   in the wizard), not by whether `tools[]` is present in the request body.
@@ -60,6 +60,8 @@ The server supports five AI providers. One is selected at startup via an interac
 - [ChatGPT](./providers/chatgpt/api.md)
 - [Qwen](./providers/qwen/api.md)
 
+There is no `providers/inception/api.md` — Inception is authless and browser-driven; see `providers/inception/`.
+
 ### Provider Selection Flow
 
 ```
@@ -68,19 +70,19 @@ server start
     → _stepProviderSelection()  → choose: deepseek | claude | chatgpt | qwen | inception
     → _stepUserLogin()          → choose existing user or create new
     → _stepSessionSelection()   → choose existing session or create new
-  → ChatRouter.mount(preSelected)
+  → buildRouter(preSelected, {db, userId, sessionName})
   → app.listen(port)
 ```
 
 ### Provider Overview
 
-| Provider  | Base URL                           | Auth Method                                        | Session Model                                                                                                                | Auto-Switch                  | Internal Ref                          |
-| --------- | ---------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ------------------------------------- |
-| DeepSeek  | `https://chat.deepseek.com/api/v0` | Browser cookies + POW challenge                    | `chatSessionId` + `parentMessageId`                                                                                          | No                           | [api.md](./providers/deepseek/api.md) |
-| Claude    | `https://claude.ai/api`            | Browser cookies + HAR headers                      | `chatSessionId` (UUID) + `parentMessageId` (UUID)                                                                            | Yes (rate-limit → next user) | [api.md](./providers/claude/api.md)   |
-| ChatGPT   | `https://chatgpt.com/backend-api`  | Browser cookies + sentinel POW                     | `chatSessionId` (conversation_id) + `parentMessageId`                                                                        | No                           | [api.md](./providers/chatgpt/api.md)  |
-| Qwen      | `https://chat.qwen.ai/api/v2`      | Browser cookies (`token=` JWT) + optional Bearer   | `chatSessionId` (chat id) + `parentMessageId`                                                                                | No                           | [api.md](./providers/qwen/api.md)     |
-| Inception | `https://chat.inceptionlabs.ai`    | None (authless); real Chromium profile, no capture | none server-side; the browser UI keeps the thread; `session.metadata.promptCount` drives summary rotation at the 47th prompt | No                           | see `AGENTS.md`                       |
+| Provider  | Base URL                           | Auth Method                                        | Session Model                                                                                          | Wait policy            | Internal Ref                          |
+| --------- | ---------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ---------------------- | ------------------------------------- |
+| DeepSeek  | `https://chat.deepseek.com/api/v0` | Browser cookies + POW challenge                    | `chatSessionId` + `parentMessageId`                                                                    | suspended (wait_until) | [api.md](./providers/deepseek/api.md) |
+| Claude    | `https://claude.ai/api`            | Browser cookies + HAR headers                      | `chatSessionId` (UUID) + `parentMessageId` (UUID)                                                      | at-limit → next user   | [api.md](./providers/claude/api.md)   |
+| ChatGPT   | `https://chatgpt.com/backend-api`  | Browser cookies + sentinel POW                     | `chatSessionId` (conversation_id) + `parentMessageId`                                                  | No                     | [api.md](./providers/chatgpt/api.md)  |
+| Qwen      | `https://chat.qwen.ai/api/v2`      | Browser cookies (`token=` JWT) + optional Bearer   | `chatSessionId` (chat id) + `parentMessageId`                                                          | daily-limit            | [api.md](./providers/qwen/api.md)     |
+| Inception | `https://chat.inceptionlabs.ai`    | None (authless); real Chromium profile, no capture | browser UI keeps the thread; `session.metadata.promptCount` drives summary rotation at the 47th prompt | none                   | see `providers/inception/`            |
 
 ---
 
@@ -88,7 +90,7 @@ server start
 
 ### Rate Limiter (`utils/rate-limiter.js`)
 
-**Algorithm:** Sliding window — 15 requests per 60 seconds per label (`DeepSeek`, `Claude`, `ChatGPT`, `Qwen`, `Inception`).
+**Algorithm:** Sliding window — 15 requests per 60 s per label (`DeepSeek`, `Claude`, `ChatGPT`, `Qwen`, `Inception`). A provider 429 sets a cooldown that overrides the normal window (`setProviderCooldown`).
 
 **Function:** `acquireSlot(label, reset)`
 
@@ -113,7 +115,7 @@ See `openapi.json` `components.schemas.ErrorCategory` for the full category enum
 - Splits on `\n`, handles partial lines
 - Parses `data:` lines as JSON
 - Detects `[DONE]` → calls `onDone`
-- 1MB buffer cap for malformed lines
+- 1 MiB line cap for malformed lines (see `utils/sse-reader.js`)
 
 ### SSE Writer (`utils/sse-writer.js`)
 
@@ -132,43 +134,48 @@ The per-request stream lifecycle (scan, flush, stop, error emission) lives in `e
 Manages cookie persistence across requests:
 
 - `seedFromHeader(cookieHeader)` → parses `Set-Cookie` / `Cookie` header
-- `captureFromFetchHeaders(headers)` → extracts `set-cookie` from response
-- `captureFromRawHeaders(rawHeaders)` → extracts from raw header array
-- `toString()` → serializes all cookies for request header
+- `captureFromFetchHeaders(headers, label)` → extracts `set-cookie` from a fetch response
+- `captureFromRawHeaders(rawHeaders, label)` → same, from a raw header array
+- `toString()` → serializes all cookies for the request header
 
 ### Tool Compiler (`engine/compiler.js`)
 
 Singleton per IDE×provider (cached in `ToolCompiler.objects`):
 
-- **`formatPrompt(messages, pipeline)`** → dispatches messages to role-specific handlers, handles file uploads via pipeline.upload, returns `{ prompt, skill }`
-- **`buildPrompt(userPrompt, pipeline)`** → prepends system instructions on new sessions (unless pipeline.haveInstructionsAPI)
+- **`uploadAndFormatPrompt(messages, pipeline)`** → slices after the last assistant, decodes data-URI uploads, dispatches role handlers, returns `{ prompt, skill }`
+- **`buildPrompt(userPrompt, pipeline)`** → prepends system instructions on a new session (unless the provider has an instructions API)
 - **`compile(compactStr, session)`** → parses MHI compact string, emits IDE-specific tool call
 - **`parse(compactStr)`** → 3-part parser: tool name, key=value pairs, repeating array groups
 - **`emit(internal, session)`** → converts internal JSON to IDE-specific tool call format
-- **`matchSkill(text, raw)`** → static — O(1) trigger-word lookup with positional param substitution
+- **`matchSkill(text, raw)`** → O(1) trigger map, plus `matchMcpTrigger` and positional `#{name}#` params`
 
 ### Stream Pipeline (`engine/pipeline.js`)
 
 Created per-request by routes — owns the SSE lifecycle:
 
-- **`setup(messages, tools, req)`** → restoreMcpInjections → formatPrompt → skill check → buildPrompt → showAvailableMcpTags
+- **`setup(messages, tools, req)`** → registerAutoMcpServers → restoreMcpInjections → reinjectEvery / reinjectAt → drift + loop-break fragments → uploadAndFormatPrompt → skill → buildPrompt
 - **`scan(text)`** → 3-state FSM (outside/toolStartFound/inTool) — parses MHI tool syntax, batches tool_calls on flush
+- **`flush()`** → inspectBatch → cross-turn loop-break → emitToolCalls
+- **`flushFinish()`** → usage fold + turnCount → one `[DONE]`
 - **`onError(error)`** → emits OpenAI-compatible error via stream
 - **`emitAndEnd(text)`** → scan + flush + stop + DONE
 
+The single `[DONE]` is deferred until the tool loop resolves (deferFinish). Intermediate assistant text is invisible to the client.
+
 ### Instructions (`engine/instructions.js`)
 
-Singleton that loads and caches system prompts:
+Singleton that loads and caches prompt fragments through `utils/bundle.js` (disk from source, embedded in the dist bundle):
 
-- **`instructions.md`** — base system prompt with tool runtime format (SYNTAX/RULES/EXTRA)
-- **`extra/*.md`** — extra prompt fragments (memory, save_workflow, summary), one per file in `engine/extra/`
-- SHA-256 hashed for cache invalidation
+- **`instructions.md`** — full agent system prompt incl. `<mhi_list>`
+- **`agent.md`** — the `<memory>` workflow (AGENTS.md read/update)
+- **`extra/*.md`** — extra fragments; each auto-registers as `$<basename>` (`loop-break`, `reminder`, `summary`, `test`, `instructions-1500`)
+- SHA-256 hashed for cache invalidation (`getExtra` caches per file; `list()` exposes hashes)
 
 ---
 
 ## User Data Schema (SQLite)
 
-Users and sessions persist in `temp/db/zerokey.db` (SQLite). Column names are snake_case; JS objects are camelCase (mapped in `core/state/users.js` and `core/state/sessions.js`). The authoritative schema is declared in JS next to each store (`SCHEMA` in `core/state/users.js` and `core/state/sessions.js`); sqlite-pro generates the DDL.
+Users and sessions persist in `temp/db/zerokey.db` (SQLite via `sqlite-pro`). Column names are snake_case; JS objects are camelCase (mapped in `core/state/users.js` and `core/state/sessions.js`). The authoritative schema is declared in JS next to each store (`SCHEMA` in `core/state/users.js` and `core/state/sessions.js`); `sqlite-pro` generates the DDL. `BASE_SCHEMA_VERSION=4` — `db.open` refuses a DB whose `meta.schema_version` exceeds it (fail-closed).
 
 | Table          | Key                          | Holds                                                                                                                                                                                                      |
 | -------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -194,19 +201,26 @@ Users and sessions persist in `temp/db/zerokey.db` (SQLite). Column names are sn
 
 ## IDE Support
 
-The tool surface is resolved per request from the system prompt fingerprint (`surfaces/registry.js` `resolveSurface` → `getIDEMapper(surface)` → `{tools, reverseMap, user, system, user, tool}`). Known surfaces: `vscode`, `copilot`, `terax`, `opencode`.
+The tool surface is resolved per request from the system prompt fingerprint (`surfaces/registry.js` `resolveSurface` → `getIDEMapper(surface)` → `{tools, reverseMap, user, system, tool}`). Surfaces are auto-discovered from `surfaces/<name>/index.js`: `vscode`, `copilot`, `terax`, `opencode`, `openai`. The `openai` surface declares `realSessionPrefix = null`, so it is never matched by fingerprint — it is the fallback.
 
-A request with no recognizable surface (e.g. an ephemeral title-generation call) defaults to `vscode` and is treated as a non-tool-calling utility call.
+Priority (see `utils/session-classifier.js`):
+
+1. Real IDE fingerprint (`resolveSurface`) → isReal: true, surface: matched
+2. IDE-internal utility (`resolveUtility`) → isReal: false (ephemeral), surface: openai
+3. Otherwise → `openai` surface, isReal: true
+
+The `openai` surface is the default for plain OpenAI SDK callers, new IDEs before a fingerprint is declared, and curl scripts. Whether a tool loop runs is decided by the session's `toolCalling` flag, not by `tools[]` presence.
 
 ---
 
 ## Graceful Shutdown
 
-On `SIGINT` / `SIGTERM`:
+On `SIGINT` / `SIGTERM` / `SIGHUP` (`server.js`):
 
-1. `users.flushAll()` / `sessions.flushAll()` — drain pending debounced writes, then close the store
-2. `server.close()` — stop accepting new connections
-3. 5-second force-kill timeout
+1. `selector.flush()` — drain pending debounced writes
+2. `app.stop()` — stop accepting new connections
+3. `cleanup()` — flush + close the store, then `startup.release(port)`
+4. `uncaughtException` logs the full stack, drains, and exits 1; `unhandledRejection` logs only
 
 ---
 

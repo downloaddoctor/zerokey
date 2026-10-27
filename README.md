@@ -70,8 +70,8 @@ OpenAI-compatible local AI proxy for **DeepSeek**, **Claude**, **ChatGPT**, **Qw
 - **OpenAI-compatible** — drop-in replacement for `/v1/models` and `/v1/chat/completions`
 - **Five providers** — DeepSeek, Claude, ChatGPT, Qwen, and Inception (Mercury) — switch at startup
 - **Streaming** — SSE response streaming for all providers
-- **Multi-IDE** — VS Code, Terax, OpenCode; the tool surface is auto-detected per request from the IDE's system prompt (no auth/API key required)
-- **Session persistence** — in-memory session tracking; flushed to disk on graceful shutdown
+- **Multi-IDE** — VS Code, Copilot, Terax, OpenCode, plus a plain-OpenAI surface; the tool surface is auto-detected per request from the system prompt (no auth/API key required)
+- **Session persistence** — SQLite at `temp/db/zerokey.db`; 250 ms debounced write-through, drained on SIGINT/SIGTERM/SIGHUP. Lifecycle data only — never prompt or response content.
 - **Tool call support** — integrated ToolCompiler translates OpenAI-style function calling into provider-compatible prompt grammar
 
 ## Quick Start
@@ -146,10 +146,11 @@ through the real web UI — no further captures needed.
 
 1. Open DevTools → Network tab
 2. Visit `claude.ai` and start a conversation
-3. Find the **StreamTimeline** request to `/claudeai-rpc/.../ConversationService/StreamTimeline`
+3. Find a `POST /claudeai-rpc/anthropic.bard.api.v1alpha.ConversationService/StreamTimeline` request (the current web client). Legacy `/api/organizations/<org>/chat_conversations/<uuid>/completion` captures also work.
 4. Right-click → Copy → Copy as fetch (Node.js) — it **must include the `cookie` header**
 5. Paste into the startup wizard
-   (legacy REST SSE is still available with `CLAUDE_TRANSPORT=completion`)
+
+Default transport is `completion` (REST SSE); the Connect-RPC path (`CLAUDE_TRANSPORT=rpc`) is opt-in and blocked on the f15 signer.
 
 ### Qwen
 
@@ -168,7 +169,7 @@ No capture needed — the site is authless. ZeroKey drives a real Chromium windo
 
 ## IDE Integration
 
-VS Code (actively tested), Terax, and OpenCode are all tested and working. There is no auth — the tool surface (VS Code, Terax, OpenCode) is detected per request from the system prompt, so just point any OpenAI-compatible client at the server. Where a client requires an "API key" field, any non-empty placeholder works.
+VS Code (actively tested), Copilot, Terax, and OpenCode are all tested and working. There is no auth — the tool surface is detected per request from the system prompt, so just point any OpenAI-compatible client at the server. A client with no recognized IDE fingerprint routes to the `openai` surface. Where a client requires an "API key" field, any non-empty placeholder works.
 
 ### VS Code — Built-in
 

@@ -1,30 +1,32 @@
-# ZeroKey v0.4.0
+# ZeroKey v0.5.0
 
 > Self-hosted, personal-use OpenAI-compatible AI proxy for DeepSeek, Claude, ChatGPT, Qwen, and Inception (Mercury). Uses your own browser session — no API keys, no shared accounts, no relay servers.
 
-ZeroKey turns a browser session you already have (DeepSeek, Claude, ChatGPT, Qwen, or Inception, logged in normally) into a local `http://localhost:7250/v1` endpoint that any OpenAI-compatible client can call — including VS Code Chat, Terax, and OpenCode. It runs entirely on your machine. There is no hosted version, no shared account pool, and no telemetry.
+ZeroKey turns a browser session you already have into a local `http://localhost:7250/v1` endpoint. Any OpenAI-compatible client can call it, including VS Code Chat, Terax, and OpenCode. It runs entirely on your machine. There is no hosted version, no shared account pool, and no telemetry.
 
 ## Is it safe?
 
-- ZeroKey does not ask for or store your password. You capture a `fetch()` request from your own browser's DevTools (Network tab) and paste it into the setup wizard — ZeroKey only ever sees the session cookie you choose to share.
-- Nothing is uploaded anywhere. Session data is written to `temp/db/zerokey.db` on your own disk (gitignored) and never leaves your machine.
-- ZeroKey does not create access, bypass authentication, or provide shared/commercial access to any provider. You use only your own account.
-- You are responsible for complying with each provider's (DeepSeek, Claude, ChatGPT, Qwen, Inception) Terms of Service — ZeroKey does not make that determination for you.
-- Source is open and inspectable: https://github.com/downloaddoctor/zerokey
+- ZeroKey does not ask for or store your password. You paste a `fetch()` captured from your own browser's DevTools; ZeroKey only sees the session cookie you choose to share.
+- Nothing is uploaded anywhere. Session state lives in `temp/db/zerokey.db` on your disk (gitignored).
+- ZeroKey does not create access, bypass authentication, or provide shared/commercial access to any provider.
+- You are responsible for complying with each provider's Terms of Service.
+- Source: https://github.com/downloaddoctor/zerokey
 - License: ZeroKey Non-Commercial License — personal use only.
 
 ## How to start (under 2 minutes)
 
-1. Install: `git clone https://github.com/downloaddoctor/zerokey.git && cd zerokey && pnpm install && pnpm start` — or download a one-click launcher (`zerokey.bat` / `zerokey.sh`) from https://github.com/downloaddoctor/zerokey/releases/latest
-2. Run the interactive wizard: pick a **Provider** (DeepSeek, Claude, ChatGPT, or Qwen), paste a `fetch()` copied from that provider's DevTools Network tab as your **User**, then pick or create a **Session**.
+1. `git clone https://github.com/downloaddoctor/zerokey.git && cd zerokey && pnpm install && pnpm start` — or download a launcher (`zerokey.bat` / `zerokey.sh`) from https://github.com/downloaddoctor/zerokey/releases/latest
+2. Run the wizard: pick a provider, paste a `fetch()` from that provider's DevTools Network tab, then pick or create a session.
 3. Point your IDE at `http://localhost:7250/v1`
 
 ## Key facts
 
-- 5 providers supported: DeepSeek, Claude, ChatGPT, Qwen, Inception (pick one per server process — restart to switch)
-- 3 IDEs supported: VS Code (built-in Chat), Terax, OpenCode — any OpenAI-compatible client works
-- OpenAI-compatible endpoints: `GET /v1/models`, `POST /v1/chat/completions` (SSE streaming)
-- Extensible: MCP tools named `mcp_<server>_<tool>` auto-register; custom skills are trigger-word + template entries in `engine/triggers.js`
+- 5 providers: DeepSeek, Claude, ChatGPT, Qwen, Inception. One per server process — restart to switch.
+- 4 IDE surfaces: VS Code, Copilot, Terax, OpenCode. Any OpenAI-compatible client works via the `openai` surface.
+- Endpoints: `GET /v1/models`, `POST /v1/chat/completions` (SSE), `GET /health`, `GET /openapi.json`, `GET /docs`
+- 14 built-in MHI tools: read, write, replace, ls, mkdir, glob, grep, cmd, cmd_bg, cmd_poll, cmd_kill, errors, fetch, view_image, todos_add, todos_set, ask
+- MCP tools named `mcp_<server>_<tool>` in `tools[]` auto-register as `$<server>`
+- Custom skills: trigger-word + MHI template entries in `engine/triggers.js`
 - No API keys, no telemetry, no hosted servers — self-hosted only
 
 ## Links

@@ -17,6 +17,7 @@ DIRECTORY
  utils/ — SSE, errors, retry, cookies, log, bundle, classifier, startup
  scripts/ — build.mjs, check-modules.js, check-prefix-drift.js
  test/ — node:test suite
+ docs/ — GitHub Pages site: index.html (human), machine.html (machine-readable index), llms.txt, logos/, favicon.svg
  temp/ — runtime only, gitignored: db/ logs/ profiles/ captures/ overflow/
 
 MODULES
@@ -128,7 +129,7 @@ DEPENDENCIES
  express@^5, impit@^0.14 (all provider HTTP via BaseAPI._client: Chrome TLS/HTTP2 fingerprint; _nodeStream wraps the WHATWG body as a Node Readable)
  playwright@^1 — DeepSeek + Inception browser transports
  prompts@^2 — startup wizard
- Runtime: node:sqlite (built-in), node:test, node:crypto
+ Runtime: node:test, node:crypto; sqlite via sqlite-pro (npm)
  Dev: eslint@^10, prettier@^3; .githooks/pre-commit runs `pnpm precommit`
 
 API
@@ -140,6 +141,7 @@ API
  POST /v1/chat/completions — SSE stream; OpenAI-compatible
  GET /docs — Swagger UI; GET /openapi.json — raw spec
  Auth: none — any non-empty API key placeholder works; loopback Host only
+ Public docs (GitHub Pages): docs/index.html (human), docs/machine.html (machine index), docs/llms.txt — no build step, plain static files; keep version/stack/provider rows in sync with package.json
  OpenCode-flavoured headers recognised: x-zerokey-session, -root-session, -message-id, -part-id, -compaction-generation (aliases x-opencode-*)
  openapi.json is hand-maintained (no generator script); keep x-reasoning-labels and x-prompt-limits in sync with providers/<name>/config.js
 
